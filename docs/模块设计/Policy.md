@@ -1,0 +1,187 @@
+﻿# Policy 模块设计
+
+## 1. 模块定位
+
+- **一句话定位**：策略引擎——把 Finding 的严重度映射为「阻断 / 警告 / 放行」动作，并应用白名单；承载 `.gitguard.yml` 的 Schema 定义与校验。
+- **所属限界上下文**：Scanning Context
+- **承担 FR**：`FR-022, FR-040, FR-041, FR-070, FR-071`
+- **承担 DR**：`DR-03`（FailClosed）、`DR-05`（硬下限：Critical 不可降级）
+- **关联 ADR**：无
+
+## 2. 输入输出契约
+
+### 2.1 输入
+
+| 来源 | 内容 |
+| --- | --- |
+| YAML 解析器 | `.gitguard.yml`（项目级） |
+| YAML 解析器 | `~/.config/gitguard/config.yml`（用户级） |
+| Detection 模块 | `IReadOnlyList<Finding>` |
+| Allowlist Store | `AllowlistEntry` 列表 |
+
+### 2.2 输出
+
+| 消费方 | 内容 |
+| --- | --- |
+| Application UseCase | `PolicyDecision { Action, IgnoredByAllowlist, Severity }` |
+| CLI 层 | 最终退出码 |
+| Audit | `PolicyOverride` 事件（若用户降级规则） |
+
+## 3. 核心规则
+
+| 规则 | 要点 |
+| --- | --- |
+| 默认映射 | `Critical → Block, High → Block, Medium → Warn, Low → Warn` |
+| 用户覆写 | 允许改映射，但 `Critical → Allow` 禁止（启动期拒绝） |
+| 禁用内置规则 | `enabled: false` 允许，但记录 `PolicyOverride` 审计 |
+| 白名单匹配 | 对单条 Finding，命中任一 AllowlistEntry 即视作 ignored（但仍记录到报告） |
+| 配置文件合并 | 项目级覆盖用户级；深度合并 map，列表则替换 |
+| Schema 版本 | `.gitguard.yml` 必须有 `version: 1`；未知版本 FailClosed |
+
+## 4. 外部依赖
+
+| 依赖 | 用途 | 失败降级 |
+| --- | --- | --- |
+| YamlDotNet | YAML 解析 | 解析失败 → FailClosed（退出码 13） |
+| SQLite（Allowlist 表） | 白名单读取 | 读失败 → FailClosed |
+
+## 5. 数据模型
+
+- `AllowlistEntry` 表见 `05-数据库设计.md` §4.3。
+- 配置文件以 `GitGuardConfig` 聚合在内存中表示：
+
+```csharp
+public sealed record GitGuardConfig(
+    int Version,
+    ScanConfig Scan,
+    LoggingConfig Logging,
+    IReadOnlyDictionary<string, RuleConfig> Rules,
+    IReadOnlyDictionary<Severity, PolicyAction> Policy,
+    ExcludeConfig Exclude,
+    PrivacyConfig Privacy);
+```
+
+## 6. 关键流程
+
+### 6.1 策略评估
+
+```mermaid
+flowchart LR
+    Findings[Findings] --> ForEach[对每一条]
+    ForEach --> Allowlist{命中 Allowlist?}
+    Allowlist -- 是 --> Ignored[action = Ignored]
+    Allowlist -- 否 --> Map{Severity → Action}
+    Map --> Block[Block / Warn]
+    Block --> Aggregate[汇总：任一 Block → 退出码 1]
+```
+
+### 6.2 配置加载
+
+```mermaid
+flowchart LR
+    UserCfg[用户 config.yml] --> Merge[合并]
+    ProjCfg[.gitguard.yml] --> Merge
+    Default[内置默认] --> Merge
+    Merge --> Validate{Validator}
+    Validate -- 版本未知 --> Fail1[退出码 13]
+    Validate -- Critical 降级为 Allow --> Fail2[退出码 13]
+    Validate -- 通过 --> Config[Immutable GitGuardConfig]
+```
+
+## 7. 配置文件 Schema（`.gitguard.yml`）
+
+> **稳定契约**：Schema 一经发布不得破坏兼容性；新字段追加时保持默认值与旧行为一致。
+
+```yaml
+version: 1
+
+scan:
+  pre_commit: true
+  pre_push: true
+  fail_closed: true
+  max_file_bytes: 1048576  # 1 MiB
+  timeout_ms: 30000
+
+logging:
+  verbose: false
+  file:
+    enabled: false
+    path: "~/.local/share/gitguard/logs/gitguard.log"
+    max_bytes: 10485760
+    max_files: 5
+
+rules:
+  secrets:
+    enabled: true
+    disabled_rules: []
+    use_gitleaks: false
+    min_entropy: 4.0
+
+  privacy:
+    enabled: true
+    disabled_rules: []
+    require_context: true
+    test_file_patterns:
+      - "**/*test*/**"
+      - "**/*spec*/**"
+      - "**/fixtures/**"
+
+  local_path:
+    enabled: true
+    disabled_rules: []
+
+  url:
+    enabled: true
+    disabled_rules: []
+
+policy:
+  critical: block   # 不可改为 allow
+  high: block
+  medium: warn
+  low: warn
+
+exclude:
+  paths:
+    - "**/bin/**"
+    - "**/obj/**"
+    - "**/node_modules/**"
+  files:
+    - "*.min.js"
+    - "*.lock"
+    - "package-lock.json"
+
+allowlist:
+  # 简单配置方式；复杂方式用 CLI 的 gitguard allowlist add
+  entries:
+    - rule_id: GGD/PRIVACY/EMAIL
+      path_pattern: "docs/example/*"
+      reason: "示例文档中的邮箱非真实用户"
+```
+
+## 8. 质量属性
+
+| 属性 | 目标 |
+| --- | --- |
+| 配置加载耗时 | ≤ 20ms |
+| Schema 版本演进向后兼容 | 所有 MINOR 版本仍能加载旧配置 |
+| 硬下限 100% 生效 | 单测 `TC-DR-05-02`（Critical→Allow 拒绝）必过 |
+
+## 9. 测试要点
+
+- [ ] 默认映射正确性。
+- [ ] Critical → Allow 被拒绝（启动期退出码 13）。
+- [ ] 白名单三条件（规则 / 路径 / 指纹）单独与组合匹配。
+- [ ] 配置合并：项目覆盖用户。
+- [ ] 未知字段：警告但不阻断（宽松解析）。
+- [ ] 未知 `version` 值：阻断。
+
+## 10. 演进与扩展位
+
+- 组织级配置 `.gitguard.org.yml`（P3）：三层合并（org > user > project 的顺序由团队管理员决定）。
+- 规则引用：允许在 YAML 中声明「启用某个来自 Gitleaks 的规则但覆写严重度」。
+
+## 11. 变更记录
+
+| 版本 | 日期 | 变更说明 |
+| --- | --- | --- |
+| 0.1.0 | 2026-10-15 | 初始化：Schema v1 + 硬下限 + 白名单三条件匹配 |
