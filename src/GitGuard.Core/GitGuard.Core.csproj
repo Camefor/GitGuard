@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 领域层：Finding / ScanRun / Policy / Allowlist / IDetector 等契约（SAD §5.1）。
+       不依赖任何其他模块，无 IO、无 Logging。 -->
+
+</Project>

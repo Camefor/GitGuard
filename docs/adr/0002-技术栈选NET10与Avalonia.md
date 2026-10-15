@@ -89,8 +89,8 @@ GitGuard 需要在开发者本机（Windows / macOS / Linux）作为 CLI 高频�
 
 ## 后续动作
 
-- [ ] 验证 `Microsoft.Data.Sqlite` 在 Native AOT 下的可用性（`GGD-0001`）。
-- [ ] 验证 `YamlDotNet` 的 trim-safe 配置或预编译模型（`GGD-0001`）。
+- [ ] 验证 `Microsoft.Data.Sqlite` 在 Native AOT 下的可用性（顺延至 `GGD-0005` 首次引入 Sqlite 时执行；`GGD-0001` 骨架期已在非桌面端项目启用 `IsAotCompatible` 分析）。
+- [ ] 验证 `YamlDotNet` 的 trim-safe 配置或预编译模型（顺延至 `GGD-0006` 首次引入规则加载时执行）。
 - [ ] 建立 CI 多平台构建矩阵（`GGD-0011`）。
 - [ ] P3 启动时锁定 Avalonia 具体 LTS 版本。
 

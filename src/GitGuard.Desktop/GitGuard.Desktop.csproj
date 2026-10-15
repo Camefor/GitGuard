@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- P3 桌面端（Avalonia）占位项目：骨架阶段仅保留模块边界（Desktop → Application）。 -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\GitGuard.Application\GitGuard.Application.csproj" />
+  </ItemGroup>
+
+</Project>

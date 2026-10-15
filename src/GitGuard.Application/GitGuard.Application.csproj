@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 应用层：ScanStaged / ScanPush / InstallHook / UninstallHook 等用例编排（SAD §5.1）。 -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\GitGuard.Core\GitGuard.Core.csproj" />
+    <ProjectReference Include="..\GitGuard.Detection\GitGuard.Detection.csproj" />
+    <ProjectReference Include="..\GitGuard.Infrastructure\GitGuard.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+<Project>
+
+  <!-- DR-01：从隐式 global using 中移除 System.Net.Http，与 BannedSymbols.txt 的命名空间封禁形成双重防线。
+       隐式 using 由 SDK 在 props 阶段注入，必须在本 targets 阶段移除才生效。 -->
+  <ItemGroup>
+    <Using Remove="System.Net.Http" />
+  </ItemGroup>
+
+</Project>

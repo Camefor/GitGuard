@@ -1,0 +1,28 @@
+<Project>
+
+  <!--
+    中央包管理（Central Package Management）。
+    ADR-0002：所有依赖固定版本，避免跨版本漂移；新增依赖必须在此登记并注明用途（13-开发规范 §11 DoD）。
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="代码分析">
+    <!-- C# 代码风格规则（docs/13-开发规范.md §2） -->
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.1.118" />
+    <!-- 代码质量与现代化检查 -->
+    <PackageVersion Include="Roslynator.Analyzers" Version="5.0.1" />
+    <!-- DR-01：禁止引用 System.Net.Http / System.Net.Sockets（见 BannedSymbols.txt） -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="测试">
+    <!-- 单元测试框架（SAD §2：xUnit v3） -->
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+    <!-- 断言库；锁定 7.x（Apache-2.0），8.x 起改为商业许可，MVP 不引入许可风险 -->
+    <PackageVersion Include="FluentAssertions" Version="7.2.2" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 基础设施层：Git CLI 调用（IGitAccess）/ SQLite 审计（IAuditStore）/ 文件系统 / 脱敏日志 Sink（SAD §5.1）。 -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\GitGuard.Core\GitGuard.Core.csproj" />
+  </ItemGroup>
+
+</Project>

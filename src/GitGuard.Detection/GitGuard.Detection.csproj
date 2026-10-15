@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 检测层：Secret / Privacy / LocalPath / Url 四类 IDetector 实现（SAD §5.1）。 -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\GitGuard.Core\GitGuard.Core.csproj" />
+  </ItemGroup>
+
+</Project>

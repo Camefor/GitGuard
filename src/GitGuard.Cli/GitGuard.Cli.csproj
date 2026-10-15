@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- CLI 层：仅允许引用 Application，禁止直接引用 Infrastructure（SAD §6，由根 Directory.Build.props 守卫拦截）。 -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>gitguard</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GitGuard.Application\GitGuard.Application.csproj" />
+  </ItemGroup>
+
+</Project>

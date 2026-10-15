@@ -138,8 +138,11 @@ GitGuard/
 │  ├─ build-aot.sh
 │  └─ hook-template.sh
 ├─ .editorconfig
-├─ Directory.Build.props          # 统一 LangVersion / Nullable / TreatWarningsAsErrors
+├─ Directory.Build.props          # 统一 LangVersion / Nullable / TreatWarningsAsErrors / Analyzer / 层边界守卫
+├─ Directory.Build.targets        # DR-01：移除隐式 System.Net.Http global using
 ├─ Directory.Packages.props       # Central Package Management
+├─ NuGet.config                   # 包源固定为 nuget.org（Package Source Mapping）
+├─ global.json                    # SDK 基线 10.0.400 + MTP 测试运行器
 └─ README.md
 ```
 

@@ -1,0 +1,53 @@
+<Project>
+
+  <!--
+    GitGuard 全仓库统一编译配置。
+    依据：docs/03-系统架构设计(SAD).md §5.1、docs/13-开发规范.md §2-§4、ADR-0001、ADR-0002。
+  -->
+
+  <!-- ===== 通用编译属性 ===== -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- ADR-0002：Native AOT 为发行形态，非桌面端项目从骨架期起保持 trim-safe 分析 -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'GitGuard.Desktop' And !$(MSBuildProjectName.EndsWith('.Tests'))">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!-- ===== 测试项目通用属性 ===== -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- ===== 代码分析器（13-开发规范 §2） ===== -->
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" />
+  </ItemGroup>
+
+  <!-- ===== 分层边界守卫（SAD §6 / ADR-0001）：Cli / Desktop 禁止直接引用 Infrastructure ===== -->
+  <Target Name="GitGuardEnforceArchitectureBoundaries" BeforeTargets="PrepareForBuild"
+          Condition="'$(MSBuildProjectName)' == 'GitGuard.Cli' Or '$(MSBuildProjectName)' == 'GitGuard.Desktop'">
+    <PropertyGroup>
+      <_GitGuardProjectReferences>@(ProjectReference)</_GitGuardProjectReferences>
+    </PropertyGroup>
+    <Error Condition="$([System.String]::Copy('$(_GitGuardProjectReferences)').Contains('GitGuard.Infrastructure'))"
+           Text="架构违规（SAD §6 / ADR-0001）：$(MSBuildProjectName) 不得直接引用 GitGuard.Infrastructure，必须经由 GitGuard.Application 访问。" />
+  </Target>
+
+</Project>

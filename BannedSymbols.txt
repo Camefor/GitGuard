@@ -1,0 +1,4 @@
+﻿// DR-01（CONTEXT.md §5）：GitGuard 必须完全本地运行，禁止访问网络。
+// 本文件由 Microsoft.CodeAnalysis.BannedApiAnalyzers 消费（RS0030），TreatWarningsAsErrors 下命中即编译失败。
+N:System.Net.Http;DR-01：禁止引用 System.Net.Http，GitGuard 不得发起任何 HTTP 访问
+N:System.Net.Sockets;DR-01：禁止引用 System.Net.Sockets，GitGuard 不得建立任何网络连接

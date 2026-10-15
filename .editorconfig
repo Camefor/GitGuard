@@ -1,0 +1,120 @@
+# GitGuard 统一编辑约定
+# 文本格式依据：docs/13-开发规范.md §12（文本文件 UTF-8 with BOM + CRLF；JSON/YAML 等现代配置按惯例）
+# C# 风格由 StyleCop / Roslynator / .NET 分析器 + TreatWarningsAsErrors 在构建期强制执行
+
+root = true
+
+# ===== 全仓库通用 =====
+[*]
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+charset = utf-8
+indent_size = 2
+
+[*.md]
+indent_size = 2
+
+[*.{sh,ps1}]
+charset = utf-8-bom
+
+# ===== C# =====
+[*.{cs,csx}]
+charset = utf-8-bom
+
+# --- using 指令 ---
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:warning
+csharp_style_namespace_declarations = file_scoped:warning
+
+# --- 排版 ---
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_parentheses = false
+csharp_prefer_braces = true:warning
+
+# --- 现代语法偏好 ---
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = true:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning
+dotnet_style_object_initializer = true:warning
+dotnet_style_collection_initializer = true:warning
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_null_propagation = true:warning
+dotnet_style_explicit_tuple_names = true:warning
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_prefer_conditional_expression_over_return = true:suggestion
+csharp_style_expression_bodied_properties = true:warning
+csharp_style_expression_bodied_accessors = true:warning
+csharp_style_expression_bodied_constructors = when_on_single_line:warning
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_operators = when_on_single_line:suggestion
+csharp_style_var_for_built_in_types = false:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_not_pattern = true:suggestion
+
+# --- 命名规则（13-开发规范 §4.1） ---
+# 私有字段：_camelCase
+dotnet_naming_rule.private_fields_underscore_camel.severity = warning
+dotnet_naming_rule.private_fields_underscore_camel.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore_camel.style = underscore_camel_case
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+
+# 常量：UPPER_SNAKE_CASE
+dotnet_naming_rule.constants_upper_snake_case.severity = warning
+dotnet_naming_rule.constants_upper_snake_case.symbols = constants
+dotnet_naming_rule.constants_upper_snake_case.style = upper_snake_case
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.upper_snake_case.capitalization = all_upper
+dotnet_naming_style.upper_snake_case.word_separator = _
+
+# 接口：I 前缀 + PascalCase
+dotnet_naming_rule.interfaces_i_prefix.severity = warning
+dotnet_naming_rule.interfaces_i_prefix.symbols = interfaces
+dotnet_naming_rule.interfaces_i_prefix.style = i_pascal_case
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.i_pascal_case.required_prefix = I
+dotnet_naming_style.i_pascal_case.capitalization = pascal_case
+
+# --- 诊断调整 ---
+dotnet_diagnostic.IDE0005.severity = warning
+# 与仓库自定义风格冲突 / 不适用于现代 C# 的 StyleCop 规则
+dotnet_diagnostic.SA1101.severity = none
+dotnet_diagnostic.SA1309.severity = none
+dotnet_diagnostic.SA1633.severity = none
+
+# ===== 测试项目 =====
+[tests/**/*.cs]
+# 测试方法命名遵循《16-测试方案》§3：<Method>_<Scenario>_<Expectation>，允许下划线
+dotnet_diagnostic.CA1707.severity = none
+# 测试项目不生成 XML 文档：关闭依赖文档模式的规则（SA 文档规则族 / IDE0005）
+dotnet_diagnostic.SA0001.severity = none
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1601.severity = none
+dotnet_diagnostic.SA1602.severity = none
+dotnet_diagnostic.IDE0005.severity = none
