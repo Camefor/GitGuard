@@ -129,14 +129,14 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| 当前任务 ID | `GGD-0001` |
+| 当前任务 ID | `GGD-0002` |
 | 当前状态 | `DONE` |
-| 当前目标 | 已完成：创建 .NET 10 解决方案与项目骨架、Directory.Build.props、.editorconfig、Directory.Packages.props、Analyzer 配置 |
-| 最后完成动作 | GGD-0001 收尾：全量构建 0 警告 0 错误、5 个测试工程全部通过、三类 Analyzer 拦截实测生效（2026-10-15） |
-| 下一步动作 | 启动 `GGD-0002`：实现 `Core.Model` 聚合（Finding / ScanRun / Policy / Allowlist 值对象），来源 DDD §3-4 |
-| 涉及文件 | `GitGuard.sln`、`src/` 与 `tests/` 全部 csproj、`Directory.Build.props`、`Directory.Build.targets`、`Directory.Packages.props`、`.editorconfig`、`stylecop.json`、`BannedSymbols.txt`、`NuGet.config`、`global.json`、`README.md` |
-| 验证结果 | `dotnet build`：0 警告 0 错误；`dotnet test`：5/5 通过；拦截实测：SA1600+CS1591（XML 文档）、RS0030（DR-01 网络封禁）、MSBuild 守卫（Cli→Infrastructure）均按预期使构建失败 |
-| 阻塞/待确认 | 无 |
+| 当前目标 | 实现 `Core.Model` 聚合与值对象：`Severity` / `ScanType` / `ScanResult` / `Fingerprint` / `SnippetMasked` / `Finding` / `ScanRun` + `Core.Policy` 的 `PolicyAction` / `PolicyDecision` / `SeverityPolicy` / `AllowlistEntry` / `AllowlistMatcher`（含 glob 匹配），来源 DDD §3-4 |
+| 最后完成动作 | GGD-0002 领域层全部实现并验证（构建 0 警告 0 错误；`dotnet test GitGuard.sln` 157/157 通过） |
+| 下一步动作 | 本次收尾提交后启动 GGD-0003：Masker / Fingerprinter / SanitizingLogger + 金丝雀 Token 单测 |
+| 涉及文件 | `src/GitGuard.Core/Domain/`、`src/GitGuard.Core/Model/`、`src/GitGuard.Core/Policy/`、`src/GitGuard.Core/GitGuardException.cs`、`tests/GitGuard.Core.Tests/`（10 个测试文件）、`.editorconfig`（规则抑制说明）、`docs/04-领域模型设计(DDD).md`（0.1.1 同步） |
+| 验证结果 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 157/157 通过（Core 新增 152 例） |
+| 阻塞/待确认 | 无。两项设计冲突已决策并回写 DDD：DDD §3.1「Clean 与 Findings 非空矛盾」采用字面语义（全部 Finding 均被 allowlist 忽略的扫描记为 Warned + ExitCode 0）；硬下限按 FR-022 表述实现，DR-05 编号不变 |
 | 最后更新 | 2026-10-15 |
 
 <!-- agent-state:end -->
@@ -147,7 +147,6 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | `GGD-0002` | `P0` | `TODO` | 实现 `Core.Model` 聚合（Finding / ScanRun / Policy / Allowlist 值对象） | 来源：DDD §3-4 / 验收：单元测试通过 |
 | [ ] | `GGD-0003` | `P0` | `TODO` | 实现 Masker / Fingerprinter / SanitizingLogger + 金丝雀 Token 单测 | 来源：DDD §6 DR-02 / 验收：TC-DR-02-01 通过 |
 | [ ] | `GGD-0004` | `P0` | `TODO` | 实现 `GitAccess`（Process 调用 Git）+ 集成测试 | 来源：SAD §5 Infrastructure / 验收：集成测试通过 |
 | [ ] | `GGD-0005` | `P0` | `TODO` | 实现 `SqliteAuditStore` + 迁移器 V001 | 来源：05-数据库设计 / 验收：写入读取集成测试 |
@@ -169,6 +168,7 @@
 | --- | --- | --- | --- | --- |
 | [x] | `GGD-INIT` | 项目文档体系初始化（CONTEXT.md、00-18 主干文档、7 份模块设计、4 份 ADR、INIT-GUIDE 完成记录） | 2026-10-15 | 所有文档写入成功；INIT-GUIDE §5 已登记；AGENT-GUIDE XX→GGD 全局替换 |
 | [x] | `GGD-0001` | 创建 .NET 10 解决方案与项目骨架（sln + 6 个 src 项目 + 5 个 tests 项目 + Analyzer + editorconfig + CPM） | 2026-10-15 | `dotnet build` 0 警告 0 错误；`dotnet test` 5/5 通过；三类 Analyzer 违规探针实测拦截成功 |
+| [x] | `GGD-0002` | 实现 `Core.Model` 聚合与 `Core.Policy` 值对象（Domain 守卫 / Fingerprint / SnippetMasked / Finding / ScanRun / SeverityPolicy / AllowlistEntry / AllowlistMatcher / GlobMatcher 等） | 2026-10-15 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 157/157 通过（Core 新增 152 例）；DDD 同步至 0.1.1 |
 
 ## 10. 取消任务
 
@@ -181,3 +181,4 @@
 - 2026-10-15 · `GGD-INIT` · 项目文档体系从零初始化完毕（18 份主干文档 + 7 份模块设计 + 4 份 ADR + CONTEXT/README/AGENT-GUIDE） · 文件写入校验：所有 Write 操作成功，无报错 · 下一步：执行 GGD-0001 创建 .NET 10 解决方案骨架
 - 2026-10-15 · `GGD-0001` · 完成 .NET 10 解决方案骨架：`GitGuard.sln`（src 六项目 + tests 五项目）、CPM 中央包管理、StyleCop/Roslynator/BannedApi 分析器、`.editorconfig`/`stylecop.json`、层边界 MSBuild 守卫、DR-01 网络命名空间封禁 · 验证：`dotnet build` 0 警告 0 错误、`dotnet test` 5/5、三类违规探针（SA1600、RS0030、层引用越界）实测拦截成功 · 关键决策：新增仓库级 `NuGet.config` 固定 nuget.org 单包源（满足 CPM 包源映射、保证 CI 一致）；`global.json` 指定 MTP 测试运行器（.NET 10 下 `dotnet test` 运行 xUnit v3 需显式启用）与 SDK 基线 10.0.400；FluentAssertions 锁定 7.2.2（8.x 起为商业许可）；xUnit v3 替代 SDK 模板默认的 v2；ADR-0002 的 Sqlite/YamlDotNet AOT 验证顺延至首次引入包的任务（GGD-0005/0006） · 未完成项：benchmarks 项目（SAD 标注可选）留待性能测试任务 · 下一步：GGD-0002
 - 2026-10-15 · `GGD-0001`（收尾） · 完成文档同步与格式统一：ADR-0001 勾选边界拦截落地、ADR-0002 两项 AOT 验证顺延至 GGD-0005/0006、SAD §5.1 结构树补充 `Directory.Build.targets`/`NuGet.config`/`global.json`；32 个改动文件统一 CRLF 与编码（.md/.cs/.sln/.txt 带 BOM，JSON/XML/editorconfig/.gitignore 无 BOM） · 验证：`dotnet build` 0 警告 0 错误、`dotnet test GitGuard.sln` 5/5 通过、文档 diff 均为内容变更无 EOL 噪音 · 环境陷阱：`dotnet test` 携带 `--nologo` 时 MTP 层误报「运行了零个测试」（exit 5，SDK 10.0.400 + xunit.v3 4.0.2），执行测试不要加该参数 · 下一步：GGD-0002
+- 2026-10-15 · `GGD-0002` · 完成领域层实现：Domain（GitGuardException / InvariantViolationException / DomainGuard / RuleIdFormat）、Model（Severity / ScanType / ScanResult / Fingerprint / SnippetMasked / Finding / ScanRun）、Policy（PolicyAction / PolicyDecision / SeverityPolicy / AllowlistEntry / AllowlistMatcher / GlobMatcher）；聚合与值对象一律经工厂方法创建并强制不变式（DR-02 / DR-03 / FR-020 / FR-022 / FR-040） · 验证：`dotnet build GitGuard.sln` 0 警告 0 错误、`dotnet test GitGuard.sln` 157/157（Core 新增 152 例领域测试） · 关键决策：`.editorconfig` 新增抑制——SA1623/1629/1642（中文 XML 文档不适用）与 CA1707/SA1310（与 13-开发规范 §4.1 的 UPPER_SNAKE_CASE 常量约定冲突）；DDD 升 0.1.1 补全派生不变式（退出码一致性 / 规范化绝对路径 / UTC / Allowlist 过期 / PolicyAction / PolicyDecision） · 环境陷阱：StyleCop 1.1.118 不识别目标类型 `new` 与集合表达式（SA1000/SA1010）；IDE0007（类型明显时用 `var`）经 EnforceCodeStyleInBuild + TreatWarningsAsErrors 升级为构建错误；lambda 内丢弃 `new` 结果触发 CA1806，改用私有工厂方法包装 · 下一步：GGD-0003

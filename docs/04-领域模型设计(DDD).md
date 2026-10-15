@@ -34,6 +34,9 @@ flowchart LR
   - `DR-02`：Finding 的 `Snippet` 必须以 `SnippetMasked` 形式存储，构造函数拒绝原文。
   - `DR-03`：若 `Result = Failed`，`ExitCode` 必须 ≥ 10 且终端输出必须有具体错误原因。
   - `Findings` 列表不可为空「同时」`Result = Clean`——相互矛盾时抛 `InvariantViolation`。
+  - `SRS FR-020`：`ExitCode` 与 `Result` 一致——`Clean / Warned ⇒ 0`，`Blocked ⇒ 1` 且至少一条 Finding，`Failed ⇒ ≥ 10`。
+  - `RepoPath` 必须是规范化的绝对路径（去除尾部分隔符）；`StartedAt` 等时间字段一律 UTC。
+  - 被 allowlist 忽略的 Finding 仍计入 `Findings`；全部 Finding 均被忽略的扫描记为 `Warned` + `ExitCode 0`（2026-10-15 决策）。
 - **生命周期**：Created → Running → (Completed | Failed | BypassDetected) → Persisted（终态）。
 - **关联聚合**：`DetectionRule`（仅通过 RuleId 引用）、`Allowlist`（仅通过 Fingerprint/Rule/Path 匹配时引用）。
 
@@ -53,6 +56,7 @@ flowchart LR
 - **不变式**：
   - 至少包含 `RuleId / PathPattern / Fingerprint` 三者之一（否则没有匹配条件）。
   - `Reason` 必填且 ≥ 5 字符。
+  - `ExpiresAt` 若存在必须晚于 `CreatedAt`；到期（`now ≥ ExpiresAt`）条目不再参与匹配。
   - 新增 / 删除需要记录 `ChangedAt` 与 `ChangedBy`（本机用户名）。
 
 ### 3.4 HookInstallation（Hook 安装聚合）
@@ -84,6 +88,8 @@ flowchart LR
 | `SnippetMasked` | `string(≤32)` | 掩码片段 | 必须包含至少 50% 的 `*`；禁止含原始敏感 token |
 | `RulePattern` | `Regex, string[]? ContextKeywords, string[]? FilePathGlobs` | 编译后 Regex | `Regex.MatchTimeout = 200ms`；禁止灾难性回溯 |
 | `ScanResult` | `Clean / Warned / Blocked / Failed` | 枚举 | `Failed ⇒ ExitCode ≥ 10` |
+| `PolicyAction` | `Allow / Warn / Block` | 枚举 | `Critical` 不允许映射为 `Allow`（硬下限，FR-022） |
+| `PolicyDecision` | `Action, IgnoredByAllowlist, Severity` | record | `IgnoredByAllowlist ⇒ Action = Allow`（FR-040） |
 | `RuleSource` | `Builtin / User / Gitleaks` | 枚举 | 记录规则来源，用于审计 |
 
 ## 5. 领域事件
@@ -172,6 +178,8 @@ flowchart LR
 | 白名单 | `AllowlistEntry` | `GitGuard.Core.Policy` |
 | 策略评估器 | `PolicyEvaluator` | `GitGuard.Core.Policy` |
 | 白名单匹配器 | `AllowlistMatcher` | `GitGuard.Core.Policy` |
+| 策略动作 | `PolicyAction`（enum） | `GitGuard.Core.Policy` |
+| 策略判定 | `PolicyDecision`（record） | `GitGuard.Core.Policy` |
 | 指纹器 | `Fingerprinter` | `GitGuard.Core.Services` |
 | 脱敏器 | `Masker` | `GitGuard.Core.Services` |
 | 检测器 | `IDetector` | `GitGuard.Core.Abstractions` |
@@ -191,3 +199,4 @@ flowchart LR
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：锁定 4 大聚合、6 条 DR、术语↔类名映射 |
+| 0.1.1 | 2026-10-15 | 与 GGD-0002 实现同步：补全 ScanRun 退出码/路径/UTC 派生不变式与 Allowlist 过期不变式；新增 PolicyAction / PolicyDecision 值对象 |

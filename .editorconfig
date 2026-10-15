@@ -107,6 +107,13 @@ dotnet_diagnostic.IDE0005.severity = warning
 dotnet_diagnostic.SA1101.severity = none
 dotnet_diagnostic.SA1309.severity = none
 dotnet_diagnostic.SA1633.severity = none
+# XML 文档用中文撰写（13-开发规范 §5）；SA16xx 强制英文句式（"Gets…"/"Initializes…"/句号结尾），不适用
+dotnet_diagnostic.SA1623.severity = none
+dotnet_diagnostic.SA1629.severity = none
+dotnet_diagnostic.SA1642.severity = none
+# 常量命名遵循 13-开发规范 §4.1 的 UPPER_SNAKE_CASE；这两条规则与下划线常量冲突
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.SA1310.severity = none
 
 # ===== 测试项目 =====
 [tests/**/*.cs]
