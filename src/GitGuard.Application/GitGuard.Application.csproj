@@ -1,6 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- 应用层：ScanStaged / ScanPush / InstallHook / UninstallHook 等用例编排（SAD §5.1）。 -->
+  <!-- 应用层：ScanStaged / ScanPush / InstallHook / UninstallHook 等用例编排 + 组合根（SAD §5.1）。 -->
+
+  <PropertyGroup>
+    <!-- YamlDotNet 静态上下文源生成器产物为 public 且不携带 XML 文档，关闭编译器的 CS1591；
+         本项目手写 public 成员的文档完整性仍由 StyleCop SA1600（error）强制 -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 配置文件 YAML 解析（FR-070 / 模块设计 Policy.md §7） -->
+    <PackageReference Include="YamlDotNet" />
+    <!-- 静态上下文源生成器：AOT 下以生成代码替代反射式类型检查（ADR-0002 后续动作） -->
+    <PackageReference Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" PrivateAssets="all" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GitGuard.Core\GitGuard.Core.csproj" />

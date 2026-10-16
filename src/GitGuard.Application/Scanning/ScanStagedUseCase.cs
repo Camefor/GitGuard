@@ -19,6 +19,7 @@ public sealed class ScanStagedUseCase
     /// <param name="auditStore">审计存储。</param>
     /// <param name="clock">时钟抽象。</param>
     /// <param name="settings">扫描设置；<see langword="null"/> 使用 <see cref="ScanSettings.Default"/>。</param>
+    /// <param name="policy">扫描级策略（映射 + 白名单）；<see langword="null"/> 使用 <see cref="ScanPolicy.Default"/>。</param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException"><paramref name="detectors"/> 为空集合。</exception>
     public ScanStagedUseCase(
@@ -26,12 +27,13 @@ public sealed class ScanStagedUseCase
         IReadOnlyList<IDetector> detectors,
         IAuditStore auditStore,
         IClock clock,
-        ScanSettings? settings = null)
+        ScanSettings? settings = null,
+        ScanPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(gitAccess);
 
         _gitAccess = gitAccess;
-        _executor = new ScanExecutor(gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default);
+        _executor = new ScanExecutor(gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default, policy);
     }
 
     /// <summary>执行暂存区扫描。</summary>

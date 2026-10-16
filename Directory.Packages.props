@@ -18,6 +18,11 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
   </ItemGroup>
 
+  <ItemGroup Label="CLI">
+    <!-- 命令行解析（ADR-0002 / SAD §2.1：CLI 框架 = System.CommandLine）；2.0 GA 起正式稳定，trim/AOT 兼容 -->
+    <PackageVersion Include="System.CommandLine" Version="2.0.13" />
+  </ItemGroup>
+
   <ItemGroup Label="存储">
     <!-- 本地审计存储（05-数据库设计 §1 / ADR-0002）；随包分发 e_sqlite3 原生库，AOT 兼容性见 ADR-0002 后续动作验证记录 -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />

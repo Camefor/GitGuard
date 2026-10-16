@@ -113,22 +113,28 @@ GitGuard/
 │  │  ├─ LocalPath/
 │  │  ├─ Url/
 │  │  └─ Adapters/                # GitleaksAdapter（P2）
-│  ├─ GitGuard.Application/       # 用例：ScanStaged / ScanPush / Install / Uninstall
+│  ├─ GitGuard.Application/       # 用例：ScanStaged / ScanPush / Install / Uninstall / Status
 │  │  ├─ Scanning/
 │  │  ├─ Hooks/
+│  │  ├─ Configuration/           # .gitguard.yml / config.yml 加载与合并（FR-070 / FR-071）
+│  │  ├─ Composition/             # GitGuardSession：Infrastructure 装配的组合根
 │  │  └─ Allowlist/
 │  ├─ GitGuard.Infrastructure/
 │  │  ├─ Git/                     # IGitAccess 实现（Process + git CLI）
 │  │  ├─ Sqlite/                  # IAuditStore 实现
 │  │  ├─ FileSystem/
 │  │  └─ Logging/                 # 带脱敏的 Sink
-│  ├─ GitGuard.Cli/               # Program.cs + System.CommandLine
+│  ├─ GitGuard.Cli/               # 入口 + System.CommandLine
+│  │  ├─ Commands/                # 命令树与子命令动作
+│  │  ├─ Reporting/               # 文本 / JSON 渲染
+│  │  └─ Logging/                 # 终端日志 + 文件 Sink
 │  └─ GitGuard.Desktop/           # Avalonia（P3，仓库中保留目录占位）
 ├─ tests/
 │  ├─ GitGuard.Core.Tests/
 │  ├─ GitGuard.Detection.Tests/
 │  ├─ GitGuard.Application.Tests/
 │  ├─ GitGuard.Infrastructure.Tests/
+│  ├─ GitGuard.Cli.Tests/         # 进程内驱动 CliApplication 的契约 / 命令链测试
 │  └─ GitGuard.E2E.Tests/         # 调起 git CLI 的集成测试
 ├─ benchmarks/
 │  └─ GitGuard.Benchmarks/        # BenchmarkDotNet（可选）
@@ -311,3 +317,4 @@ flowchart LR
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：锁定技术栈、分层、扩展点与 Native AOT 发行形态 |
+| 0.1.1 | 2026-10-16 | GGD-0009：§5.1 结构树与实现对齐——Application 补 `Configuration/`（配置加载）与 `Composition/`（`GitGuardSession` 组合根，承接「Cli 不得引用 Infrastructure」的装配职责）；Cli 补 `Commands/` / `Reporting/` / `Logging/` 子目录；tests 补 `GitGuard.Cli.Tests/` |

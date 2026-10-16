@@ -121,7 +121,20 @@
   - 项目级 `.gitguard.yml` 覆盖用户级。
   - 不存在时使用内置默认。
   - 版本字段 `version: 1` 必填；未知版本 → FailClosed。
+  - 未知字段：警告但不阻断（宽松解析），警告经 `gitguard status` 与扫描报告的 `warnings` 透出。
+  - 取值越界（`scan.max_file_bytes` / `scan.timeout_ms` / `logging.file.*` / `rules.secrets.min_entropy`）→ FailClosed（退出码 13）。
+  - `rules.secrets.use_gitleaks: true`（P2 未实现）→ FailClosed：无法兑现的开关静默忽略会构成 FailOpen。
+- **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）。
 - **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-04`
+
+### 2.12.1 `FR-071` 用户级配置
+
+- **描述**：用户级 `~/.config/gitguard/config.yml`（`PRD FR-071`，P1）。
+- **处理规则**：
+  - 与项目级配置深度合并：map 递归合并、列表整体替换；项目级优先。
+  - 文件缺失不报错（视为未配置）。
+  - 格式或取值非法与项目级同等处理（FailClosed，退出码 13）。
+- **关联测试用例**：`TC-FR-070-01`（覆盖「项目级覆盖用户级」的加载链顺序断言）
 
 ### 2.13 `FR-090` GitleaksAdapter（P2）
 
@@ -239,6 +252,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-050` | 3.5 | `模块设计/Hook.md` | `TC-FR-050-*` |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | `TC-FR-060-*` |
 | `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-*` |
+| `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01` |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-*` |
 
 ## 9. 未解问题
@@ -255,3 +269,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.0 | 2026-10-15 | 初始化：定义 20 条 FR、10+ NFR、6 条 DR 的追溯矩阵 |
 | 0.1.1 | 2026-10-16 | GGD-0007：§2.4 补充二进制文件跳过语义；§2.8 补充删除分支（`local-sha` 全零）跳过、空 stdin 无推送目标、跨 ref 提交去重与解析失败不回显输入 |
 | 0.1.2 | 2026-10-16 | GGD-0008：§2.1/§2.2 与实现对齐——`--force` 语义限定为二进制/符号链接接管；托管识别改前两行精确匹配；备份为复制且分发脚本直接调用（非 `exec`）并合并退出码（GitGuard 非零优先）；安装三阶段零半安装 + 并发锁（退出码 50）；审计记录为 upsert 状态翻转（非新增行）；补充未安装卸载退出码 5 |
+| 0.1.3 | 2026-10-16 | GGD-0009：§2.12 补充宽松解析（未知字段警告不阻断）、取值越界与 `use_gitleaks: true` 的 FailClosed 语义并标注实现落点；新增 §2.12.1 `FR-071` 用户级配置条目（原仅见于 PRD，追溯矩阵同步补行） |

@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GitGuard.Application\GitGuard.Application.csproj" />
   </ItemGroup>
 

@@ -8,6 +8,9 @@
 /// </summary>
 public sealed class SqliteException : GitGuardException
 {
+    /// <summary>错误码：审计存储失败 —— 打开 / 迁移 / 读写失败（<c>10-异常处理设计.md</c> §4 登记值，CLI 映射退出码 14）。</summary>
+    public const string AUDIT_STORE_FAILED = "AUDIT_STORE_FAILED";
+
     /// <summary>初始化 <see cref="SqliteException"/> 的实例。</summary>
     public SqliteException()
         : base("SQLite 审计存储操作失败。")

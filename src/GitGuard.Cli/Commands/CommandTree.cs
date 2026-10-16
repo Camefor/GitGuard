@@ -1,0 +1,32 @@
+﻿using System.CommandLine;
+
+namespace GitGuard.Cli.Commands;
+
+/// <summary>
+/// 命令树装配（<c>模块设计/Cli.md</c> §10）：MVP 命令集为
+/// <c>scan</c> / <c>install</c> / <c>uninstall</c> / <c>status</c> / <c>version</c>
+/// （<c>allowlist</c> / <c>audit</c> / <c>rules</c> 属 v0.2，未注册）；全局选项挂根命令并递归下发。
+/// 每次运行构建全新命令树，命令实例不跨调用共享（并行测试安全）。
+/// </summary>
+internal static class CommandTree
+{
+    /// <summary>构建根命令与全部子命令。</summary>
+    /// <param name="runtime">运行时上下文（被各命令动作闭包捕获）。</param>
+    /// <param name="globalOptions">全局选项集合（挂到根命令）。</param>
+    /// <returns>可执行的根命令。</returns>
+    /// <exception cref="ArgumentNullException">任一参数为 <see langword="null"/>。</exception>
+    internal static RootCommand Create(CliRuntime runtime, GlobalOptionSet globalOptions)
+    {
+        ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(globalOptions);
+
+        var root = new RootCommand("GitGuard：本地 Git 密钥 / 隐私泄露检测（扫描暂存区与推送范围，安装仓库 Hook）");
+        root.Subcommands.Add(ScanCommand.Create(runtime));
+        root.Subcommands.Add(InstallCommand.Create(runtime));
+        root.Subcommands.Add(UninstallCommand.Create(runtime));
+        root.Subcommands.Add(StatusCommand.Create(runtime));
+        root.Subcommands.Add(VersionCommand.Create(runtime));
+        globalOptions.AddTo(root);
+        return root;
+    }
+}

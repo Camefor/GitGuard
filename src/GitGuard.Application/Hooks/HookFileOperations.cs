@@ -57,6 +57,43 @@ internal static class HookFileOperations
         return ContainsManagedMarker(headText) ? HookFileState.ManagedScript : HookFileState.LegacyScript;
     }
 
+    /// <summary>
+    /// 读取托管标记行中的版本号（首个两行内的 <c># gitguard-managed v&lt;version&gt;</c>），供 <c>status</c> 展示 Hook 文件签名。
+    /// </summary>
+    /// <param name="hookPath">目标 Hook 绝对路径。</param>
+    /// <returns>标记行声明的版本；无标记、二进制文件或读取失败时为 <see langword="null"/>。</returns>
+    internal static string? TryReadManagedVersion(string hookPath)
+    {
+        byte[] head;
+        try
+        {
+            head = ReadHead(hookPath);
+        }
+        catch (HookException)
+        {
+            // status 为只读诊断命令：单个 Hook 不可读（权限 / 竞态删除）不阻断整体状态输出
+            return null;
+        }
+
+        if (Array.IndexOf(head, (byte)0) >= 0)
+        {
+            return null;
+        }
+
+        string[] lines = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetString(head).Split('\n');
+        int lineCount = Math.Min(lines.Length, 2);
+        for (int i = 0; i < lineCount; i++)
+        {
+            int markerIndex = lines[i].IndexOf(MANAGED_MARKER, StringComparison.Ordinal);
+            if (markerIndex >= 0)
+            {
+                return lines[i].Substring(markerIndex + MANAGED_MARKER.Length).TrimEnd('\r').Trim();
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>创建 hooks 目录（不存在时）。</summary>
     /// <param name="directory">hooks 目录绝对路径。</param>
     /// <exception cref="HookException">创建失败。</exception>

@@ -168,17 +168,18 @@ allowlist:
 
 ## 9. 测试要点
 
-- [ ] 默认映射正确性。
-- [ ] Critical → Allow 被拒绝（启动期退出码 13）。
-- [ ] 白名单三条件（规则 / 路径 / 指纹）单独与组合匹配。
-- [ ] 配置合并：项目覆盖用户。
-- [ ] 未知字段：警告但不阻断（宽松解析）。
-- [ ] 未知 `version` 值：阻断。
+- [x] 默认映射正确性（`GitGuardConfigLoaderTests.Load_NoConfigFiles_UsesBuiltinDefaults`，TC-FR-070-02）。
+- [x] Critical → Allow 被拒绝（启动期退出码 13）。
+- [x] 白名单三条件（规则 / 路径 / 指纹）单独与组合匹配（`AllowlistMatcherTests` + 加载器条目用例）。
+- [x] 配置合并：项目覆盖用户（标量覆盖、列表整体替换，TC-FR-070-01）。
+- [x] 未知字段：警告但不阻断（宽松解析；含未知顶层键与未知段落内键）。
+- [x] 未知 `version` 值：阻断（TC-FR-070-04）。
 
 ## 10. 演进与扩展位
 
 - 组织级配置 `.gitguard.org.yml`（P3）：三层合并（org > user > project 的顺序由团队管理员决定）。
 - 规则引用：允许在 YAML 中声明「启用某个来自 Gitleaks 的规则但覆写严重度」。
+- `exclude` 段落（`paths` / `files`）GGD-0009 仅解析并产生警告，消费（扫描期跳过）顺延（P2）。
 
 ## 11. 变更记录
 
@@ -187,3 +188,4 @@ allowlist:
 | 0.1.0 | 2026-10-15 | 初始化：Schema v1 + 硬下限 + 白名单三条件匹配 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：§2.1 输入契约 Detection 模块输出改为 `IAsyncEnumerable<Finding>`（ADR-0003 流式） |
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`——逐条 Finding 先查白名单（命中且未过期 → `Allow` + `IgnoredByAllowlist`），否则按 `SeverityPolicy` 映射；聚合规则：任一 `Block` → 退出码 1，仅 `Warn` → 退出码 0（§6.1 流程图同步为 `Allow + IgnoredByAllowlist`） |
+| 0.1.3 | 2026-10-16 | 与 GGD-0009 实现同步：FR-070 / FR-071 落地为 `GitGuard.Application.Configuration.GitGuardConfigLoader`（用户级 `~/.config/gitguard/config.yml` + 项目级 `.gitguard.yml`；深度合并：map 递归、列表整体替换；`version: 1` 必填；`policy.critical: allow` 硬下限；取值越界与 `use_gitleaks: true` FailClosed → 退出码 13）。新增宽松解析实现说明：反序列化忽略未知属性、由 YAML 语法树比对已知键产生警告（`warnings`）；白名单条目由配置声明时 `created_by` / `created_at` 取注入时钟与当前 OS 用户名。§9 勾选已覆盖项；§10 登记 `exclude` 消费顺延 |

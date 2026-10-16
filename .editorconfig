@@ -129,6 +129,10 @@ dotnet_diagnostic.RCS1194.severity = none
 [src/GitGuard.Core/HookException.cs]
 dotnet_diagnostic.RCS1194.severity = none
 
+# ConfigurationException 同 GitException：设计上强制携带 ErrorCode（CONFIG_INVALID → 退出码 13，10-异常处理设计 §4）。
+[src/GitGuard.Core/ConfigurationException.cs]
+dotnet_diagnostic.RCS1194.severity = none
+
 # ===== 测试项目 =====
 [tests/**/*.cs]
 # 测试方法命名遵循《16-测试方案》§3：<Method>_<Scenario>_<Expectation>，允许下划线

@@ -26,6 +26,7 @@ internal sealed class ScanExecutor
     private readonly IAuditStore _auditStore;
     private readonly IClock _clock;
     private readonly ScanSettings _settings;
+    private readonly ScanPolicy _policy;
 
     /// <summary>初始化扫描管线。</summary>
     /// <param name="gitAccess">Git 访问抽象。</param>
@@ -33,6 +34,7 @@ internal sealed class ScanExecutor
     /// <param name="auditStore">审计存储。</param>
     /// <param name="clock">时钟抽象。</param>
     /// <param name="settings">扫描设置（已合并默认值）。</param>
+    /// <param name="policy">扫描级策略（映射 + 白名单）；<see langword="null"/> 使用 <see cref="ScanPolicy.Default"/>。</param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException"><paramref name="detectors"/> 为空集合（无检测器的扫描会无意义地放行全部内容）。</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="settings"/> 的阈值非正。</exception>
@@ -41,7 +43,8 @@ internal sealed class ScanExecutor
         IReadOnlyList<IDetector> detectors,
         IAuditStore auditStore,
         IClock clock,
-        ScanSettings settings)
+        ScanSettings settings,
+        ScanPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(gitAccess);
         ArgumentNullException.ThrowIfNull(detectors);
@@ -61,6 +64,7 @@ internal sealed class ScanExecutor
         _auditStore = auditStore;
         _clock = clock;
         _settings = settings;
+        _policy = policy ?? ScanPolicy.Default;
     }
 
     /// <summary>
@@ -154,7 +158,7 @@ internal sealed class ScanExecutor
         List<Finding> findings,
         IReadOnlyList<SkippedFile> skippedFiles)
     {
-        var decisions = PolicyEvaluator.Evaluate(findings, SeverityPolicy.Default, _clock.UtcNow);
+        var decisions = PolicyEvaluator.Evaluate(findings, _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
 
         bool blocked = decisions.Values.Any(static decision => decision.Action == PolicyAction.Block);
         ScanResult result = blocked
@@ -172,7 +176,7 @@ internal sealed class ScanExecutor
     private ScanOutcome Fail(ScanType scanType, int exitCode, DateTimeOffset startedAt, long durationMs)
     {
         var decisions = PolicyEvaluator.Evaluate(
-            Array.Empty<Finding>(), SeverityPolicy.Default, _clock.UtcNow);
+            Array.Empty<Finding>(), _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
 
         var run = ScanRun.Create(_gitAccess.GetRepositoryRoot(), scanType, startedAt, durationMs, ScanResult.Failed, exitCode);
         bool auditWriteFailed = !TryPersistAudit(run, decisions);
