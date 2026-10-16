@@ -115,6 +115,12 @@ dotnet_diagnostic.SA1642.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.SA1310.severity = none
 
+# ===== 例外（按文件） =====
+# GitException 设计上强制携带 error_code（10-异常处理设计 §4 契约，Cli 依赖它映射退出码），
+# 标准异常构造器 () / (string) / (string, Exception) 允许「无码构造」，与本契约冲突，故关闭该规则。
+[src/GitGuard.Core/GitException.cs]
+dotnet_diagnostic.RCS1194.severity = none
+
 # ===== 测试项目 =====
 [tests/**/*.cs]
 # 测试方法命名遵循《16-测试方案》§3：<Method>_<Scenario>_<Expectation>，允许下划线

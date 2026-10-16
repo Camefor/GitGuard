@@ -209,7 +209,7 @@ sequenceDiagram
     App->>Git: git rev-list local..remote
     Git-->>App: 提交 SHA 列表
     loop 每个提交
-        App->>Git: git diff-tree -p -U0 <sha>
+        App->>Git: git diff-tree -p -U0 --root --no-commit-id <sha>
         Git-->>App: 差异
         App->>Det: Detect(diff)
         Det-->>App: Findings

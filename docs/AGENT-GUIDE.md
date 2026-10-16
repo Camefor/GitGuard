@@ -129,15 +129,15 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| 当前任务 ID | `GGD-0003` |
+| 当前任务 ID | `GGD-0004` |
 | 当前状态 | `DONE` |
-| 当前目标 | 实现 `Masker`（保留前后 2 字符 + 中间 `*`，≤32 字符）/ `Fingerprinter`（HMAC-SHA256 + 盐值注入）/ `SanitizingLogger`（Masker → TerminalSanitizer → PathAnonymizer 脱敏流水线）+ 金丝雀 Token 单测；来源 DDD §6 / 09-日志设计 §9.2，验收：TC-DR-02-01 通过 |
-| 最后完成动作 | GGD-0003 全部实现并验证：新增 `Core.Abstractions/ISecretRandom` 与 `Core.Services` 五个组件；Core 新增 61 例测试全部通过（含金丝雀 Token 单测） |
-| 下一步动作 | 本次收尾提交后启动 GGD-0004：实现 `GitAccess`（Process 调用 Git）+ 集成测试 |
-| 涉及文件 | `src/GitGuard.Core/Abstractions/`（ISecretRandom）、`src/GitGuard.Core/Services/`（Masker / Fingerprinter / TerminalSanitizer / PathAnonymizer / SanitizingLogger）、`tests/GitGuard.Core.Tests/`（5 个新测试文件 + TestData 金丝雀常量）、`docs/04-领域模型设计(DDD).md`（0.1.2 同步） |
-| 验证结果 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 218/218 通过（Core 新增 61 例） |
-| 阻塞/待确认 | 无。设计决策已回写 DDD 0.1.2：`Fingerprinter` 依赖由 `IClock、ISecretRandom` 修正为 `ISecretRandom`（盐生成）+ 盐值注入（`IClock` 非指纹算法所需，待 GGD-0007 使用方引入）；`Masker` 对 L<8 的短串收缩保留位数以满足 ≥50% 掩码不变式 |
-| 最后更新 | 2026-10-15 |
+| 当前目标 | 实现 `IGitAccess`（Core.Abstractions）与 `GitAccess`（Infrastructure，Process 调用 git CLI）+ 真实临时仓库集成测试；来源 SAD §5 Infrastructure / 验收：集成测试通过 |
+| 最后完成动作 | GGD-0004 全部实现并验证：`Core.GitException`（ErrorCode/ExitCode/StandardError）、`Core.Abstractions.IGitAccess`（8 方法）、`Infrastructure.Git.GitAccess`（构造期预检 + 30s 超时杀进程树 + Lazy 元数据缓存）；Infrastructure 新增 42 例真实仓库集成测试全部通过 |
+| 下一步动作 | 本次收尾提交后启动 GGD-0005：实现 `SqliteAuditStore` + 迁移器 V001（来源 05-数据库设计，验收：写入读取集成测试） |
+| 涉及文件 | `src/GitGuard.Core/GitException.cs`（新增）、`src/GitGuard.Core/Abstractions/IGitAccess.cs`（新增）、`src/GitGuard.Infrastructure/Git/GitAccess.cs`（新增）、`tests/GitGuard.Infrastructure.Tests/`（Fixture + 3 个测试文件，新增）、`tests/GitGuard.Core.Tests/GitExceptionTests.cs`（新增）、`.editorconfig`（RCS1194 文件级抑制）、`docs/02-需求规格说明书(SRS).md`、`docs/03-系统架构设计(SAD).md`、`docs/10-异常处理设计.md`（0.1.1） |
+| 验证结果 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 265/265 通过（Core 新增 5 例、Infrastructure 新增 42 例，含超时/缺失 git/非仓库/子目录/根提交等真实 git 场景） |
+| 阻塞/待确认 | 无。已定决策：非 Git 仓库预检以 `git rev-parse --show-toplevel` 判定（bare 仓库一并拒绝，GitGuard 面向开发机普通工作区）；`GitException` 置于 Core 根命名空间（10-异常处理 0.1.1 已记录）；`diff-tree` 补 `--root`/`--no-commit-id` 已回写 SRS §2.8、SAD §7.2 |
+| 最后更新 | 2026-10-16 |
 
 <!-- agent-state:end -->
 
@@ -147,7 +147,6 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | `GGD-0004` | `P0` | `TODO` | 实现 `GitAccess`（Process 调用 Git）+ 集成测试 | 来源：SAD §5 Infrastructure / 验收：集成测试通过 |
 | [ ] | `GGD-0005` | `P0` | `TODO` | 实现 `SqliteAuditStore` + 迁移器 V001 | 来源：05-数据库设计 / 验收：写入读取集成测试 |
 | [ ] | `GGD-0006` | `P0` | `TODO` | 实现四类 `IDetector` + 内置规则 YAML | 来源：模块设计/Secret.md 等 / 验收：TC-FR-021-* 通过 |
 | [ ] | `GGD-0007` | `P0` | `TODO` | 实现 `ScanStagedUseCase` / `ScanPushUseCase` | 来源：SRS §2.4-2.8 / 验收：E2E TC-FR-020-01~10 |
@@ -169,6 +168,7 @@
 | [x] | `GGD-0001` | 创建 .NET 10 解决方案与项目骨架（sln + 6 个 src 项目 + 5 个 tests 项目 + Analyzer + editorconfig + CPM） | 2026-10-15 | `dotnet build` 0 警告 0 错误；`dotnet test` 5/5 通过；三类 Analyzer 违规探针实测拦截成功 |
 | [x] | `GGD-0002` | 实现 `Core.Model` 聚合与 `Core.Policy` 值对象（Domain 守卫 / Fingerprint / SnippetMasked / Finding / ScanRun / SeverityPolicy / AllowlistEntry / AllowlistMatcher / GlobMatcher 等） | 2026-10-15 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 157/157 通过（Core 新增 152 例）；DDD 同步至 0.1.1 |
 | [x] | `GGD-0003` | 实现脱敏三件套：`Masker` / `Fingerprinter`（HMAC-SHA256 + 盐值注入）/ `SanitizingLogger`（TerminalSanitizer + PathAnonymizer）+ `ISecretRandom` 抽象 | 2026-10-15 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 218/218 通过（Core 新增 61 例，含 TC-DR-02-01 金丝雀单测）；DDD 同步至 0.1.2 |
+| [x] | `GGD-0004` | 实现 `IGitAccess` / `GitAccess`（Process 调用 git CLI）+ `GitException`（ErrorCode 契约，置于 Core）+ 真实临时仓库集成测试 | 2026-10-16 | `dotnet build GitGuard.sln` 0 警告 0 错误；`dotnet test GitGuard.sln` 265/265 通过（Core 新增 5 例、Infrastructure 新增 42 例）；SRS §2.8 / SAD §7.2 / 10-异常处理 0.1.1 同步 |
 
 ## 10. 取消任务
 
@@ -183,3 +183,4 @@
 - 2026-10-15 · `GGD-0001`（收尾） · 完成文档同步与格式统一：ADR-0001 勾选边界拦截落地、ADR-0002 两项 AOT 验证顺延至 GGD-0005/0006、SAD §5.1 结构树补充 `Directory.Build.targets`/`NuGet.config`/`global.json`；32 个改动文件统一 CRLF 与编码（.md/.cs/.sln/.txt 带 BOM，JSON/XML/editorconfig/.gitignore 无 BOM） · 验证：`dotnet build` 0 警告 0 错误、`dotnet test GitGuard.sln` 5/5 通过、文档 diff 均为内容变更无 EOL 噪音 · 环境陷阱：`dotnet test` 携带 `--nologo` 时 MTP 层误报「运行了零个测试」（exit 5，SDK 10.0.400 + xunit.v3 4.0.2），执行测试不要加该参数 · 下一步：GGD-0002
 - 2026-10-15 · `GGD-0002` · 完成领域层实现：Domain（GitGuardException / InvariantViolationException / DomainGuard / RuleIdFormat）、Model（Severity / ScanType / ScanResult / Fingerprint / SnippetMasked / Finding / ScanRun）、Policy（PolicyAction / PolicyDecision / SeverityPolicy / AllowlistEntry / AllowlistMatcher / GlobMatcher）；聚合与值对象一律经工厂方法创建并强制不变式（DR-02 / DR-03 / FR-020 / FR-022 / FR-040） · 验证：`dotnet build GitGuard.sln` 0 警告 0 错误、`dotnet test GitGuard.sln` 157/157（Core 新增 152 例领域测试） · 关键决策：`.editorconfig` 新增抑制——SA1623/1629/1642（中文 XML 文档不适用）与 CA1707/SA1310（与 13-开发规范 §4.1 的 UPPER_SNAKE_CASE 常量约定冲突）；DDD 升 0.1.1 补全派生不变式（退出码一致性 / 规范化绝对路径 / UTC / Allowlist 过期 / PolicyAction / PolicyDecision） · 环境陷阱：StyleCop 1.1.118 不识别目标类型 `new` 与集合表达式（SA1000/SA1010）；IDE0007（类型明显时用 `var`）经 EnforceCodeStyleInBuild + TreatWarningsAsErrors 升级为构建错误；lambda 内丢弃 `new` 结果触发 CA1806，改用私有工厂方法包装 · 下一步：GGD-0003
 - 2026-10-15 · `GGD-0003` · 完成脱敏组件：`Core.Abstractions/ISecretRandom`；`Core.Services` 新增 `Masker`（保留前后 2 字符 + 中间 `*`，短串按 `min(2, L/4)` 收缩以满足 SnippetMasked「≥50% 掩码」不变式）、`Fingerprinter`（HMAC-SHA256，盐 32 字节由调用方注入，`CreateSalt` 经 `ISecretRandom` 生成）、`TerminalSanitizer`（源生成正则去除 ANSI CSI 与控制字符，保留 `\n`/`\t`）、`PathAnonymizer`（SHA-256 截断 16 字符）、`SanitizingLogger`（三步流水线组合） · 验证：`dotnet build GitGuard.sln` 0 警告 0 错误、`dotnet test GitGuard.sln` 218/218（Core 新增 61 例；金丝雀 Token 全文不出现在掩码文本、指纹与组合日志行中） · 关键决策：DDD §6 `Fingerprinter` 依赖修正为 `ISecretRandom` + 盐值注入（`IClock` 非指纹算法所需，待 GGD-0007 使用方引入）；指纹算法采用 HMAC-SHA256（盐为密钥）而非朴素拼接；DDD 升 0.1.2 · 环境陷阱：StyleCop 1.1.118 不识别 C# 主构造函数（SA1009），测试替身改用普通构造函数；测试源码避免内嵌真实控制字符（ANSI 用例以 `(char)0x1B` 常量与 `\uXXXX` 转义文本构造） · 下一步：GGD-0004
+- 2026-10-16 · `GGD-0004` · 完成 Git 访问层：`Core/GitException.cs`（`ErrorCode`/`ExitCode`/`StandardError`，供 Cli 映射退出码 2/10）、`Core/Abstractions/IGitAccess.cs`（8 方法）、`Infrastructure/Git/GitAccess.cs`（构造期 `git rev-parse --show-toplevel` 预检，非仓库 → `NOT_A_GIT_REPOSITORY`；子进程以 `ArgumentList` 免 shell、UTF-8、cwd 固定为工作区根、30s 超时后杀进程树且不重试、元数据 Lazy 单进程缓存） · 集成测试：`TempGitRepository` 真实仓库夹具（本地配置中和全局身份/签名/autocrlf/hooksPath）+ 42 例（仓库预检 20 / 暂存差异 6 / 提交枚举与差异 16），真实 git 命令路径全覆盖 · 验证：`dotnet build GitGuard.sln` 0 警告 0 错误、`dotnet test GitGuard.sln` 265/265 通过（Core 新增 5 例 GitException 单测） · 关键决策：差异命令统一携带 `--no-color --no-ext-diff --no-textconv` 中和用户 diff 配置；`diff-tree` 补 `--root`（初始提交按全量新增，`TC-FR-030` 场景）与 `--no-commit-id`（纯 unified 输出）并回写 SRS §2.8 / SAD §7.2；`GitException` 置于 Core 根命名空间（Cli 不得引用 Infrastructure），10-异常处理升 0.1.1；`.editorconfig` 对 `GitException.cs` 关闭 RCS1194（强制带码构造与标准异常构造器三元组冲突） · 环境陷阱：`null!` 传参与同名重载产生 CS0121 二义性，需显式 `(string)` 转换；lambda 内丢弃 `new` 触发 CA1806（沿用工厂方法包装） · 下一步：GGD-0005

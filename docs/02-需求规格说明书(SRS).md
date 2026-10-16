@@ -85,7 +85,7 @@
 - **输入**：Git 从 stdin 传入的 `<local-ref> <local-sha> <remote-ref> <remote-sha>` 行。
 - **处理规则**：
   - 对每一行：若 `remote-sha` 全零（新分支），计算范围 `<local-sha>`；否则 `<remote-sha>..<local-sha>`。
-  - 使用 `git rev-list` 枚举提交，再逐个 `git diff-tree -p -U0 <commit>` 扫描。
+  - 使用 `git rev-list` 枚举提交，再逐个 `git diff-tree -p -U0 --root --no-commit-id <commit>` 扫描（`--root` 使初始提交按全量新增输出，避免新分支仅含根提交时漏扫；`--no-commit-id` 保证输出为纯 unified 差异）。
 - **异常处理**：Git 输入解析失败 → FailClosed；范围枚举失败 → FailClosed。
 - **关联测试用例**：`TC-FR-030-01` ~ `TC-FR-030-04`
 
