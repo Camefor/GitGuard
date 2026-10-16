@@ -61,6 +61,35 @@ public sealed class FindingTests
     }
 
     [Fact]
+    public void Restore_WithExplicitId_PreservesId()
+    {
+        var id = Guid.CreateVersion7();
+        var snippet = SnippetMasked.Create("AKIA****************");
+
+        var finding = Finding.Restore(id, "GGD/SECRET/AWS-AKID", "src/appsettings.json", 18, Severity.Critical, TestData.SampleFingerprint, snippet);
+
+        finding.Id.Should().Be(id);
+        finding.RuleId.Should().Be("GGD/SECRET/AWS-AKID");
+        finding.CommitSha.Should().BeNull();
+    }
+
+    [Fact]
+    public void Restore_EmptyId_Throws()
+    {
+        Action act = () => Finding.Restore(Guid.Empty, "GGD/SECRET/AWS-AKID", "src/appsettings.json", 18, Severity.Critical, TestData.SampleFingerprint, SnippetMasked.Create("AKIA****************"));
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*DDD §3.1*");
+    }
+
+    [Fact]
+    public void Restore_InvalidRuleId_Throws()
+    {
+        Action act = () => Finding.Restore(Guid.CreateVersion7(), "secret/AWS", "src/appsettings.json", 18, Severity.Critical, TestData.SampleFingerprint, SnippetMasked.Create("AKIA****************"));
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*DDD §3.2*");
+    }
+
+    [Fact]
     public void Create_WhitespaceFilePath_Throws()
     {
         Action act = () => TestData.CreateFinding(filePath: "   ");

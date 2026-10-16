@@ -6,4 +6,14 @@
     <ProjectReference Include="..\GitGuard.Core\GitGuard.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- ADR-0002：SQLite via Microsoft.Data.Sqlite（EF Core 不引入，迁移器自写：05-数据库设计 §6） -->
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 迁移脚本随程序集内嵌（05-数据库设计 §6：Sqlite/Migrations/VNNN_<description>.sql） -->
+    <EmbeddedResource Include="Sqlite\Migrations\*.sql" />
+  </ItemGroup>
+
 </Project>

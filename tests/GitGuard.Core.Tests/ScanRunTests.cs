@@ -254,4 +254,31 @@ public sealed class ScanRunTests
         first.Equals(first).Should().BeTrue();
         first.Should().NotBe(second);
     }
+
+    [Fact]
+    public void Restore_WithExplicitId_PreservesId()
+    {
+        var id = Guid.CreateVersion7();
+
+        var run = ScanRun.Restore(id, TestData.SampleRepoPath, ScanType.PreCommit, TestData.SampleUtcNow, 12, ScanResult.Clean, 0);
+
+        run.Id.Should().Be(id);
+        run.Result.Should().Be(ScanResult.Clean);
+    }
+
+    [Fact]
+    public void Restore_EmptyId_Throws()
+    {
+        Action act = () => ScanRun.Restore(Guid.Empty, TestData.SampleRepoPath, ScanType.PreCommit, TestData.SampleUtcNow, 12, ScanResult.Clean, 0);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*DDD §3.1*");
+    }
+
+    [Fact]
+    public void Restore_BlockedWithoutFindings_Throws()
+    {
+        Action act = () => ScanRun.Restore(Guid.CreateVersion7(), TestData.SampleRepoPath, ScanType.PreCommit, TestData.SampleUtcNow, 12, ScanResult.Blocked, 1);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*DDD §3.1*");
+    }
 }

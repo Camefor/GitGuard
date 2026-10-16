@@ -73,11 +73,38 @@ public sealed class Finding : IEquatable<Finding>
         Severity severity,
         Fingerprint fingerprint,
         SnippetMasked snippetMasked,
+        string? commitSha = null) =>
+        Restore(Guid.CreateVersion7(), ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha);
+
+    /// <summary>
+    /// 以既有身份标识重建发现项；供持久化层（<c>IAuditStore</c>）读回时还原原始 <see cref="Id"/>，
+    /// 业务代码不得用于新建。其余校验与 <see cref="Create"/> 完全一致。
+    /// </summary>
+    /// <param name="id">既有身份标识（UUIDv7，来自持久化存储）。</param>
+    /// <param name="ruleId">命中的规则 ID。</param>
+    /// <param name="filePath">相对仓库根的路径。</param>
+    /// <param name="lineNumber">1-based 行号。</param>
+    /// <param name="severity">严重度。</param>
+    /// <param name="fingerprint">由 <c>Fingerprinter</c> 产出的指纹。</param>
+    /// <param name="snippetMasked">由 <c>Masker</c> 产出的脱敏片段。</param>
+    /// <param name="commitSha">可选：所属提交 SHA（40 或 64 位十六进制）。</param>
+    /// <returns>通过全部不变式校验的发现项。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="ruleId"/> 或 <paramref name="filePath"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="InvariantViolationException">任一领域不变式被违反时抛出。</exception>
+    public static Finding Restore(
+        Guid id,
+        string ruleId,
+        string filePath,
+        int lineNumber,
+        Severity severity,
+        Fingerprint fingerprint,
+        SnippetMasked snippetMasked,
         string? commitSha = null)
     {
         ArgumentNullException.ThrowIfNull(ruleId);
         ArgumentNullException.ThrowIfNull(filePath);
 
+        DomainGuard.Require(id != Guid.Empty, "DDD §3.1", "Finding.Id 不能为空；持久化还原必须携带原始身份标识");
         DomainGuard.Require(RuleIdFormat.IsValid(ruleId), "DDD §3.2", $"规则 ID 不符合 ^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$ 契约：{ruleId}");
         DomainGuard.Require(!string.IsNullOrWhiteSpace(filePath), "DDD §4.1", "FilePath 不能为空");
         DomainGuard.Require(!Path.IsPathRooted(filePath), "DDD §4.1", $"FilePath 必须是相对仓库根的路径：{filePath}");
@@ -94,7 +121,7 @@ public sealed class Finding : IEquatable<Finding>
             DomainGuard.Require(validSha, "DDD §4.1", $"CommitSha 必须为 40 或 64 位十六进制：{commitSha}");
         }
 
-        return new Finding(Guid.CreateVersion7(), ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha);
+        return new Finding(id, ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha);
     }
 
     /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>

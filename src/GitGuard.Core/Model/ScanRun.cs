@@ -82,10 +82,37 @@ public sealed class ScanRun : IEquatable<ScanRun>
         long? durationMs,
         ScanResult result,
         int exitCode,
+        IEnumerable<Finding>? findings = null) =>
+        Restore(Guid.CreateVersion7(), repoPath, scanType, startedAt, durationMs, result, exitCode, findings);
+
+    /// <summary>
+    /// 以既有身份标识重建扫描运行；供持久化层（<c>IAuditStore</c>）读回时还原原始 <see cref="Id"/>，
+    /// 业务代码不得用于新建。其余校验与 <see cref="Create"/> 完全一致。
+    /// </summary>
+    /// <param name="id">既有身份标识（UUIDv7，来自持久化存储）。</param>
+    /// <param name="repoPath">仓库绝对路径；尾部分隔符会被规范化去除。</param>
+    /// <param name="scanType">扫描类型。</param>
+    /// <param name="startedAt">开始时间（UTC）。</param>
+    /// <param name="durationMs">耗时（毫秒），未完成时为 <see langword="null"/>。</param>
+    /// <param name="result">扫描结果。</param>
+    /// <param name="exitCode">CLI 退出码。</param>
+    /// <param name="findings">发现项列表；可为 <see langword="null"/>（等价于空列表）。</param>
+    /// <returns>通过全部不变式校验的扫描运行记录。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="repoPath"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="InvariantViolationException">任一领域不变式被违反时抛出。</exception>
+    public static ScanRun Restore(
+        Guid id,
+        string repoPath,
+        ScanType scanType,
+        DateTimeOffset startedAt,
+        long? durationMs,
+        ScanResult result,
+        int exitCode,
         IEnumerable<Finding>? findings = null)
     {
         ArgumentNullException.ThrowIfNull(repoPath);
 
+        DomainGuard.Require(id != Guid.Empty, "DDD §3.1", "ScanRun.Id 不能为空；持久化还原必须携带原始身份标识");
         DomainGuard.Require(!string.IsNullOrWhiteSpace(repoPath), "DDD §4.1", "RepoPath 不能为空");
         DomainGuard.Require(Path.IsPathRooted(repoPath), "05-数据库设计 §4.1", $"RepoPath 必须是绝对路径：{repoPath}");
         DomainGuard.Require(Enum.IsDefined(scanType), "DDD §4.2", $"未知的 ScanType 取值：{(int)scanType}");
@@ -124,7 +151,7 @@ public sealed class ScanRun : IEquatable<ScanRun>
 
         string normalizedRepoPath = Path.TrimEndingDirectorySeparator(repoPath);
 
-        return new ScanRun(Guid.CreateVersion7(), normalizedRepoPath, scanType, startedAt, durationMs, result, exitCode, items);
+        return new ScanRun(id, normalizedRepoPath, scanType, startedAt, durationMs, result, exitCode, items);
     }
 
     /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>
