@@ -37,6 +37,9 @@ internal sealed class AcceptanceHarness : IDisposable
     /// <summary>初始化隔离工作区：目录树、平台数据目录推导、Git 仓库基线配置（含 hooks 目录钉住）。</summary>
     internal AcceptanceHarness()
     {
+        // 先于任何落盘检查：跳过时（Assert.Skip 抛异常）不留下半成品目录
+        EnsureHermeticUserConfig();
+
         Root = Path.Combine(Path.GetTempPath(), "gitguard-e2e", Guid.NewGuid().ToString("N"));
         _homeDirectory = Path.Combine(Root, HOME_DIRECTORY_NAME);
         _localAppDataDirectory = Path.Combine(Root, LOCAL_APP_DATA_DIRECTORY_NAME);
@@ -51,8 +54,6 @@ internal sealed class AcceptanceHarness : IDisposable
         DataDirectory = ResolveDataDirectory();
         UserConfigDirectory = Path.Combine(_homeDirectory, ".config", "gitguard");
         AuditDatabasePath = Path.Combine(DataDirectory, "audit.db");
-
-        EnsureHermeticUserConfig();
 
         RunGitOrThrow("init", "--quiet", "--initial-branch=master");
         RunGitOrThrow("config", "user.name", "GitGuard E2E");
