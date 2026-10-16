@@ -1,0 +1,28 @@
+﻿#!/bin/sh
+# gitguard-managed v{{VERSION}}
+# This hook is managed by GitGuard. Do not edit by hand.
+# The original hook (if any) is kept next to this script as {{HOOK_NAME}}.local.bak and is called at the end.
+# To remove GitGuard hooks run: gitguard uninstall
+
+GITGUARD_BIN="{{GITGUARD_BIN}}"
+if [ ! -x "$GITGUARD_BIN" ]; then
+    echo "GitGuard: executable not found or not executable: $GITGUARD_BIN" >&2
+    exit 10
+fi
+
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+LEGACY_HOOK="$HOOK_DIR/{{HOOK_NAME}}.local.bak"
+
+GUARD_EXIT=0
+"$GITGUARD_BIN" scan --push || GUARD_EXIT=$?
+
+LEGACY_EXIT=0
+if [ -x "$LEGACY_HOOK" ]; then
+    "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+fi
+
+if [ "$GUARD_EXIT" -ne 0 ]; then
+    exit "$GUARD_EXIT"
+fi
+
+exit "$LEGACY_EXIT"

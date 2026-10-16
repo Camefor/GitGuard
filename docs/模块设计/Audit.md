@@ -15,7 +15,7 @@
 | 来源 | 内容 |
 | --- | --- |
 | `ScanStagedUseCase` / `ScanPushUseCase` / `ScanManualUseCase` | `ScanRun` + `Findings[]` |
-| `InstallHookUseCase` / `UninstallHookUseCase` | `HookInstallation` |
+| `InstallHookUseCase` / `UninstallHookUseCase` | `HookInstallation` + `HookInstalled` / `HookUninstalled` 事件（卸载附 `RestoredLegacyHook`） |
 | `AllowlistUseCase` | `AllowlistEntry` 变更 |
 | `BypassDetectionService` | `BypassEvent` |
 
@@ -32,6 +32,7 @@
 | 规则 | 要点 |
 | --- | --- |
 | 全写事务 | ScanRun + Findings 必须单事务提交；避免孤儿记录 |
+| Hook 写事务 | `hook_installations` upsert 与 `HookInstalled` / `HookUninstalled` 事件同事务提交（`SaveHookInstallation` / `SaveHookUninstallation`，GGD-0008）；`occurred_at` 安装取 `InstalledAt`、卸载取当前时刻 |
 | 脱敏强制 | `Finding.snippet_masked` 构造函数拒绝原文；写入 SQLite 前 CHECK 约束兜底 |
 | 保留期清理 | 启动期后台任务清理 180 天前数据；可通过 `audit.retention_days` 覆写 |
 | 导出脱敏 | `audit export` 必须保持脱敏，不恢复原文 |
@@ -41,7 +42,7 @@
 
 | 依赖 | 用途 | 失败降级 |
 | --- | --- | --- |
-| `Microsoft.Data.Sqlite` | SQLite 访问 | 存储层失败上抛 `SqliteException`（FailClosed，含 BUSY 退避耗尽）；扫描管线捕获后降级：扫描结果照常返回并置 `AuditWriteFailed` 标志（补写机制待后续任务） |
+| `Microsoft.Data.Sqlite` | SQLite 访问 | 存储层失败上抛 `SqliteException`（FailClosed，含 BUSY 退避耗尽）；扫描管线捕获后降级：扫描结果照常返回并置 `AuditWriteFailed` 标志（补写机制待后续任务）；Hook 安装 / 卸载用例不捕获（磁盘变更已先行生效，异常上抛由 CLI 分类映射） |
 
 ## 5. 数据模型
 
@@ -75,6 +76,24 @@ sequenceDiagram
     Store-->>App: ok
 ```
 
+### 6.3 写入 Hook 安装 / 卸载
+
+```mermaid
+sequenceDiagram
+    participant App as Install/UninstallHookUseCase
+    participant Store as SqliteAuditStore
+    participant DB
+
+    App->>Store: SaveHookInstallation(installation)
+    Store->>DB: BEGIN
+    Store->>DB: UPSERT hook_installations（status=Active，冲突刷新字段）
+    Store->>DB: INSERT audit_logs（HookInstalled，occurred_at=InstalledAt）
+    Store->>DB: COMMIT
+    Store-->>App: ok
+```
+
+> 卸载对称使用 `SaveHookUninstallation(installation, restoredLegacyHook)`：upsert 保留 `installed_at` / `version` / 备份路径并翻转为 `Uninstalled`，事件 `HookUninstalled`。Hook 用例**不捕获** `SqliteException`（FailClosed 上抛）；磁盘变更先于审计写入，审计失败时盘上脚本已生效（可能产生「已安装未留痕」，由重复安装 upsert 自然修复）。
+
 ### 6.2 启动期保留清理
 
 ```mermaid
@@ -106,6 +125,7 @@ flowchart LR
 
 ## 9. 测试要点
 
+- [x] Hook 安装 / 卸载状态行与事件同事务落库（GGD-0008：`SqliteAuditStoreHookTests` 直读校验 + `HookEndToEndTests` 真实库端到端）。
 - [ ] 金丝雀 Token 不入库（DR-02）。
 - [ ] `BUSY` 重试逻辑：3 次指数退避；仍失败则发 `AuditWriteFailed`。
 - [ ] 清理阈值生效。
@@ -124,3 +144,4 @@ flowchart LR
 | 0.1.0 | 2026-10-15 | 初始化：事务模型、保留清理、脱敏约束 |
 | 0.1.1 | 2026-10-16 | GGD-0005：`SqliteAuditStore` 落地（WAL、ScanRun + Findings + ScanCompleted 事件单事务、BUSY 3 次退避后 FailClosed）；Unix 0600 与符号链接路径拒绝（08-权限设计 §5.1/§9），Windows ACL 加固延后至 CLI 路径解析任务；`ScanRun.Restore` / `Finding.Restore` 支持读回原始身份标识 |
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：扫描管线经 `IAuditStore.SaveScanRun(run, decisions)` 单事务落库（`findings.action` 取 `PolicyDecision`）；存储层 `SqliteException` 在管线内被捕获并降级为 `AuditWriteFailed` 标志，扫描结果照常返回（§4 / §6.1） |
+| 0.1.3 | 2026-10-16 | 与 GGD-0008 实现同步：§2.1 输入补 Hook 事件；§3 新增 Hook 写事务规则；§6.3 新增 Hook 安装 / 卸载写入流程（upsert + 事件同事务，卸载 `RestoredLegacyHook` 载荷，Hook 用例不捕获 `SqliteException`）；§4 降级列补 Hook 场景；§9 勾选 Hook 事务测试项 |

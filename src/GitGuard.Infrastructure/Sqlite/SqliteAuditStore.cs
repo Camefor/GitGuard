@@ -100,6 +100,46 @@ public sealed class SqliteAuditStore : IAuditStore
         return ExecuteWithBusyRetry("查询最近扫描", connection => SelectRecentScanRuns(connection, normalizedRepoPath, limit));
     }
 
+    /// <inheritdoc />
+    public void SaveHookInstallation(HookInstallation installation)
+    {
+        ArgumentNullException.ThrowIfNull(installation);
+
+        ExecuteWithBusyRetry("写入 Hook 安装记录", connection =>
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            UpsertHookInstallation(connection, transaction, installation, preserveExisting: false);
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "Hook",
+                "HookInstalled",
+                BuildHookInstalledPayload(installation),
+                installation.InstalledAt);
+            transaction.Commit();
+        });
+    }
+
+    /// <inheritdoc />
+    public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook)
+    {
+        ArgumentNullException.ThrowIfNull(installation);
+
+        ExecuteWithBusyRetry("写入 Hook 卸载记录", connection =>
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            UpsertHookInstallation(connection, transaction, installation, preserveExisting: true);
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "Hook",
+                "HookUninstalled",
+                BuildHookUninstalledPayload(installation, restoredLegacyHook),
+                DateTimeOffset.UtcNow);
+            transaction.Commit();
+        });
+    }
+
     private static TimeSpan[] ResolveBusyRetryDelays(IReadOnlyList<TimeSpan>? delays)
     {
         if (delays is null)
@@ -200,16 +240,93 @@ public sealed class SqliteAuditStore : IAuditStore
         SqliteConnection connection,
         SqliteTransaction transaction,
         ScanRun run,
-        IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions)
+        IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions) =>
+        InsertAuditEvent(
+            connection,
+            transaction,
+            "Scan",
+            "ScanCompleted",
+            BuildScanCompletedPayload(run, findingDecisions),
+            DateTimeOffset.UtcNow);
+
+    private static void InsertAuditEvent(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string category,
+        string eventType,
+        string payloadJson,
+        DateTimeOffset occurredAt)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText =
             "INSERT INTO audit_logs (occurred_at, category, event_type, payload_json) " +
-            "VALUES ($occurred_at, 'Scan', 'ScanCompleted', $payload_json);";
-        command.Parameters.AddWithValue("$occurred_at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-        command.Parameters.AddWithValue("$payload_json", BuildScanCompletedPayload(run, findingDecisions));
+            "VALUES ($occurred_at, $category, $event_type, $payload_json);";
+        command.Parameters.AddWithValue("$occurred_at", occurredAt.ToUnixTimeMilliseconds());
+        command.Parameters.AddWithValue("$category", category);
+        command.Parameters.AddWithValue("$event_type", eventType);
+        command.Parameters.AddWithValue("$payload_json", payloadJson);
         command.ExecuteNonQuery();
+    }
+
+    private static void UpsertHookInstallation(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        HookInstallation installation,
+        bool preserveExisting)
+    {
+        // 卸载（FR-011 / 05-数据库设计 §7）：行已存在时仅翻转状态，保留首次安装的 installed_at / version / 备份路径；
+        // 安装（FR-010）：刷新为本次安装的字段并置 Active
+        string sql = preserveExisting
+            ? "INSERT INTO hook_installations (repo_path, hook_type, installed_at, version, original_hook_backup_path, status) " +
+              "VALUES ($repo_path, $hook_type, $installed_at, $version, $backup_path, 'Uninstalled') " +
+              "ON CONFLICT (repo_path, hook_type) DO UPDATE SET status = 'Uninstalled';"
+            : "INSERT INTO hook_installations (repo_path, hook_type, installed_at, version, original_hook_backup_path, status) " +
+              "VALUES ($repo_path, $hook_type, $installed_at, $version, $backup_path, 'Active') " +
+              "ON CONFLICT (repo_path, hook_type) DO UPDATE SET " +
+              "installed_at = excluded.installed_at, version = excluded.version, " +
+              "original_hook_backup_path = excluded.original_hook_backup_path, status = 'Active';";
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$repo_path", installation.RepoPath);
+        command.Parameters.AddWithValue("$hook_type", installation.HookType.ToHookName());
+        command.Parameters.AddWithValue("$installed_at", installation.InstalledAt.ToUnixTimeMilliseconds());
+        command.Parameters.AddWithValue("$version", installation.Version);
+        command.Parameters.AddWithValue("$backup_path", (object?)installation.OriginalHookBackupPath ?? DBNull.Value);
+        command.ExecuteNonQuery();
+    }
+
+    private static string BuildHookInstalledPayload(HookInstallation installation)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("RepoPath", installation.RepoPath);
+            writer.WriteString("HookType", installation.HookType.ToHookName());
+            writer.WriteString("Version", installation.Version);
+            writer.WriteBoolean("HadLegacyHook", installation.OriginalHookBackupPath is not null);
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static string BuildHookUninstalledPayload(HookInstallation installation, bool restoredLegacyHook)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("RepoPath", installation.RepoPath);
+            writer.WriteString("HookType", installation.HookType.ToHookName());
+            writer.WriteBoolean("RestoredLegacyHook", restoredLegacyHook);
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private static string BuildScanCompletedPayload(ScanRun run, IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions)

@@ -8,4 +8,14 @@
     <ProjectReference Include="..\GitGuard.Infrastructure\GitGuard.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Hook 分发脚本模板随程序集嵌入（ADR-0004：单文件发行不做外部文件依赖）；
+         LogicalName 固定资源名，与 HookScriptBuilder 的读取键一一对应。
+         WithCulture=false 必需：MSBuild 把文件名中的 .sh 段识别为区域代码（Serbo-Croatian），
+         否则资源名被剥离为 ...pre-commit.template 并被改派到附属程序集，主程序集取不到。
+         仓库内按 13-开发规范 存储（UTF-8 with BOM + CRLF），渲染时归一化为 LF + 无 BOM（POSIX sh 拒绝 BOM/CR）。 -->
+    <EmbeddedResource Include="Hooks\Templates\pre-commit.sh.template" LogicalName="GitGuard.Application.Hooks.Templates.pre-commit.sh.template" WithCulture="false" />
+    <EmbeddedResource Include="Hooks\Templates\pre-push.sh.template" LogicalName="GitGuard.Application.Hooks.Templates.pre-push.sh.template" WithCulture="false" />
+  </ItemGroup>
+
 </Project>

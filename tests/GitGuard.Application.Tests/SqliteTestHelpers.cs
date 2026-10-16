@@ -34,6 +34,15 @@ internal static class SqliteTestHelpers
         return values;
     }
 
+    /// <summary>读取单行单列整数值。</summary>
+    internal static long ReadScalarLong(SqliteConnection connection, string commandText)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        object? value = command.ExecuteScalar();
+        return value is long number ? number : throw new InvalidOperationException($"查询未返回整数：{commandText}");
+    }
+
     /// <summary>读取单行单列文本值。</summary>
     internal static string ReadScalarString(SqliteConnection connection, string commandText)
     {

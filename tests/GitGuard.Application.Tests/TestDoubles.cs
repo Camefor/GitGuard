@@ -12,17 +12,20 @@ internal sealed class FakeGitAccess : IGitAccess
     private readonly Func<string> _stagedDiff;
     private readonly Func<string, IReadOnlyList<string>> _listCommitShas;
     private readonly Func<string, string> _commitDiff;
+    private readonly string? _hooksPath;
 
     internal FakeGitAccess(
         string repositoryRoot,
         Func<string>? stagedDiff = null,
         Func<string, IReadOnlyList<string>>? listCommitShas = null,
-        Func<string, string>? commitDiff = null)
+        Func<string, string>? commitDiff = null,
+        string? hooksPath = null)
     {
         RepositoryRoot = repositoryRoot;
         _stagedDiff = stagedDiff ?? (() => string.Empty);
         _listCommitShas = listCommitShas ?? (_ => Array.Empty<string>());
         _commitDiff = commitDiff ?? (_ => string.Empty);
+        _hooksPath = hooksPath;
     }
 
     internal string RepositoryRoot { get; }
@@ -37,7 +40,7 @@ internal sealed class FakeGitAccess : IGitAccess
 
     public string GetGitCommonDirectory() => Path.Combine(RepositoryRoot, ".git");
 
-    public string? GetConfiguredHooksPath() => null;
+    public string? GetConfiguredHooksPath() => _hooksPath;
 
     public string GetVersion() => "git version 0.0.0-fake";
 
@@ -123,6 +126,11 @@ internal sealed class RecordingAuditStore : IAuditStore
 
     internal IReadOnlyDictionary<Finding, PolicyDecision>? LastDecisions { get; private set; }
 
+    internal List<HookInstallation> SavedHookInstallations { get; } = new List<HookInstallation>();
+
+    internal List<(HookInstallation Installation, bool RestoredLegacyHook)> SavedHookUninstallations { get; } =
+        new List<(HookInstallation, bool)>();
+
     public void SaveScanRun(ScanRun run, IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions)
     {
         SavedRuns.Add(run);
@@ -133,6 +141,11 @@ internal sealed class RecordingAuditStore : IAuditStore
 
     public IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit) =>
         SavedRuns.Where(run => run.RepoPath == repoPath).Take(limit).ToList();
+
+    public void SaveHookInstallation(HookInstallation installation) => SavedHookInstallations.Add(installation);
+
+    public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook) =>
+        SavedHookUninstallations.Add((installation, restoredLegacyHook));
 }
 
 /// <summary>测试用审计存储：写入必败，用于验证 AuditWriteFailed 降级路径（不改变扫描判定）。</summary>
@@ -144,6 +157,12 @@ internal sealed class FailingAuditStore : IAuditStore
     public ScanRun? FindScanRun(Guid runId) => null;
 
     public IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit) => Array.Empty<ScanRun>();
+
+    public void SaveHookInstallation(HookInstallation installation) =>
+        throw new SqliteException("审计写入失败（测试注入）。");
+
+    public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook) =>
+        throw new SqliteException("审计写入失败（测试注入）。");
 }
 
 /// <summary>测试用发现项构造：固定指纹盐与脱敏片段，只关注严重度 / 路径 / 提交归属。</summary>

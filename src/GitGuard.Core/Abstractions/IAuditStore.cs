@@ -36,4 +36,24 @@ public interface IAuditStore
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="limit"/> 小于 1。</exception>
     /// <exception cref="SqliteException">读取失败。</exception>
     IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit);
+
+    /// <summary>
+    /// 写入 Hook 安装记录：<c>hook_installations</c> 以 (repo_path, hook_type) 复合主键 upsert
+    /// （刷新 installed_at / version / 备份路径并置 <c>Active</c>）+ <c>HookInstalled</c> 审计事件
+    /// （category = <c>Hook</c>，08-权限设计 §7），单事务提交。
+    /// </summary>
+    /// <param name="installation">安装记录聚合（<c>DDD §5</c> 载荷：RepoPath / HookType / Version / HadLegacyHook）。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="installation"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽），调用方按 FailClosed 处理。</exception>
+    void SaveHookInstallation(HookInstallation installation);
+
+    /// <summary>
+    /// 写入 Hook 卸载结果：<c>hook_installations</c> upsert 并置 <c>Uninstalled</c>（行已存在时保留既有
+    /// installed_at / version / 备份路径，仅翻转状态，见 05-数据库设计 §7）+ <c>HookUninstalled</c> 审计事件，单事务提交。
+    /// </summary>
+    /// <param name="installation">卸载记录；行不存在时以其字段插入。</param>
+    /// <param name="restoredLegacyHook">是否还原了原有 Hook（FR-011；<c>DDD §5</c> 载荷字段 RestoredLegacyHook）。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="installation"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽），调用方按 FailClosed 处理。</exception>
+    void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook);
 }

@@ -231,18 +231,21 @@ sequenceDiagram
 
     Dev->>Cli: gitguard install
     Cli->>App: InstallHookUseCase.Execute()
+    App->>FS: 获取 <git-common-dir>/gitguard.install.lock 独占锁
     App->>FS: 读取 core.hooksPath 或 .git/hooks
-    App->>FS: 检查 pre-commit / pre-push 是否存在
-    alt 存在未托管 Hook
-        App->>FS: 备份至 <hook>.local.bak
+    App->>FS: 预检 pre-commit / pre-push（任一冲突则整体失败，零半安装）
+    alt 存在未托管文本 Hook
+        App->>FS: 复制备份至 <hook>.local.bak
         App->>FS: 写分发脚本，末尾调用备份脚本
-    else 不存在
-        App->>FS: 直接写分发脚本
+    else 不存在或已托管
+        App->>FS: 直接写 / 刷新分发脚本
     end
-    App->>DB: INSERT HookInstallation
+    App->>DB: UPSERT hook_installations（Active）+ HookInstalled 事件
     App-->>Cli: InstallResult
     Cli-->>Dev: 安装摘要
 ```
+
+> 二进制 / 符号链接 / 「遗留备份 + 非托管目标」冲突 → `HookException(UNKNOWN_HOOK_PRESENT)` 退出码 4（前者需 `--force`，后者不可接管）。
 
 ### 7.4 FailClosed 默认阻断分支
 

@@ -109,12 +109,12 @@ CLI 命令目前无需分页。`gitguard audit list` 支持 `--limit N --offset 
 
 - **用途**：在当前仓库注入 pre-commit / pre-push 分发脚本。
 - **选项**：
-  - `--force` 允许覆盖同名的 GitGuard 旧脚本。
+  - `--force` 允许接管无法安全包裹的既有 Hook（二进制 / 符号链接形态）；普通文本 Hook 自动备份包裹，无需 `--force`；「遗留 `.local.bak` + 非托管目标」冲突不可用 `--force` 绕过。
   - `--hook <name>` 仅安装某个 Hook（默认全部）。
 - **输入**：当前工作目录（必须是 Git 仓库）。
 - **输出**：安装摘要（人类可读） / JSON（`--format json`）。
-- **退出码**：0 成功；2 非 Git 仓库；3 写入权限不足；4 需要 `--force` 覆盖未知 Hook。
-- **幂等**：是（已安装再次执行只刷新版本）。
+- **退出码**：0 成功；2 非 Git 仓库；3 写入权限不足；4 目标 Hook 无法安全包裹（需 `--force` 或不可接管）；50 已有并发 install / uninstall 持锁。
+- **幂等**：是（已安装再次执行只刷新版本，不重复备份）。
 - **关联 FR**：`FR-010`。
 - **示例**：
 
@@ -124,8 +124,10 @@ gitguard install --format json
 
 ### 5.2 `gitguard uninstall` — 卸载 Hook
 
-- **选项**：`--hook <name>` 仅卸载某个 Hook。
-- **退出码**：0 成功；2 非 Git 仓库；5 未发现 GitGuard 安装记录（视作成功，返回 0 + 警告）。
+- **选项**：
+  - `--hook <name>` 仅卸载某个 Hook。
+  - `--force` 仅当备份仍存在时，允许接管被手工替换的非托管目标并还原备份。
+- **退出码**：0 成功；2 非 Git 仓库；5 未发现 GitGuard 安装痕迹（不动文件、不写审计，仅提示）；50 已有并发 install / uninstall 持锁。
 - **幂等**：是。
 - **关联 FR**：`FR-011`。
 
@@ -194,9 +196,9 @@ gitguard install --format json
 | 1 | 业务阻断 | 命中阻断级规则 | 根据报告修复或登记白名单 |
 | 2 | 环境 | 非 Git 仓库 | 在正确仓库目录中执行 |
 | 3 | 环境 | 写入权限不足 | 检查文件权限 |
-| 4 | 环境 | 需要 `--force` 覆盖未知 Hook | 确认已有 Hook 来源后加 `--force` |
-| 5 | 环境 | 未发现 GitGuard 安装 | （视作成功；仅在 `uninstall` 中出现） |
-| 6 | 环境 | Hook 存在但未被 GitGuard 托管 | 考虑 `gitguard install --force` 接管 |
+| 4 | 环境 | 目标 Hook 为二进制 / 符号链接（需 `--force`）或遗留备份冲突（不可接管） | 二进制 / 符号链接确认来源后加 `--force`；遗留备份冲突先手工清理 |
+| 5 | 环境 | 未发现 GitGuard 安装痕迹 | （非故障：无需卸载；仅在 `uninstall` 中出现） |
+| 6 | 环境 | Hook 存在但未被 GitGuard 托管 | 考虑 `gitguard install` 接管（二进制 / 符号链接需 `--force`） |
 | 10 | FailClosed | Git 命令失败 | 查看 `--verbose` 日志排查 Git 环境 |
 | 11 | FailClosed | 检测器异常 | 查看日志；配置可暂时禁用疑似规则 |
 | 12 | FailClosed | 扫描超时 | 调整 `.gitguard.yml` 中 `scan.timeout_ms` |
@@ -217,7 +219,7 @@ gitguard install --format json
 ## 8. 并发与幂等
 
 - CLI 对同一仓库同时运行多个 `scan` 时，SQLite 依赖 WAL 模式支持并发读 + 串行写；写冲突时自动重试 3 次（基础退避 50ms）。
-- `install` / `uninstall` 命令在同仓库禁止并发（通过 `.git/gitguard.install.lock` 文件锁实现）；并发第二条直接退出码 50（忙）。
+- `install` / `uninstall` 命令在同仓库禁止并发（通过 `<git-common-dir>/gitguard.install.lock` 文件锁实现，worktree 场景下各 worktree 共享同一锁）；并发第二条直接退出码 50（忙）。
 
 ## 9. 安全头与跨域
 
@@ -228,3 +230,4 @@ N/A（本地 CLI 无 HTTP）。
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：7 条顶级命令、15 条稳定退出码、JSON Schema `gitguard.scan.v1` |
+| 0.1.1 | 2026-10-16 | GGD-0008：§5.1/§5.2 与实现对齐（`--force` 语义限定为二进制 / 符号链接接管；uninstall 补充 `--force` 与退出码 5 / 50 契约）；§6 退出码 4/5/6 场景细化；§8 锁路径更正为 `<git-common-dir>/gitguard.install.lock`（worktree 共享） |

@@ -63,8 +63,9 @@ flowchart LR
 
 - **聚合根**：`HookInstallation`
 - **不变式**：
-  - 同一仓库 + Hook 类型只能有一条「有效」记录；重新安装覆盖旧记录为 `Status=Replaced`。
-  - 若原仓库有未托管 Hook，`OriginalHookBackupPath` 必填。
+  - 同一仓库 + Hook 类型仅一条记录（复合主键 `(RepoPath, HookType)`）；重新安装 upsert 刷新字段并翻转为 `Active`，卸载翻转为 `Uninstalled`（`Replaced` 为预留状态，当前实现无写入方，GGD-0008 修正原「重装覆盖旧记录为 Replaced」设想）。
+  - 若原仓库有未托管 Hook，安装时 `OriginalHookBackupPath` 记录备份文件名（与分发脚本同目录）；无原 Hook 时为 `null`。
+  - `RepoPath` 为规范化绝对路径；`InstalledAt` 为 UTC；`OriginalHookBackupPath` 非空时必须是纯文件名且以 `.local.bak` 结尾（GGD-0008）。
 
 ## 4. 实体与值对象
 
@@ -112,7 +113,7 @@ flowchart LR
 | `Fingerprinter` | 对敏感原文做 SHA-256 + Salt（HMAC-SHA256）生成 `Fingerprint`；Salt 来自用户机器的随机密钥（首次运行生成） | `ISecretRandom`（生成盐）；盐值由调用方注入 |
 | `Masker` | 把原文裁剪为 `SnippetMasked`（保留前后 2 字符，中间 `*`，总长不超 32） | - |
 | `SanitizingLogger` | 日志脱敏流水线：敏感字段经 `Masker` 掩码、文本经 `TerminalSanitizer` 去控制字符、路径经 `PathAnonymizer` 匿名化；由 Infrastructure 日志 Sink 调用 | - |
-| `HookScriptBuilder` | 根据平台生成 Hook 分发脚本（Unix sh / Windows PowerShell / Git bash） | - |
+| `HookScriptBuilder` | 根据 Hook 类型渲染 POSIX sh 分发脚本（嵌入式模板 + `{{VERSION}}` / `{{GITGUARD_BIN}}` / `{{HOOK_NAME}}` 替换，LF + 无 BOM 归一化；PowerShell 变体已撤销，GGD-0008）。实现落在 `GitGuard.Application.Hooks`（依赖嵌入资源，属应用关注点而非纯领域逻辑） | - |
 | `AllowlistMatcher` | 判断一个 Finding 是否命中白名单（三条件组合） | - |
 
 ## 7. 领域规则（DR）
@@ -155,7 +156,7 @@ flowchart LR
 
 - **规则描述**：安装不得静默覆盖已有 Hook；必须备份原文件并链式调用。
 - **适用聚合**：HookInstallation。
-- **违反处理**：`InstallHookUseCase` 在覆盖前强制检查 `# gitguard-managed` 标签；缺标签时必须备份。
+- **违反处理**：`InstallHookUseCase` 在覆盖前强制检查 `# gitguard-managed` 标记（前两行内）；缺标记的普通文本 Hook 复制备份后包裹，二进制 / 符号链接需 `--force` 才接管，遗留备份冲突一律拒绝（GGD-0008）。
 - **关联测试**：`TC-DR-05-01`（含 Husky 的仓库安装后 Husky Hook 仍被触发）。
 
 ### 7.6 `DR-06` 绕过留痕
@@ -213,3 +214,4 @@ flowchart LR
 | 0.1.2 | 2026-10-15 | 与 GGD-0003 实现同步：指纹算法定为 HMAC-SHA256（盐值由调用方注入），`Fingerprinter` 依赖修正为 `ISecretRandom`（`IClock` 待使用方引入）；`Masker` 短串保留位数细化；新增 SanitizingLogger / TerminalSanitizer / PathAnonymizer / ISecretRandom 术语 |
 | 0.1.3 | 2026-10-16 | 与 GGD-0006 实现同步：DetectionRule 成员与 `RulePattern` 值对象补入声明式校验器（`Validators`；未知名称在检测器构造期拒绝，FailClosed） |
 | 0.1.4 | 2026-10-16 | 与 GGD-0007 实现同步：`IClock` 抽象（`GitGuard.Core.Abstractions`）与 `SystemClock`（`GitGuard.Infrastructure.Time`）落地；`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`（白名单优先、过期条目不生效），§6 依赖列同步；术语表补「时钟抽象」 |
+| 0.1.5 | 2026-10-16 | 与 GGD-0008 实现同步：§3.4 修正重装语义为 upsert（`Replaced` 预留无写入方）、补备份文件名 / 路径 / UTC 约束；§6 `HookScriptBuilder` 更正为仅渲染 POSIX sh 分发脚本（撤销 PowerShell 变体），注明落地于 Application 层 |
