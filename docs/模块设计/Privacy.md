@@ -19,13 +19,13 @@
 
 ### 2.2 输出
 
-同 Secret 模块：返回 `IReadOnlyList<Finding>`。
+同 Secret 模块：返回 `IAsyncEnumerable<Finding>`（ADR-0003 流式契约）。
 
 ## 3. 核心规则
 
 | RuleId | 名称 | 严重度 | 判定要点 |
 | --- | --- | --- | --- |
-| `GGD/PRIVACY/CN-MOBILE` | 中国大陆手机号 | Medium | `(?<![\d])(1[3-9]\d{9})(?![\d])` + 上下文含 `phone|mobile|tel|手机` 或在测试文件中标签为 `fake` 则不命中 |
+| `GGD/PRIVACY/CN-MOBILE` | 中国大陆手机号 | Medium | `(?<![0-9])1[3-9][0-9]{9}(?![0-9])` + 上下文含 `phone` / `mobile` / `tel` / `手机`；测试文件路径命中降一级（Medium → Low） |
 | `GGD/PRIVACY/CN-IDCARD-18` | 18 位身份证 | High | 符合校验位的 18 位；上下文含 `id|idcard|身份证` |
 | `GGD/PRIVACY/CN-IDCARD-15` | 15 位身份证 | Medium | 格式匹配 + 上下文 |
 | `GGD/PRIVACY/CN-BANKCARD` | 银行卡号 | High | 符合 Luhn 校验 + 长度 16-19 位 |
@@ -43,24 +43,24 @@
 
 ## 5. 数据模型
 
-无独立持久化。Finding 的 `snippet_masked` 对手机号强制脱敏为 `138****5678` 风格。
+无独立持久化。Finding 的 `snippet_masked` 经 Core `Masker` 统一脱敏（保留命中值前后各 2 字符、中间 `*`，总长 ≤ 32），如手机号 `13812345678` → `13*******78`。
 
 ## 6. 关键流程
 
 ```mermaid
 flowchart LR
     Input[差异行] --> FilterPath{文件 glob 过滤}
-    FilterPath -- 测试文件 .faker, .mock, .example --> Skip[降低严重度\n从 block → warn]
+    FilterPath -- 测试文件路径 --> Skip[严重度降一级]
     FilterPath -- 普通文件 --> Match{格式匹配}
     Match -- 命中 --> Validate{校验位 + 上下文}
-    Validate -- 通过 --> Mask[特定格式脱敏：\n手机号 138****5678\n身份证 110***********0019]
+    Validate -- 通过 --> Mask[脱敏：Core Masker 统一处理]
     Mask --> Finding
     Validate -- 否 --> Skip
 ```
 
 **降级策略**：
 
-- 文件路径包含 `test`、`spec`、`fixture`、`mock`、`sample`、`example` → 严重度自动降一级（block → warn）。
+- 文件路径包含 `test`、`spec`、`fixture`、`mock`、`sample`、`example`（大小写不敏感的子串匹配）→ 严重度自动降一级。
 - 但仍保留命中记录供用户复盘。
 
 ## 7. 配置项
@@ -69,7 +69,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `rules.privacy.enabled` | bool | true | 全局开关 |
 | `rules.privacy.disabled_rules` | string[] | [] | 禁用的规则 ID |
-| `rules.privacy.test_file_patterns` | string[] | 见默认 | 哪些 glob 视为测试文件自动降级 |
+| `rules.privacy.test_file_patterns` | string[] | `["test","spec","fixture","mock","sample","example"]` | 哪些路径子串视为测试文件自动降级 |
 | `rules.privacy.require_context` | bool | true | 是否要求上下文关键字（关掉可提升召回但增加误报） |
 
 ## 8. 质量属性
@@ -98,3 +98,4 @@ flowchart LR
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：5 条 MVP 规则 + 测试文件自动降级策略 |
+| 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；CN-MOBILE 正则改用 ASCII `[0-9]`（防全角数字误报）、移除 `fake` 标签语义（改为测试文件路径降一级）；脱敏统一由 Core `Masker` 承担；`test_file_patterns` 明确为路径子串（大小写不敏感） |

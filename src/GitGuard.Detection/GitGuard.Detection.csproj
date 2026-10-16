@@ -2,8 +2,28 @@
 
   <!-- 检测层：Secret / Privacy / LocalPath / Url 四类 IDetector 实现（SAD §5.1）。 -->
 
+  <PropertyGroup>
+    <!-- YamlDotNet 静态上下文源生成器产物为 public 且不携带 XML 文档，关闭编译器的 CS1591；
+         本项目手写 public 成员的文档完整性仍由 StyleCop SA1600（error）强制 -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\GitGuard.Core\GitGuard.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 内置规则 YAML 解析（ADR-0002：配置解析 = YamlDotNet） -->
+    <PackageReference Include="YamlDotNet" />
+    <!-- 静态上下文源生成器：AOT 下以生成代码替代反射式类型检查（ADR-0002 后续动作）；
+         仅参与编译，不随产物分发 -->
+    <PackageReference Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 内置规则随程序集嵌入（ADR-0002：单文件发行，规则不做外部文件依赖）；
+         LogicalName 固定资源名，与 BuiltinRuleLoader 的读取键一一对应 -->
+    <EmbeddedResource Include="Rules\BuiltinRules.yaml" LogicalName="GitGuard.Detection.Rules.BuiltinRules.yaml" />
   </ItemGroup>
 
 </Project>

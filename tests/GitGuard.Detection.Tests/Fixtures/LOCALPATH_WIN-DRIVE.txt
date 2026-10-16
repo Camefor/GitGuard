@@ -1,0 +1,16 @@
+﻿; GGD/LOCALPATH/WIN-DRIVE（Low）：行首盘符根路径；Users 用户目录经负向先行排除，交由 WIN-USER 规则
+[positive]
+D:\projects\gitguard\src
+C:/work/repo/app.sln
+e:\temp\build.log
+
+[negative]
+path = D:\projects\app
+D:\Users\alice\app
+\\server\share\file.txt
+
+[edge]
+hit: D:\repo
+hit: Z:/data
+miss: D:\Users\share
+miss: 2:\folder

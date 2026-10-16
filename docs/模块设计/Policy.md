@@ -16,7 +16,7 @@
 | --- | --- |
 | YAML 解析器 | `.gitguard.yml`（项目级） |
 | YAML 解析器 | `~/.config/gitguard/config.yml`（用户级） |
-| Detection 模块 | `IReadOnlyList<Finding>` |
+| Detection 模块 | `IAsyncEnumerable<Finding>`（ADR-0003 流式契约） |
 | Allowlist Store | `AllowlistEntry` 列表 |
 
 ### 2.2 输出
@@ -185,3 +185,4 @@ allowlist:
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：Schema v1 + 硬下限 + 白名单三条件匹配 |
+| 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：§2.1 输入契约 Detection 模块输出改为 `IAsyncEnumerable<Finding>`（ADR-0003 流式） |

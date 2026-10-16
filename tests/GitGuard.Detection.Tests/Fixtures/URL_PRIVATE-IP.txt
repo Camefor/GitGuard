@@ -1,0 +1,17 @@
+﻿; GGD/URL/PRIVATE-IP（Medium）：RFC1918 私有网段（10/8、172.16/12、192.168/16）+ 127/8 环回
+[positive]
+host = 10.0.0.5
+db = 192.168.1.100:5432
+upstream = http://172.16.20.30:8080/api
+health = http://127.0.0.1:8080/health
+
+[negative]
+dns = 8.8.8.8
+bastion = 172.15.1.1
+legacy = 192.169.1.1
+
+[edge]
+hit: 网关 10.255.0.1 已启用
+hit: 127.0.0.2 为环回别名
+miss: 110.0.0.5
+miss: 172.32.0.1

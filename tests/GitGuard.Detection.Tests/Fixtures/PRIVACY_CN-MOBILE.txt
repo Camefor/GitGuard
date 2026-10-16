@@ -1,0 +1,16 @@
+﻿; GGD/PRIVACY/CN-MOBILE（Medium）：1[3-9] + 9 位 + 上下文（phone / mobile / tel / 手机）
+[positive]
+phone = "13812345678"
+mobile: 15900001111
+手机号：18600012222
+
+[negative]
+order_no = 13812345678
+phone = "12812345678"
+phone = "138123456789"
+
+[edge]
+hit: contact tel: 13812345678 (work)
+hit: TEL=17712345678
+miss: phone = "+8613812345678"
+miss: 身份证校验 = 13812345678901234

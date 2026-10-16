@@ -1,0 +1,16 @@
+﻿; GGD/LOCALPATH/TEMP-WORK（Low）：容器工作区 / 挂载点 / 云开发环境路径前缀
+[positive]
+mount = /workspace/volumes/cache/
+docker: /mnt/c/data/
+workdir = ~/workspace/gitguard
+
+[negative]
+/workspace/projects/app
+/mnt/Data/x
+path = ~/workspace
+
+[edge]
+hit: cd /mnt/d/logs/ && ls
+hit: tar -C ~/workspace/ -xzf pkg.tgz
+miss: /workspace/volume/
+miss: /mnt/dd/out/

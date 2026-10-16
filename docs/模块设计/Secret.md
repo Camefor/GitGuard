@@ -22,17 +22,17 @@
 
 | 消费方 | 内容 | 格式 | 异常响应 |
 | --- | --- | --- | --- |
-| `PolicyEvaluator` | `IReadOnlyList<Finding>` | Finding | 抛 `DetectionException` 由上层 FailClosed |
+| `PolicyEvaluator` | `IAsyncEnumerable<Finding>`（ADR-0003 流式契约） | Finding | 抛 `DetectionException` 由上层 FailClosed |
 
 ## 3. 核心规则（内置清单，MVP）
 
 | RuleId | 名称 | 严重度 | 判定要点 |
 | --- | --- | --- | --- |
-| `GGD/SECRET/AWS-AKID` | AWS Access Key ID | Critical | 正则 `\bAKIA[0-9A-Z]{16}\b` + 行长 ≤ 256 |
+| `GGD/SECRET/AWS-AKID` | AWS Access Key ID | Critical | 正则 `\bAKIA[0-9A-Z]{16}\b` |
 | `GGD/SECRET/AWS-SECRET` | AWS Secret（弱启发） | Critical | 40 字符高熵 Base64 + 上下文含 `aws_secret` / `secret_access_key` |
 | `GGD/SECRET/GITHUB-TOKEN` | GitHub PAT | Critical | 正则 `\bgh[pousr]_[A-Za-z0-9_]{36,}\b` |
 | `GGD/SECRET/SLACK-TOKEN` | Slack Token | High | 正则 `\bxox[baprs]-[A-Za-z0-9-]{10,}\b` |
-| `GGD/SECRET/JWT` | JWT | Medium | `^eyJ[A-Za-z0-9_-]+?\.eyJ[...]+?\.[A-Za-z0-9_-]+$` |
+| `GGD/SECRET/JWT` | JWT | Medium | `(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])` |
 | `GGD/SECRET/PRIVATE-KEY` | PEM 私钥块 | Critical | 匹配 `-----BEGIN [A-Z ]*PRIVATE KEY-----` |
 | `GGD/SECRET/GENERIC-PASSWORD` | 代码中硬编码密码 | High | 关键字 `(password|passwd|pwd)` + `=` + 引号包裹的 ≥ 6 字符值；排除 `password = args.password` 等变量赋值 |
 | `GGD/SECRET/DB-CONN-STRING` | 带密码的连接串 | High | `(Server|Host|Data Source)=...;Password=\S+` |
@@ -66,8 +66,8 @@ flowchart LR
 
 **关键细节**：
 
-- 文件扩展名过滤：`.lock`、`.min.js`、二进制扩展名跳过。
-- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（跳过 `GENERIC-PASSWORD` 这类低置信度规则）。
+- 文件后缀过滤：`.lock`、`.min.js`、`.min.css` 整文件跳过；二进制文件过滤由上游差异收集（`FR-020`）承担。
+- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY`；跳过 `GENERIC-PASSWORD` 这类低置信度规则）。
 - 熵值用来辅助判定 `AWS-SECRET`：仅在 Shannon 熵 > 4.0 时命中。
 
 ## 7. 配置项
@@ -110,3 +110,4 @@ flowchart LR
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：8 条 MVP 内置规则 + GitleaksAdapter 扩展位 |
+| 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003 流式）；AWS-AKID 移除「行长 ≤ 256」表述（长行策略统一见 §6）；JWT 正则改为边界断言式（规则按行匹配、无 Multiline，`^`/`$` 不适用）；整文件跳过后缀定为 `.lock` / `.min.js` / `.min.css`；脱敏统一由 Core `Masker` 承担 |

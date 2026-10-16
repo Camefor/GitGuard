@@ -1,0 +1,150 @@
+# GitGuard 内置规则集（MVP：21 条）
+# 依据：docs/模块设计/Secret.md §3、Privacy.md §3、LocalPathUrl.md §3；DDD §9 反模式（禁止在检测器代码中写死正则）。
+# 字段说明：
+#   id               规则 ID，必须符合 ^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$（13-开发规范 §4.1）
+#   severity         Low / Medium / High / Critical（DDD §4.2）
+#   pattern          .NET 正则；单引号 YAML 标量保持反斜杠字面量；以 200ms 超时编译（13-开发规范 §4.2）
+#   context_keywords 非空时，命中行须包含任一关键字（大小写不敏感）
+#   validators       声明式校验器：shannon-entropy / luhn / cn-id-checksum
+#   enabled          省略视为 true；禁用规则不参与扫描
+# 修改规则后必须同步 docs/模块设计/*.md 的规则表并补充 Fixtures 正负样本。
+
+version: 1
+
+rules:
+  # ===== Secret（模块设计 Secret §3） =====
+  - id: GGD/SECRET/AWS-AKID
+    name: AWS Access Key ID
+    severity: Critical
+    pattern: '\bAKIA[0-9A-Z]{16}\b'
+    enabled: true
+
+  - id: GGD/SECRET/AWS-SECRET
+    name: AWS Secret（弱启发）
+    severity: Critical
+    pattern: '(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40}(?![A-Za-z0-9+/])'
+    context_keywords: [aws_secret, secret_access_key]
+    validators: [shannon-entropy]
+    enabled: true
+
+  - id: GGD/SECRET/GITHUB-TOKEN
+    name: GitHub PAT
+    severity: Critical
+    pattern: '\bgh[pousr]_[A-Za-z0-9_]{36,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/PRIVATE-KEY
+    name: PEM 私钥块
+    severity: Critical
+    pattern: '-----BEGIN (?:[A-Z ]*PRIVATE KEY)-----'
+    enabled: true
+
+  - id: GGD/SECRET/SLACK-TOKEN
+    name: Slack Token
+    severity: High
+    pattern: '\bxox[baprs]-[A-Za-z0-9-]{10,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/GENERIC-PASSWORD
+    name: 代码中硬编码密码
+    severity: High
+    pattern: '(?i)(?:password|passwd|pwd)\s*["'']?\s*[:=]\s*["'']([^"'']{6,})["'']'
+    enabled: true
+
+  - id: GGD/SECRET/DB-CONN-STRING
+    name: 带密码的连接串
+    severity: High
+    pattern: '(?i)(?:Server|Host|Data Source)\s*=\s*[^;\s]+;.*?Password\s*=\s*([^;\s]+)'
+    enabled: true
+
+  - id: GGD/SECRET/JWT
+    name: JWT
+    severity: Medium
+    pattern: '(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])'
+    enabled: true
+
+  # ===== Privacy（模块设计 Privacy §3） =====
+  - id: GGD/PRIVACY/CN-IDCARD-18
+    name: 18 位身份证
+    severity: High
+    pattern: '(?<![0-9Xx])[0-9]{17}[0-9Xx](?![0-9Xx])'
+    context_keywords: [id, idcard, id_card, 身份证]
+    validators: [cn-id-checksum]
+    enabled: true
+
+  - id: GGD/PRIVACY/CN-BANKCARD
+    name: 银行卡号
+    severity: High
+    pattern: '(?<![0-9])[0-9]{16,19}(?![0-9])'
+    validators: [luhn]
+    enabled: true
+
+  - id: GGD/PRIVACY/CN-MOBILE
+    name: 中国大陆手机号
+    severity: Medium
+    pattern: '(?<![0-9])1[3-9][0-9]{9}(?![0-9])'
+    context_keywords: [phone, mobile, tel, 手机]
+    enabled: true
+
+  - id: GGD/PRIVACY/CN-IDCARD-15
+    name: 15 位身份证
+    severity: Medium
+    pattern: '(?<![0-9])[1-9][0-9]{5}[0-9]{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12][0-9]|3[01])[0-9]{3}(?![0-9])'
+    context_keywords: [id, idcard, id_card, 身份证]
+    enabled: true
+
+  - id: GGD/PRIVACY/EMAIL
+    name: 邮箱
+    severity: Low
+    pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    enabled: true
+
+  # ===== LocalPath（模块设计 LocalPathUrl §3.1） =====
+  - id: GGD/LOCALPATH/UNIX-HOME
+    name: Unix 用户主目录绝对路径
+    severity: Low
+    pattern: '/(?:home|Users)/[\w.-]+/'
+    enabled: true
+
+  - id: GGD/LOCALPATH/WIN-USER
+    name: Windows 用户目录绝对路径
+    severity: Low
+    pattern: '[A-Za-z]:[\\/](?i:Users)[\\/][\w.-]+[\\/]'
+    enabled: true
+
+  - id: GGD/LOCALPATH/WIN-DRIVE
+    name: Windows 驱动器盘符
+    severity: Low
+    pattern: '^[A-Za-z]:[\\/](?!(?i:Users)[\\/])'
+    enabled: true
+
+  - id: GGD/LOCALPATH/TEMP-WORK
+    name: 常见临时/工作区绝对路径
+    severity: Low
+    pattern: '(?:/workspace/volumes/|/mnt/[a-z]/|~/workspace/)'
+    enabled: true
+
+  # ===== Url（模块设计 LocalPathUrl §3.2） =====
+  - id: GGD/URL/CREDENTIALS-IN-URL
+    name: URL 带用户名密码
+    severity: High
+    pattern: '(?:https?|ftp)://([^/\s:@]+:[^@\s/]+)@'
+    enabled: true
+
+  - id: GGD/URL/TOKEN-IN-QUERY
+    name: 查询参数含 token/apikey
+    severity: High
+    pattern: '[?&](?:token|apikey|access_token|api_key)=([^&\s]+)'
+    enabled: true
+
+  - id: GGD/URL/PRIVATE-IP
+    name: 私有 / 环回 IP
+    severity: Medium
+    pattern: '(?<![0-9.])(?:10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})(?![0-9.])'
+    enabled: true
+
+  - id: GGD/URL/LOCAL-HOSTNAME
+    name: 内网域名
+    severity: Medium
+    pattern: '\b[\w-]+\.(?:local|internal|corp|lan)(?![\w.])'
+    enabled: true

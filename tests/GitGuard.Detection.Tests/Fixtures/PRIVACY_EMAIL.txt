@@ -1,0 +1,16 @@
+﻿; GGD/PRIVACY/EMAIL（Low）：标准邮箱格式；无上下文要求
+[positive]
+contact = "alice@example.com"
+maintainer: bob.smith+tag@corp.example.org
+{"email":"zhang.san_01%test@mail.example.co.uk"}
+
+[negative]
+user@@example.com
+foo@bar
+admin@internal.123
+
+[edge]
+hit: 收件人 <dev-team@example.com>
+hit: reply_to = "x.y-z_1@sub.domain.example"
+miss: 无效 @@example.com
+miss: short = "a@b.c"

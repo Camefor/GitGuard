@@ -12,7 +12,7 @@
 
 ## 2. 输入输出契约
 
-同 Secret / Privacy 模块：输入差异 Hunk，输出 `IReadOnlyList<Finding>`。
+同 Secret / Privacy 模块：输入差异 Hunk，输出 `IAsyncEnumerable<Finding>`（ADR-0003 流式契约）。
 
 ## 3. 核心规则
 
@@ -27,8 +27,8 @@
 
 **降级策略**：
 
-- 在 `.gitignore`、`README.md`、`docs/**` 中出现时自动降级一级（低 → 不命中）。
-- 示例代码块（Markdown 的三反引号段落）内不计入命中。
+- 在 `.gitignore`、`README.md`、`docs/**` 中出现时自动降级一级（Low 规则无可降级即不命中）。
+- （P2）示例代码块（Markdown 的三反引号段落）感知：本版本未实现，代码块内路径仍按普通文本行扫描。
 
 ### 3.2 Url 规则
 
@@ -41,8 +41,8 @@
 
 **降级策略**：
 
-- URL 出现在以 `example`、`sample`、`demo` 开头的文件名中 → 命中但严重度 - 1。
-- 公共文档类 URL（`github.com`、`api.github.com` 等 TLD 白名单）不触发命中。
+- URL 出现在以 `example`、`sample`、`demo` 开头的文件名（大小写不敏感）中 → 命中但严重度降一级（Low 保持 Low，命中记录保留）。
+- 公共文档类 URL（`github.com`、`api.github.com` 等）不触发命中：由规则集本身保证（无凭据 / Token / 内网特征即不命中）；显式主机白名单 `rules.url.public_hostname_whitelist` 为 P2，本版本未实现。
 
 ## 4. 外部依赖
 
@@ -53,21 +53,20 @@
 
 ## 5. 数据模型
 
-脱敏输出：
+脱敏输出（由 Core `Masker` 统一承担：保留命中值前后各 2 字符、中间 `*`，总长 ≤ 32）：
 
-- LocalPath：`/Users/q***/Desktop/project` → 保留第一个用户名字符 + `***` + 路径尾段。
-- Url：`https://u***:***@host.com/path` → 用户名密码遮罩。
+- LocalPath：`/Users/alice/` → `/U*********e/`。
+- Url：凭据 `user:pass` → `us*****ss`。
 
 ## 6. 关键流程
 
 ```mermaid
 flowchart LR
-    Line[差异行] --> IsCode{是否代码块}
-    IsCode -- 是 --> Scan[运行规则]
-    IsCode -- 否（markdown 代码块） --> Context{是文档?}
-    Context -- 是 --> Downgrade[严重度 -1 或 跳过]
-    Scan --> Match{匹配}
-    Match -- 命中 --> Mask[脱敏]
+    Line[差异行] --> Match{格式匹配}
+    Match -- 命中 --> Path{文档 / 示例路径?}
+    Path -- 是 --> Step[严重度降一级\nLow 无可降即丢弃]
+    Path -- 否 --> Mask[脱敏：Core Masker]
+    Step --> Mask
     Mask --> Finding
 ```
 
@@ -92,9 +91,9 @@ flowchart LR
 ## 9. 测试要点
 
 - [ ] Windows / Unix 路径分别覆盖。
-- [ ] 代码块内 vs 文档内行为差异。
+- [ ] 文档文件（`.gitignore` / `README.md` / `docs/**`）中 Low 规则不命中。
 - [ ] URL 带 Token 的脱敏输出不含原 Token。
-- [ ] 公共 URL 白名单生效（如 `https://github.com`）。
+- [ ] （P2）Markdown 代码块感知与公共 URL 主机白名单。
 
 ## 10. 演进与扩展位
 
@@ -106,3 +105,4 @@ flowchart LR
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：4 条 LocalPath + 4 条 Url 规则 |
+| 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；文档文件降级明确为 glob（`.gitignore` / `README.md` / `docs/**`）+ Low 丢弃；示例文件降级明确为文件名前缀匹配；脱敏统一由 Core `Masker` 承担（§5 示例对齐）；公开 URL 主机白名单与 Markdown 代码块感知记为 P2（本版本未实现） |

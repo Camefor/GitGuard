@@ -23,6 +23,14 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
   </ItemGroup>
 
+  <ItemGroup Label="规则加载">
+    <!-- 内置规则 YAML 解析（ADR-0002：配置解析 = YamlDotNet；AOT 验证见 ADR-0002 后续动作） -->
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+    <!-- YamlDotNet 官方静态上下文源生成器（MIT，随 YamlDotNet 维护）：
+         AOT 下以生成代码替代反射式类型检查，消除 IL2026/IL3050 警告 -->
+    <PackageVersion Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" Version="18.1.0" />
+  </ItemGroup>
+
   <ItemGroup Label="测试">
     <!-- 单元测试框架（SAD §2：xUnit v3） -->
     <PackageVersion Include="xunit.v3" Version="4.0.2" />

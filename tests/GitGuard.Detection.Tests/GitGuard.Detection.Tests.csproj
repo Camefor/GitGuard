@@ -17,4 +17,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 规则样本随测试输出复制：BuiltinRuleFixtureTests 以 Fixtures 目录为准逐行驱动检测器 -->
+    <None Update="Fixtures\**\*.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

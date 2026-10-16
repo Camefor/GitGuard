@@ -1,0 +1,16 @@
+﻿; GGD/URL/TOKEN-IN-QUERY（High）：查询参数 token/apikey/access_token/api_key；命中值取第 1 捕获组（遇 & 终止）
+[positive]
+url = "https://api.example.com/v1/data?token=eyJhbGciOiJIUzI1NiJ9"
+auth: https://example.com/cb?access_token=abc123&state=x
+get https://api.internal/x?apikey=9f8e7d6c5b4a&v=2
+
+[negative]
+https://api.example.com/v1/path?limit=10
+https://api.example.com?token=
+token=abc123
+
+[edge]
+hit: https://api.example.com?token=a-b_c.d-123
+hit: /oauth/callback?access_token=x%2Fy%3D&next=/
+miss: https://api.example.com?Token=abc123
+miss: https://api.example.com?token_hint=abc123

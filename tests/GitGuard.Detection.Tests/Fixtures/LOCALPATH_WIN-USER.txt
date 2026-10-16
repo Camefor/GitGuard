@@ -1,0 +1,16 @@
+﻿; GGD/LOCALPATH/WIN-USER（Low）：<盘符>:\Users\<用户名>\，Users 段大小写不敏感
+[positive]
+D:\Users\alice\projects\app
+C:/Users/bob/app.sln
+cache = "e:\users\carol\temp\"
+
+[negative]
+D:\User\alice\projects
+D:\Data\Users\alice\
+path = D:\Users\alice
+
+[edge]
+hit: 路径 = c:\USERS\dev\repo\
+hit: X:/Users/u/
+miss: D:\Users
+miss: /Users/alice/

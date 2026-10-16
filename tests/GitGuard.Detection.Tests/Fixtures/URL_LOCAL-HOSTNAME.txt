@@ -1,0 +1,16 @@
+﻿; GGD/URL/LOCAL-HOSTNAME（Medium）：内网域名后缀 .local / .internal / .corp / .lan
+[positive]
+db = db.internal
+mdns: printer.local
+intranet = wiki.corp
+
+[negative]
+example.com
+internal.example.com
+local.dev
+
+[edge]
+hit: 内网域名 app-lan.internal 可访问
+hit: http://gitlab.corp:8080/
+miss: service.local.
+miss: example.lantern

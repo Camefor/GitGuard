@@ -1,0 +1,16 @@
+﻿; GGD/LOCALPATH/UNIX-HOME（Low）：/home/<user>/ 或 /Users/<user>/ 绝对路径前缀（要求闭合斜杠）
+[positive]
+cd /home/alice/projects/gitguard
+export GOPATH=/Users/dev/go
+base_dir = "/home/node.app-1/data/"
+
+[negative]
+/root/scripts/deploy.sh
+/homework/alice/submit
+path = /Users
+
+[edge]
+hit: WORKDIR /home/ci-runner/
+hit: /Users/john.doe/Library/
+miss: /home/alice
+miss: /usr/home

@@ -43,7 +43,7 @@ flowchart LR
 ### 3.2 DetectionRule（检测规则聚合）
 
 - **聚合根**：`DetectionRule`
-- **成员**：`RulePattern`（值对象，含正则/上下文/文件 glob）、`Severity`、`Source`
+- **成员**：`RulePattern`（值对象，含正则/上下文/文件 glob/声明式校验器）、`Severity`、`Source`
 - **不变式**：
   - `RuleId` 必须符合 `^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$`。
   - `Pattern` 必须可编译；编译失败时拒绝加载。
@@ -86,7 +86,7 @@ flowchart LR
 | `ScanType` | `PreCommit / PrePush / Manual / Bypass` | 枚举 | `Bypass` 的 `ScanRun` 无 Finding |
 | `Fingerprint` | `string(64)` | SHA-256 hex | 固定 64 字符；禁止从 Finding 外部直接构造 |
 | `SnippetMasked` | `string(≤32)` | 掩码片段 | 必须包含至少 50% 的 `*`；禁止含原始敏感 token |
-| `RulePattern` | `Regex, string[]? ContextKeywords, string[]? FilePathGlobs` | 编译后 Regex | `Regex.MatchTimeout = 200ms`；禁止灾难性回溯 |
+| `RulePattern` | `Regex, string[]? ContextKeywords, string[]? FilePathGlobs, string[]? Validators` | 编译后 Regex | `Regex.MatchTimeout = 200ms`；禁止灾难性回溯；`Validators` 仅允许支撑检测器登记的名称（`shannon-entropy` / `luhn` / `cn-id-checksum`），未知名称在检测器构造期拒绝（FailClosed） |
 | `ScanResult` | `Clean / Warned / Blocked / Failed` | 枚举 | `Failed ⇒ ExitCode ≥ 10` |
 | `PolicyAction` | `Allow / Warn / Block` | 枚举 | `Critical` 不允许映射为 `Allow`（硬下限，FR-022） |
 | `PolicyDecision` | `Action, IgnoredByAllowlist, Severity` | record | `IgnoredByAllowlist ⇒ Action = Allow`（FR-040） |
@@ -210,3 +210,4 @@ flowchart LR
 | 0.1.0 | 2026-10-15 | 初始化：锁定 4 大聚合、6 条 DR、术语↔类名映射 |
 | 0.1.1 | 2026-10-15 | 与 GGD-0002 实现同步：补全 ScanRun 退出码/路径/UTC 派生不变式与 Allowlist 过期不变式；新增 PolicyAction / PolicyDecision 值对象 |
 | 0.1.2 | 2026-10-15 | 与 GGD-0003 实现同步：指纹算法定为 HMAC-SHA256（盐值由调用方注入），`Fingerprinter` 依赖修正为 `ISecretRandom`（`IClock` 待使用方引入）；`Masker` 短串保留位数细化；新增 SanitizingLogger / TerminalSanitizer / PathAnonymizer / ISecretRandom 术语 |
+| 0.1.3 | 2026-10-16 | 与 GGD-0006 实现同步：DetectionRule 成员与 `RulePattern` 值对象补入声明式校验器（`Validators`；未知名称在检测器构造期拒绝，FailClosed） |
