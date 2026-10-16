@@ -109,8 +109,9 @@ flowchart LR
 | 服务 | 职责 | 依赖 |
 | --- | --- | --- |
 | `PolicyEvaluator` | 将 Finding 的 `Severity` + 配置映射到 `Block/Warn/Allow` 动作 | `SeverityPolicy`（配置） |
-| `Fingerprinter` | 对敏感原文做 SHA-256 + Salt 生成 `Fingerprint`；Salt 来自用户机器的随机密钥（首次运行生成） | `IClock`、`ISecretRandom` |
+| `Fingerprinter` | 对敏感原文做 SHA-256 + Salt（HMAC-SHA256）生成 `Fingerprint`；Salt 来自用户机器的随机密钥（首次运行生成） | `ISecretRandom`（生成盐）；盐值由调用方注入 |
 | `Masker` | 把原文裁剪为 `SnippetMasked`（保留前后 2 字符，中间 `*`，总长不超 32） | - |
+| `SanitizingLogger` | 日志脱敏流水线：敏感字段经 `Masker` 掩码、文本经 `TerminalSanitizer` 去控制字符、路径经 `PathAnonymizer` 匿名化；由 Infrastructure 日志 Sink 调用 | - |
 | `HookScriptBuilder` | 根据平台生成 Hook 分发脚本（Unix sh / Windows PowerShell / Git bash） | - |
 | `AllowlistMatcher` | 判断一个 Finding 是否命中白名单（三条件组合） | - |
 
@@ -130,6 +131,10 @@ flowchart LR
 - **规则描述**：Finding 聚合内禁止持久化原文；Logging Sink 必须在写入前强制脱敏。
 - **适用聚合**：ScanRun → Finding。
 - **违反处理**：`Finding` 的构造函数要求 `SnippetMasked` 值对象，无法传入原文；运行时断言。
+- **实现细化（2026-10-15，GGD-0003）**：
+  - `Fingerprinter` 使用 HMAC-SHA256（盐为密钥、UTF-8 原文为消息）；盐为 32 字节 `fingerprint.salt`，由调用方注入以保证跨 run 稳定（Infrastructure 首次运行生成 / 读入后原子写回）。
+  - `Masker` 保留位数取 `min(2, L/4)`：原文长度 L ≥ 8 保留前后各 2 字符；L < 8 收缩为 1 或 0 个，保证「掩码占比 ≥ 50%」不变式恒成立。
+  - `SanitizingLogger`（含 `TerminalSanitizer` 与 `PathAnonymizer`）落实 09-日志设计 §9.2 的三步流水线。
 - **关联测试**：`TC-DR-02-01`（金丝雀 Token 注入后扫描 SQLite 与日志文件验证不存在）。
 
 ### 7.3 `DR-03` 失败关闭（FailClosed）
@@ -182,6 +187,10 @@ flowchart LR
 | 策略判定 | `PolicyDecision`（record） | `GitGuard.Core.Policy` |
 | 指纹器 | `Fingerprinter` | `GitGuard.Core.Services` |
 | 脱敏器 | `Masker` | `GitGuard.Core.Services` |
+| 脱敏流水线 | `SanitizingLogger` | `GitGuard.Core.Services` |
+| 终端清洗器 | `TerminalSanitizer` | `GitGuard.Core.Services` |
+| 路径匿名器 | `PathAnonymizer` | `GitGuard.Core.Services` |
+| 随机源抽象 | `ISecretRandom` | `GitGuard.Core.Abstractions` |
 | 检测器 | `IDetector` | `GitGuard.Core.Abstractions` |
 | Hook 安装 | `HookInstallation` | `GitGuard.Core.Model` |
 | Hook 分发器脚本构建 | `HookScriptBuilder` | `GitGuard.Application.Hooks` |
@@ -200,3 +209,4 @@ flowchart LR
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：锁定 4 大聚合、6 条 DR、术语↔类名映射 |
 | 0.1.1 | 2026-10-15 | 与 GGD-0002 实现同步：补全 ScanRun 退出码/路径/UTC 派生不变式与 Allowlist 过期不变式；新增 PolicyAction / PolicyDecision 值对象 |
+| 0.1.2 | 2026-10-15 | 与 GGD-0003 实现同步：指纹算法定为 HMAC-SHA256（盐值由调用方注入），`Fingerprinter` 依赖修正为 `ISecretRandom`（`IClock` 待使用方引入）；`Masker` 短串保留位数细化；新增 SanitizingLogger / TerminalSanitizer / PathAnonymizer / ISecretRandom 术语 |
