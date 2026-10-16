@@ -108,7 +108,7 @@ flowchart LR
 
 | 服务 | 职责 | 依赖 |
 | --- | --- | --- |
-| `PolicyEvaluator` | 将 Finding 的 `Severity` + 配置映射到 `Block/Warn/Allow` 动作 | `SeverityPolicy`（配置） |
+| `PolicyEvaluator` | 将 Finding 的 `Severity` + 配置映射到 `Block/Warn/Allow` 动作；白名单命中（未过期）优先于严重度映射 | `SeverityPolicy`（配置）、`AllowlistEntry` 列表、当前时间 |
 | `Fingerprinter` | 对敏感原文做 SHA-256 + Salt（HMAC-SHA256）生成 `Fingerprint`；Salt 来自用户机器的随机密钥（首次运行生成） | `ISecretRandom`（生成盐）；盐值由调用方注入 |
 | `Masker` | 把原文裁剪为 `SnippetMasked`（保留前后 2 字符，中间 `*`，总长不超 32） | - |
 | `SanitizingLogger` | 日志脱敏流水线：敏感字段经 `Masker` 掩码、文本经 `TerminalSanitizer` 去控制字符、路径经 `PathAnonymizer` 匿名化；由 Infrastructure 日志 Sink 调用 | - |
@@ -191,6 +191,7 @@ flowchart LR
 | 终端清洗器 | `TerminalSanitizer` | `GitGuard.Core.Services` |
 | 路径匿名器 | `PathAnonymizer` | `GitGuard.Core.Services` |
 | 随机源抽象 | `ISecretRandom` | `GitGuard.Core.Abstractions` |
+| 时钟抽象 | `IClock` | `GitGuard.Core.Abstractions` |
 | 检测器 | `IDetector` | `GitGuard.Core.Abstractions` |
 | Hook 安装 | `HookInstallation` | `GitGuard.Core.Model` |
 | Hook 分发器脚本构建 | `HookScriptBuilder` | `GitGuard.Application.Hooks` |
@@ -211,3 +212,4 @@ flowchart LR
 | 0.1.1 | 2026-10-15 | 与 GGD-0002 实现同步：补全 ScanRun 退出码/路径/UTC 派生不变式与 Allowlist 过期不变式；新增 PolicyAction / PolicyDecision 值对象 |
 | 0.1.2 | 2026-10-15 | 与 GGD-0003 实现同步：指纹算法定为 HMAC-SHA256（盐值由调用方注入），`Fingerprinter` 依赖修正为 `ISecretRandom`（`IClock` 待使用方引入）；`Masker` 短串保留位数细化；新增 SanitizingLogger / TerminalSanitizer / PathAnonymizer / ISecretRandom 术语 |
 | 0.1.3 | 2026-10-16 | 与 GGD-0006 实现同步：DetectionRule 成员与 `RulePattern` 值对象补入声明式校验器（`Validators`；未知名称在检测器构造期拒绝，FailClosed） |
+| 0.1.4 | 2026-10-16 | 与 GGD-0007 实现同步：`IClock` 抽象（`GitGuard.Core.Abstractions`）与 `SystemClock`（`GitGuard.Infrastructure.Time`）落地；`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`（白名单优先、过期条目不生效），§6 依赖列同步；术语表补「时钟抽象」 |

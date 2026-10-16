@@ -73,8 +73,9 @@ public sealed class GitAccess : IGitAccess
     /// <inheritdoc />
     public string GetStagedDiff()
     {
-        // DR-04：PreCommit 的唯一差异入口；--no-color/--no-ext-diff/--no-textconv 中性化用户 diff 配置，保证输出恒为标准 unified-0 格式
-        var result = RunGit("diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv");
+        // DR-04：PreCommit 的唯一差异入口；--no-color/--no-ext-diff/--no-textconv 中性化用户 diff 配置，保证输出恒为标准 unified-0 格式；
+        // -c core.quotepath=false 让非 ASCII 路径以原始 UTF-8 输出（默认会转成 \NNN 八进制转义，破坏解析层路径与 glob 匹配）
+        var result = RunGit("-c", "core.quotepath=false", "diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv");
         EnsureGitSucceeded(result, "diff --cached -U0");
         return result.StandardOutput;
     }
@@ -95,8 +96,9 @@ public sealed class GitAccess : IGitAccess
         ValidateRevisionArgument(commitSha, nameof(commitSha));
 
         // --root 将初始提交视为全量新增（否则其差异恒为空，新分支 pre-push 会漏扫）；
-        // --no-commit-id 抑制 diff 前的裸提交 SHA 行，保证输出即标准 unified diff
-        var result = RunGit("diff-tree", "-p", "-U0", "--root", "--no-commit-id", "--no-color", "--no-ext-diff", "--no-textconv", commitSha);
+        // --no-commit-id 抑制 diff 前的裸提交 SHA 行，保证输出即标准 unified diff；
+        // -c core.quotepath=false 语义同 GetStagedDiff
+        var result = RunGit("-c", "core.quotepath=false", "diff-tree", "-p", "-U0", "--root", "--no-commit-id", "--no-color", "--no-ext-diff", "--no-textconv", commitSha);
         EnsureGitSucceeded(result, $"diff-tree {commitSha}");
         return result.StandardOutput;
     }

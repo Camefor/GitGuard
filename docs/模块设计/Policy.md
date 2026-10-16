@@ -69,7 +69,7 @@ public sealed record GitGuardConfig(
 flowchart LR
     Findings[Findings] --> ForEach[对每一条]
     ForEach --> Allowlist{命中 Allowlist?}
-    Allowlist -- 是 --> Ignored[action = Ignored]
+    Allowlist -- 是 --> Ignored[Allow + IgnoredByAllowlist]
     Allowlist -- 否 --> Map{Severity → Action}
     Map --> Block[Block / Warn]
     Block --> Aggregate[汇总：任一 Block → 退出码 1]
@@ -186,3 +186,4 @@ allowlist:
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：Schema v1 + 硬下限 + 白名单三条件匹配 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：§2.1 输入契约 Detection 模块输出改为 `IAsyncEnumerable<Finding>`（ADR-0003 流式） |
+| 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`——逐条 Finding 先查白名单（命中且未过期 → `Allow` + `IgnoredByAllowlist`），否则按 `SeverityPolicy` 映射；聚合规则：任一 `Block` → 退出码 1，仅 `Warn` → 退出码 0（§6.1 流程图同步为 `Allow + IgnoredByAllowlist`） |

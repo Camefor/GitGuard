@@ -41,7 +41,7 @@
 
 | 依赖 | 用途 | 失败降级 |
 | --- | --- | --- |
-| `Microsoft.Data.Sqlite` | SQLite 访问 | 异常 → FailClosed；写失败不阻断扫描流程但发 `AuditWriteFailed` 事件 |
+| `Microsoft.Data.Sqlite` | SQLite 访问 | 存储层失败上抛 `SqliteException`（FailClosed，含 BUSY 退避耗尽）；扫描管线捕获后降级：扫描结果照常返回并置 `AuditWriteFailed` 标志（补写机制待后续任务） |
 
 ## 5. 数据模型
 
@@ -64,7 +64,7 @@ sequenceDiagram
     participant Store as SqliteAuditStore
     participant DB
 
-    App->>Store: SaveScanRunAsync(run, findings)
+    App->>Store: SaveScanRun(run, decisions)
     Store->>DB: BEGIN
     Store->>DB: INSERT scan_runs
     loop N findings
@@ -123,3 +123,4 @@ flowchart LR
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：事务模型、保留清理、脱敏约束 |
 | 0.1.1 | 2026-10-16 | GGD-0005：`SqliteAuditStore` 落地（WAL、ScanRun + Findings + ScanCompleted 事件单事务、BUSY 3 次退避后 FailClosed）；Unix 0600 与符号链接路径拒绝（08-权限设计 §5.1/§9），Windows ACL 加固延后至 CLI 路径解析任务；`ScanRun.Restore` / `Finding.Restore` 支持读回原始身份标识 |
+| 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：扫描管线经 `IAuditStore.SaveScanRun(run, decisions)` 单事务落库（`findings.action` 取 `PolicyDecision`）；存储层 `SqliteException` 在管线内被捕获并降级为 `AuditWriteFailed` 标志，扫描结果照常返回（§4 / §6.1） |

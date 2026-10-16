@@ -14,7 +14,7 @@
 
 | 来源 | 内容 | 格式 | 单位 | 缺失语义 |
 | --- | --- | --- | --- | --- |
-| `ScanStagedUseCase` / `ScanPushUseCase` | 差异文本 Hunk（新增/修改行） | `FileChange { Path, Hunks[Line] }` | UTF-8 字符串 | 空 Hunk 跳过 |
+| `ScanStagedUseCase` / `ScanPushUseCase` | 差异文本 Hunk（新增/修改行） | `FileChange { Path, Lines[ChangedLine] }` | UTF-8 字符串 | 行列表为空时空跑 |
 | 规则库 | 内置规则集 `BuiltinRules.yaml` 的 `secret` 分类 | DetectionRule | - | 为空时模块空跑 |
 | 可选：GitleaksAdapter（P2） | 外部进程输出 | JSON | - | 不可用时降级 |
 
@@ -111,3 +111,4 @@ flowchart LR
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：8 条 MVP 内置规则 + GitleaksAdapter 扩展位 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003 流式）；AWS-AKID 移除「行长 ≤ 256」表述（长行策略统一见 §6）；JWT 正则改为边界断言式（规则按行匹配、无 Multiline，`^`/`$` 不适用）；整文件跳过后缀定为 `.lock` / `.min.js` / `.min.css`；脱敏统一由 Core `Masker` 承担 |
+| 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：上游差异解析落地（`UnifiedDiffParser` 将 `git diff --cached -U0` / `git diff-tree -p -U0` 输出按行号展开为逐文件变更）；§2.1 输入格式修正为 `FileChange { Path, Lines[ChangedLine] }` |

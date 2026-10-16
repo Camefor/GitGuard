@@ -15,7 +15,7 @@
 | 来源 | 内容 | 格式 | 缺失语义 |
 | --- | --- | --- | --- |
 | 用户 CLI 调用 | `gitguard install / uninstall / status` | 命令行参数 | - |
-| Git 自身调用 | `pre-commit` 无参；`pre-push` 从 stdin 读 push info | - | 空 stdin → 走降级逻辑扫所有未推送提交 |
+| Git 自身调用 | `pre-commit` 无参；`pre-push` 从 stdin 读 push info | - | 空 stdin → 无推送目标：Clean / 退出码 0（GGD-0007 决策：Git 仅在存在待推送引用时调用 pre-push，不执行「扫描所有未推送提交」的全历史降级） |
 | `.git/config` | `core.hooksPath` 等 | - | 不存在 → 用默认 `.git/hooks` |
 
 ### 2.2 输出
@@ -183,3 +183,4 @@ exit "$LEGACY_EXIT"
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：Install/Pre-commit/Pre-push 流程 + Unix 脚本模板 |
+| 0.1.1 | 2026-10-16 | 与 GGD-0007 实现同步：§2.1 pre-push 空 stdin 语义由「降级扫描所有未推送提交」改判为「无推送目标 → Clean / 退出码 0」（Git 仅在存在待推送引用时触发 pre-push） |
