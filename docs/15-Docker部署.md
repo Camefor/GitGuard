@@ -35,9 +35,9 @@ RUN dotnet publish src/GitGuard.Cli/GitGuard.Cli.csproj \
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS smoke
 WORKDIR /app
 COPY --from=publish /out/gitguard /usr/local/bin/gitguard
-RUN gitguard --version && apt-get update && apt-get install -y git && \
+RUN gitguard version && apt-get update && apt-get install -y git && \
     cd /tmp && git init demo && cd demo && \
-    gitguard install && echo "AKIAIOSFODNN7EXAMPLE_TEST" > key.txt && \
+    gitguard install && echo "AKIAIOSFODNN7EXAMPLE" > key.txt && \
     git add key.txt && (git commit -m "canary" || echo "blocked as expected")
 ```
 
@@ -82,7 +82,7 @@ docker build -t gitguard-ci:local .
 docker build --build-arg RID=linux-arm64 -t gitguard-ci:arm64 .
 
 # 禁网 smoke 验证 DR-01
-docker run --rm --network=none gitguard-ci:local gitguard --version
+docker run --rm --network=none gitguard-ci:local gitguard version
 ```
 
 ## 9. 本地开发
@@ -103,3 +103,4 @@ dotnet run --project src/GitGuard.Cli -- scan --staged
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：澄清 Docker 仅用于 CI 构建；运行时无容器依赖；禁网 smoke 验证 DR-01 |
+| 0.1.1 | 2026-10-18 | GGD-0012 文档回填：版本命令更正为 `gitguard version`；smoke 金丝雀改为可被 `GGD/SECRET/AWS-AKID`（`\bAKIA[0-9A-Z]{16}\b`）命中的 `AKIAIOSFODNN7EXAMPLE` |

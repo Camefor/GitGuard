@@ -4,7 +4,7 @@
 
 | 版本 | 主题 | 目标用户 | 关键功能 | 退出条件 |
 | --- | --- | --- | --- | --- |
-| v0.1 MVP | CLI + Hook 分发 + 四类检测器 | 开发者（单人） | FR-010 ~ FR-032、FR-070 | §12 `16-测试方案.md` 的 8 条必过场景全部通过 |
+| v0.1 MVP | CLI + Hook 分发 + 四类检测器 | 开发者（单人） | FR-010 ~ FR-032、FR-070、FR-071（FR-050 顺延 `GGD-0013`；白名单仅配置文件级；FR-040~042 CLI / FR-060~061 属 v0.2） | §12 `16-测试方案.md` 的 8 条必过场景全部通过 |
 | v0.2 | 规则升级 + 白名单 + Gitleaks 适配 | 开发者 + 小团队 | FR-040 ~ FR-061、FR-080、FR-090 | 真实项目接入，首周误报率 ≤ 10% |
 | v0.3 | Avalonia 桌面端 | 偏好图形化的用户 | FR-100 | 桌面端覆盖所有 CLI 核心能力 |
 | v1.0（候选）| 规则库沉淀 + 文档稳定 | 公开发布 | - | 规则库 ≥ 60 条，稳定运行 3 个月，无 P0 Bug |
@@ -18,17 +18,17 @@
 - **交付物**：
   - `GitGuard.sln` 项目骨架（Core / Detection / Application / Infrastructure / Cli / tests）。
   - `gitguard install / uninstall / status / scan / version` 五条命令。
-  - 四类检测器（Secret / Privacy / LocalPath / Url）各 ≥ 10 条内置规则。
+  - 四类检测器（Secret / Privacy / LocalPath / Url）内置规则共 21 条（Secret 8 / Privacy 5 / LocalPath 4 / Url 4）；「各 ≥ 10 条」目标顺延到 v0.2 规则升级。
   - SQLite 审计 Schema v1；迁移器可用。
   - CI 多平台构建矩阵；Native AOT 发行物。
-  - 文档：00 ~ 18、模块设计、ADR-0001 ~ 0003 全部到位。
+  - 文档：00 ~ 18、模块设计、ADR-0001 ~ 0004 全部到位。
 - **依赖**：无前置阶段。
 - **风险**：
   - Hook 兼容性与各家框架的差异 → 通过真实 Fixture 测试覆盖。
   - Native AOT 下某些反射依赖包不可用 → 启动期用 trim-safe 包，必要时自写序列化。
 - **退出条件**：
-  - [ ] 8 条 MVP 必过场景全部通过。
-  - [ ] NFR-P-001 ~ 003 达标。
+  - [ ] 8 条 MVP 必过场景全部通过（S1~S7 已通过；S8 待 `GGD-0013`）。
+  - [ ] NFR-P-001 ~ 003 达标（尚未测量，`GGD-0020`）。
   - [ ] 开发者（本人）在 2 个真实仓库中启用 ≥ 2 周，无数据丢失、无误伤。
 
 ### 2.2 阶段 2：规则升级（v0.2）
@@ -112,8 +112,8 @@ flowchart LR
 
 | # | 风险 | 影响 | 概率 | 应对 | Owner | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R-01 | Native AOT 下 YAML / SQLite 依赖反射兼容性问题 | 高 | 中 | 启动期用 trim-safe 包；CI 冒烟验证 | 项目负责人 | Open |
-| R-02 | Husky / lefthook / pre-commit 的 Hook 格式差异导致兼容失败 | 高 | 中 | 真实 Fixture + CI 矩阵 | 项目负责人 | Open |
+| R-01 | Native AOT 下 YAML / SQLite 依赖反射兼容性问题 | 高 | 中 | 启动期用 trim-safe 包；CI 冒烟验证 | 项目负责人 | 缓解中（trim-safe 已落地；`release.yml` 原生平台冒烟已接线） |
+| R-02 | Husky / lefthook / pre-commit 的 Hook 格式差异导致兼容失败 | 高 | 中 | 真实 Fixture + CI 矩阵 | 项目负责人 | 部分缓解（Husky 形态文本 Hook 已由 E2E S6 / TC-DR-05-01 覆盖；lefthook / pre-commit 待 `GGD-0021`） |
 | R-03 | 中国手机号检测误报率过高 | 中 | 高 | 结合上下文关键字（如 `phone`, `mobile`, `tel`） | 项目负责人 | Open |
 | R-04 | 用户习惯 `--no-verify` 导致 Hook 价值被架空 | 中 | 高 | 文档宣讲 + 服务端扫描是互补 | 项目负责人 | Open |
 | R-05 | 单人维护进度延迟 | 中 | 中 | 文档优先，范围克制；MVP 不追求覆盖所有规则 | 项目负责人 | Open |
@@ -123,3 +123,4 @@ flowchart LR
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：三阶段路线、12 条 MVP 任务、8 个里程碑 |
+| 0.1.1 | 2026-10-18 | GGD-0012 文档回填：§1 v0.1 范围与 PRD 对齐（FR-071 纳入、FR-050 顺延、FR-040~042 CLI / FR-060~061 归 v0.2）；§2.1 交付物校正为 21 条规则（8/5/4/4）并更新退出条件进度；§6 R-01 / R-02 标注缓解状态 |

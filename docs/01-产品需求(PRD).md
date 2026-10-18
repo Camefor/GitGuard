@@ -23,8 +23,8 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
   3. 写入分发脚本到 `.git/hooks/pre-commit`、`pre-push`（或 `core.hooksPath` 对应目录）。
   4. 在 SQLite `HookInstallations` 表记录安装状态与 GitGuard 版本。
   5. 终端输出安装成功的摘要（涉及 Hook、原有 Hook 的保留方式）。
-- **成功指标**：`gitguard status` 显示 `installed`，`git commit --dry-run` 不产生错误。
-- **失败分支**：无 Git 仓库、无写入权限、原 Hook 为未知脚本但带可执行标记 → 显式提示用户确认，终止安装。
+- **成功指标**：`gitguard status` 将每个 Hook 分类为 `Missing` / `Managed` / `Legacy` / `Binary` / `SymbolicLink`，`Managed` 即 GitGuard 已托管；存在未托管的 `Legacy` / `Binary` / `SymbolicLink` 时退出码 6 并提示运行 `install`。安装后 `git commit --dry-run` 不产生错误。
+- **失败分支**：无 Git 仓库（退出码 2）、无写入权限（退出码 3）、原 Hook 为二进制或符号链接且未给 `--force`（退出码 4）→ 显式提示并零写入终止安装。普通文本 Hook 不视为失败：自动复制备份为 `<hook>.local.bak` 并链式包裹。
 - **对应功能需求**：`FR-010, FR-011, FR-012`
 
 ### 3.2 场景「`git commit` 前被 GitGuard 拦截」
@@ -34,7 +34,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
   1. Hook 分发器调用 GitGuard，GitGuard 通过 `git diff --cached` 读取暂存区差异。
   2. 加载 `.gitguard.yml` 和用户级配置，运行四类检测器。
   3. 对每个发现项应用策略引擎映射到动作（block/warn/allow）。
-  4. 若存在 `critical` 或 `high` 级 block，返回非零退出码并输出终端报告（文件、行号、规则、脱敏片段、建议）。
+  4. 若存在 `critical` 或 `high` 级 block，返回非零退出码并输出终端报告（文件、行号、规则、脱敏片段、动作、severity、fingerprint；v0.1 不输出逐规则「处理建议」文案，见 `02-SRS` §2.7）。
   5. 将 ScanRun 和所有发现项以脱敏指纹形式写入 SQLite。
 - **成功指标**：开发者在 10 秒内看到清晰的拦截原因；真实敏感信息被阻断。
 - **失败分支**：
@@ -50,7 +50,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
   2. 把每个提交作为独立 ScanRun 的子集，命中后汇总报告。
   3. 任一提交命中阻断级规则 → FailClosed 阻断整次推送。
 - **成功指标**：历史提交中加入的密钥仍被识别，即便后续提交已删除。
-- **失败分支**：无法读取 remote 远程指针（如新建分支） → 退回到扫描所有本地未推送提交。
+- **失败分支**：`remote-sha` 全零（新建分支）→ 范围退化为 `local-sha` 可达的全部提交；空 stdin → 视为无推送目标直接 Clean（退出码 0）。
 - **对应功能需求**：`FR-030, FR-031, FR-032`
 
 ### 3.4 场景「误报登记为白名单」
@@ -63,6 +63,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **成功指标**：误报被豁免，但不等于规则失效；别的真实命中仍能拦截。
 - **失败分支**：缺少 `--reason` → 拒绝写入，白名单变更必须留言。
 - **对应功能需求**：`FR-040, FR-041, FR-042`
+- **v0.1 落地状态**：匹配引擎（规则 / 路径 / 指纹三粒度）与扫描汇总已可用，白名单来源为 `.gitguard.yml` 的 `allowlist.entries`；`gitguard allowlist add/remove/list` CLI 与 SQLite 白名单管理未实现，随 v0.2 交付。
 
 ### 3.5 场景「开发者显式绕过（`--no-verify` 或 `GITGUARD_SKIP`）」
 
@@ -74,6 +75,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **成功指标**：绕过事件可被查询；不伪装为「扫描通过」。
 - **失败分支**：开发者同时用 `--no-verify` 和 `GITGUARD_SKIP=1`，仍登记一次。
 - **对应功能需求**：`FR-050`
+- **v0.1 落地状态**：顺延至 `GGD-0013`；`post-commit` Hook 未注册，`GITGUARD_SKIP` 环境变量未识别。
 
 ### 3.6 场景「仓库全量扫描 / 基线建立」
 
@@ -86,58 +88,63 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **成功指标**：老仓库接入零摩擦；基线清晰可维护。
 - **失败分支**：仓库过大导致超时 → 支持 `--since <commit>` / `--max-files` 分段。
 - **对应功能需求**：`FR-060, FR-061`
+- **v0.1 落地状态**：未实现。`gitguard scan --all` / `--since` / `--max-files` 当前按未识别选项拒绝（用法错误 7），随 v0.2 交付。
 
 ## 4. 功能优先级
 
-| 编号 | 功能 | 优先级 | 对应场景 | 验收要点 |
-| --- | --- | --- | --- | --- |
-| `FR-010` | `gitguard install` 安装 Hook | P0 | 3.1 | 安装后 `pre-commit` / `pre-push` 均被注入；原 Hook 保留并被链式调用 |
-| `FR-011` | `gitguard uninstall` 卸载 Hook | P0 | 3.1 | 仅移除 GitGuard 注册项；原 Hook 恢复可运行 |
-| `FR-012` | `gitguard status` 查询安装状态 | P0 | 3.1 | 输出 Git 版本、Hook 路径、GitGuard 版本、是否已注入 |
-| `FR-020` | 暂存区扫描（`gitguard scan --staged`） | P0 | 3.2 | 严格使用 `git diff --cached`；不包含未暂存内容 |
-| `FR-021` | 四类检测器 Secret/Privacy/LocalPath/Url | P0 | 3.2 | 命中率符合 §6 验收用例集 |
-| `FR-022` | 策略引擎映射严重度到动作 | P0 | 3.2 | 可通过 `.gitguard.yml` 覆写默认映射 |
-| `FR-023` | 终端报告 | P0 | 3.2 | 包含文件、行号、规则 ID、脱敏片段、处理建议 |
-| `FR-030` | 推送扫描（`gitguard scan --push`） | P0 | 3.3 | 覆盖推送范围内每个提交；无法确定远程时降级为扫描所有未推送提交 |
-| `FR-031` | 多提交聚合报告 | P0 | 3.3 | 每个 Finding 带来源 commit SHA |
-| `FR-032` | FailClosed 行为 | P0 | 3.2 / 3.3 | 任何异常默认阻断，不默认放行 |
-| `FR-040` | 白名单登记 `gitguard allowlist add/remove/list` | P1 | 3.4 | 必填 reason；写入 SQLite |
-| `FR-041` | 白名单匹配粒度：规则 / 路径 / 指纹 | P1 | 3.4 | 三种匹配均可独立启用 |
-| `FR-042` | 已忽略项仍在终端汇总 | P1 | 3.4 | 每次扫描输出 `ignored N / blocked M / warned K` |
-| `FR-050` | 绕过事件审计 | P1 | 3.5 | 识别 `--no-verify` 与 `GITGUARD_SKIP=1`，记录为独立事件 |
-| `FR-060` | 全量扫描 `gitguard scan --all` | P1 | 3.6 | 支持 `--since` / `--max-files` 分段 |
-| `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 |
-| `FR-070` | 配置：`.gitguard.yml` 项目级 | P0 | 全部 | 支持规则开关、严重度覆写、exclude 路径 |
-| `FR-071` | 配置：用户级 `~/.config/gitguard/config.yml` | P1 | 全部 | 项目级覆盖用户级 |
-| `FR-080` | 自定义正则规则 | P2 | 3.2 | 支持命名、严重度、上下文过滤 |
-| `FR-090` | GitleaksAdapter | P2 | 3.2 | 通过 `IDetector` 接入；可独立开关；无 Gitleaks 时降级不报错 |
-| `FR-100` | Avalonia 桌面端 | P3 | 全部 | 风险列表、规则管理、安装状态查看、多仓库 |
+| 编号 | 功能 | 优先级 | 对应场景 | 验收要点 | v0.1 实现状态 |
+| --- | --- | --- | --- | --- | --- |
+| `FR-010` | `gitguard install` 安装 Hook | P0 | 3.1 | 安装后 `pre-commit` / `pre-push` 均被注入；原 Hook 保留并被链式调用 | 已实现（GGD-0008） |
+| `FR-011` | `gitguard uninstall` 卸载 Hook | P0 | 3.1 | 仅移除 GitGuard 注册项；原 Hook 恢复可运行 | 已实现（GGD-0008） |
+| `FR-012` | `gitguard status` 查询安装状态 | P0 | 3.1 | 输出 Git 版本、Hook 路径、GitGuard 版本、Hook 分类 | 已实现（状态分类见 3.1） |
+| `FR-020` | 暂存区扫描（`gitguard scan --staged`） | P0 | 3.2 | 严格使用 `git diff --cached`；不包含未暂存内容 | 已实现（GGD-0007） |
+| `FR-021` | 四类检测器 Secret/Privacy/LocalPath/Url | P0 | 3.2 | 命中率符合 §6 验收用例集 | 已实现：21 条内置规则（Secret 8 / Privacy 5 / LocalPath 4 / Url 4） |
+| `FR-022` | 策略引擎映射严重度到动作 | P0 | 3.2 | 可通过 `.gitguard.yml` 覆写默认映射 | 已实现（含 `critical` 不可降级为 `allow` 的硬下限） |
+| `FR-023` | 终端报告 | P0 | 3.2 | 包含文件、行号、规则 ID、脱敏片段 | 部分实现：文本 / JSON 报告与脱敏片段可用，无逐规则「建议」文案 |
+| `FR-030` | 推送扫描（`gitguard scan --push`） | P0 | 3.3 | 覆盖推送范围内每个提交；无法确定远程时降级为扫描所有未推送提交 | 已实现（GGD-0007；新分支退化为 `local-sha` 可达提交） |
+| `FR-031` | 多提交聚合报告 | P0 | 3.3 | 每个 Finding 带来源 commit SHA | 已实现 |
+| `FR-032` | FailClosed 行为 | P0 | 3.2 / 3.3 | 任何异常默认阻断，不默认放行 | 已实现：Git / 检测器 / 超时 / 配置异常 → 10 / 11 / 12 / 13 |
+| `FR-040` | 白名单登记 `gitguard allowlist add/remove/list` | P1 | 3.4 | 必填 reason；写入 SQLite | 未实现 CLI；v0.1 仅支持配置文件 `allowlist.entries` |
+| `FR-041` | 白名单匹配粒度：规则 / 路径 / 指纹 | P1 | 3.4 | 三种匹配均可独立启用 | 部分实现：配置文件三粒度匹配可用，CLI / SQLite 管理未实现 |
+| `FR-042` | 已忽略项仍在终端汇总 | P1 | 3.4 | 每次扫描输出 `ignored N / blocked M / warned K` | 已实现：汇总行含「白名单忽略 N」 |
+| `FR-050` | 绕过事件审计 | P1 | 3.5 | 识别 `--no-verify` 与 `GITGUARD_SKIP=1`，记录为独立事件 | 未实现（顺延 GGD-0013） |
+| `FR-060` | 全量扫描 `gitguard scan --all` | P1 | 3.6 | 支持 `--since` / `--max-files` 分段 | 未实现（v0.2） |
+| `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 | 未实现（v0.2） |
+| `FR-070` | 配置：`.gitguard.yml` 项目级 | P0 | 全部 | 支持规则开关、严重度覆写、exclude 路径 | 部分实现：`exclude` 已解析但未消费（被排除路径仍会被扫描，GGD-0019） |
+| `FR-071` | 配置：用户级 `~/.config/gitguard/config.yml` | P1 | 全部 | 项目级覆盖用户级 | 已实现（GGD-0009） |
+| `FR-080` | 自定义正则规则 | P2 | 3.2 | 支持命名、严重度、上下文过滤 | 未实现（v0.2） |
+| `FR-090` | GitleaksAdapter | P2 | 3.2 | 通过 `IDetector` 接入；可独立开关；无 Gitleaks 时降级不报错 | 未实现（v0.2；`use_gitleaks: true` → 退出码 13） |
+| `FR-100` | Avalonia 桌面端 | P3 | 全部 | 风险列表、规则管理、安装状态查看、多仓库 | 未实现（v0.3） |
 
 ## 5. 非功能需求摘要
 
 - **性能**：`pre-commit` P95 < 500ms（单仓库，常规暂存区 < 500 行差异）；`pre-push` P95 < 2s（≤ 50 提交，≤ 5000 行差异）。详见 `02-SRS` §5.1。
 - **安全**：本地化、零明文留存、FailClosed、绕过留痕。详见 `02-SRS` §5.3 与 `08-权限设计.md`。
 - **合规**：对个人数据按 GB/T 35273 做最小必要原则处理，不记录身份证/手机号原文。
-- **可访问性**：CLI 输出支持 `--no-color` 和 `--json`；桌面端满足 WCAG 2.1 AA。
-- **跨平台兼容性**：Windows 10+ / macOS 12+ / Ubuntu 20.04+ 单一发行物；兼容 Git ≥ 2.9。
+- **可访问性**：CLI 输出支持 `--no-color` 和 `--format json`；`GITGUARD_LANG=en` 国际化顺延 `GGD-0014`；桌面端满足 WCAG 2.1 AA。
+- **跨平台兼容性**：Windows 11 / macOS 14 / Ubuntu 24.04 三平台各产出 Native AOT 单一可执行文件；兼容 Git ≥ 2.9（CI 使用各平台最新稳定 Git，旧版本矩阵顺延 `GGD-0017`）。
+
+> v0.1 的逐条 NFR 落地与未验证项见 `02-SRS` §5。
 
 ## 6. 产品验收
 
-- [ ] `gitguard install` 可在 Clean 仓库和已有 Husky/lefthook 仓库中正确安装（场景 3.1）。
-- [ ] 暂存区包含真实格式的测试密钥时阻止 `commit`（场景 3.2）。
-- [ ] 未暂存文件存在密钥、但暂存区无问题时**不**误拦截（DR-04）。
-- [ ] 本地包含密钥的历史提交被 `push` 时仍能拦截（场景 3.3）。
-- [ ] 普通公开 URL、正常示例代码不被无差别拦截。
-- [ ] 已存在的 Husky Hook 在安装后仍能被触发，退出码正确传播。
-- [ ] 扫描器崩溃 / 超时时默认阻断（DR-03）。
-- [ ] `--no-verify` 本地绕过被记录为独立审计事件（DR-06）。
-- [ ] 白名单登记必填 reason，可按规则 / 路径 / 指纹豁免。
-- [ ] SQLite 中无任何 Token / 密码 / 完整敏感行原文（DR-02）。
+- [x] `gitguard install` 可在 Clean 仓库和已有文本 Hook（Husky 形态）的仓库中正确安装（场景 3.1；TC-FR-010-01~05）。
+- [x] 暂存区包含真实格式的测试密钥时阻止 `commit`（场景 3.2；E2E S1）。
+- [x] 未暂存文件存在密钥、但暂存区无问题时**不**误拦截（DR-04；E2E S2）。
+- [x] 本地包含密钥的历史提交被 `push` 时仍能拦截（场景 3.3；E2E S3、S4）。
+- [x] 普通公开 URL、正常示例代码不被无差别拦截（E2E S5）。
+- [x] 已存在的文本 Hook 在安装后仍能被触发，退出码正确传播（DR-05；E2E S6）。
+- [x] 扫描器崩溃 / 超时时默认阻断（DR-03；E2E S7a / S7b + TC-DR-03）。
+- [ ] `--no-verify` 本地绕过被记录为独立审计事件（DR-06；顺延 `GGD-0013`）。
+- [ ] 白名单登记必填 reason，可按规则 / 路径 / 指纹豁免（配置文件 `allowlist.entries` 已可用；CLI / SQLite 登记随 v0.2）。
+- [x] SQLite 中无任何 Token / 密码 / 完整敏感行原文（DR-02；TC-DR-02-01）。
+- [ ] lefthook / pre-commit 真实框架兼容矩阵（NFR-A-001；`GGD-0021`）。
+- [ ] NFR-P-001~004 性能基准（`GGD-0020`）。
 
 ## 7. 产品路线与版本计划
 
-- **v0.1 MVP**：场景 3.1-3.3 + 3.5；FR-010 ~ FR-071；无 GitleaksAdapter；无桌面端。
-- **v0.2**：场景 3.4 和 3.6；FR-080、FR-090；全历史扫描与基线。
+- **v0.1 MVP**：场景 3.1-3.3 + 3.5；FR-010 ~ FR-032、FR-070、FR-071；配置文件级白名单匹配（`allowlist.entries`）可用。其中场景 3.5 / FR-050 尚待 `GGD-0013`；FR-040 ~ FR-042 的 CLI / SQLite 管理、FR-060 / FR-061 全量扫描不在 v0.1 范围；无 GitleaksAdapter；无桌面端。
+- **v0.2**：场景 3.4 和 3.6；FR-040 ~ FR-061、FR-080、FR-090；全历史扫描与基线。
 - **v0.3**：Avalonia 桌面端 FR-100；组织级配置。
 
 详细交付节奏见 `17-开发RoadMap.md`。
@@ -154,3 +161,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 版本 | 日期 | 变更说明 |
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：定义 6 个核心场景、20 条 FR 及 10 条 MVP 验收 |
+| 0.1.1 | 2026-10-18 | GGD-0012 文档回填：§3.1~§3.6 按实现校正 status 状态分类、`--force` 语义、报告字段、新分支降级与未落地范围；§4 新增「v0.1 实现状态」列（21 条规则分布、白名单仅配置文件可用、`exclude` 未消费等）；§5 `--json` 更正为 `--format json`、平台矩阵对齐 NFR-A-002；§6 勾选 S1~S7 与 DR-02 验收并登记未过项；§7 v0.1 范围与 RoadMap 对齐 |

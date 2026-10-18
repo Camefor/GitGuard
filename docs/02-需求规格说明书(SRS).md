@@ -33,7 +33,7 @@
 ### 2.3 `FR-012` 查询状态
 
 - **描述**：输出当前仓库和用户环境中 GitGuard 的安装状态与版本信息。
-- **输出**：JSON 或人类可读文本，包含 Git 版本、`core.hooksPath`、Hook 文件签名、GitGuard 版本、配置文件加载链。
+- **输出**：JSON（`gitguard.status.v1`）或人类可读文本，包含 Git 版本、`core.hooksPath`、Hook 状态分类（`Missing` / `Managed` / `Legacy` / `Binary` / `SymbolicLink`）、GitGuard 版本、配置文件加载链与配置警告；存在未托管的 `Legacy` / `Binary` / `SymbolicLink` 时 `needs_attention=true`（退出码 6）。
 - **关联测试用例**：`TC-FR-012-01`
 
 ### 2.4 `FR-020` 暂存区扫描
@@ -44,7 +44,7 @@
 - **处理规则**：严格使用 `git diff --cached`；不读取磁盘工作区文件；文件 > `scan.max_file_bytes`（默认 1 MiB）跳过并记为「skipped」；二进制文件同样跳过并记为「skipped」。
 - **异常处理**：Git 命令失败 → FailClosed 退出码 10；检测器抛异常 → FailClosed 退出码 11。
 - **关联领域规则**：`DR-03, DR-04`
-- **关联测试用例**：`TC-FR-020-01` ~ `TC-FR-020-10`
+- **关联测试用例**：`TC-FR-020-01` ~ `TC-FR-020-05`（`ScanEndToEndTests` / `CliScanCommandTests`）；FailClosed 分支见 `TC-DR-03-*`
 
 ### 2.5 `FR-021` 四类检测器
 
@@ -53,7 +53,7 @@
   - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱。
   - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\` 等。
   - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` 查询参数、内网保留 IP 段（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、127.0.0.0/8）。
-- **处理规则**：每个检测器实现 `IDetector`；返回 `IEnumerable<Finding>`；运行顺序：Secret → Privacy → LocalPath → Url；可通过策略配置独立禁用。
+- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 21 条（Secret 8 / Privacy 5 / LocalPath 4 / Url 4），可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
 - **关联领域规则**：`DR-01, DR-02`
 - **关联测试用例**：`TC-FR-021-S-*`（Secret）/ `TC-FR-021-P-*`（Privacy）/ `TC-FR-021-L-*`（LocalPath）/ `TC-FR-021-U-*`（Url）
 
@@ -68,18 +68,25 @@
 
 ### 2.7 `FR-023` 终端报告格式
 
-- **描述**：命中项以统一格式输出到 stderr。
-- **输出格式**（人类可读）：
+- **描述**：命中项以统一格式输出到 stderr（`--format json` 时改为 stdout 输出机器可读 JSON，文本报告不再输出）。
+- **输出格式**（人类可读，v0.1 实际形态）：
 
   ```text
-  ❌ [GGD/SECRET/AWS-AKID] appsettings.Production.json:18
-     片段：AKIA****************
-     建议：改用环境变量或密钥管理服务
-     指纹：sha256:ab12...（可用于白名单）
+  ✖ GitGuard 扫描被阻断（exit_code=1）
+    仓库：D:/work/demo
+    类型：pre-commit
+    结果：Blocked（扫描 3 个文件，发现 1 项：阻断 1 / 警告 0 / 白名单忽略 0）
+    耗时：42 ms
+    发现项：
+      [Block] GGD/SECRET/AWS-AKID  appsettings.Production.json:18  AKIA****************
+        severity=Critical  fingerprint=<64 位十六进制 HMAC>  commit=<push 扫描时的来源提交 SHA>
   ```
 
-- **可选 JSON 输出**：`--format json` 时输出结构化 Finding 列表。
-- **关联测试用例**：`TC-FR-023-01` ~ `TC-FR-023-03`
+  - 颜色由 `--no-color` / `NO_COLOR` / 非 TTY 自动关闭；文本模式下进度与警告同样走 stderr。
+  - 跳过文件（二进制 / 超限）、审计写入降级与配置警告按需追加「跳过 / 警告」行。
+  - v0.1 **不输出逐规则「建议」文案**；`fingerprint` 可用于 v0.2 白名单登记。
+- **可选 JSON 输出**：`--format json` 输出 `gitguard.scan.v1` Schema（`findings` / `summary` / `skipped_files` / `warnings` 等字段，见 `06-API接口设计` §4.2）。
+- **关联测试用例**：报告文本与 JSON 字段由 `CliScanCommandTests` 与 E2E 场景覆盖；无独立 `ReportWriter` 单测。
 
 ### 2.8 `FR-030` 推送扫描
 
@@ -92,7 +99,7 @@
   - 空 stdin → 无推送目标：直接 Clean（退出码 0）。
   - 提交在多个 ref 行重复出现时按首次出现顺序去重，只扫描一次。
 - **异常处理**：Git 输入解析失败（行格式不符）→ FailClosed 退出码 10，不回显原始输入内容（DR-02）；范围枚举 / 提交差异失败 → FailClosed 退出码 10。
-- **关联测试用例**：`TC-FR-030-01` ~ `TC-FR-030-04`
+- **关联测试用例**：`TC-FR-030-01` ~ `TC-FR-030-02`（`ScanEndToEndTests`）；推送输入解析与去重见 `PushUpdateTests` / `ScanPushUseCaseTests`
 
 ### 2.9 `FR-040` 白名单
 
@@ -100,19 +107,22 @@
 - **输入**：`gitguard allowlist add --rule <id>`、`--path <glob>`、`--fingerprint <hash>` 任一或组合；`--reason` 必填。
 - **输出**：写入 `Allowlist` 表。
 - **处理规则**：匹配时按「rule + path + fingerprint」三者取交集；缺省项视为通配。
-- **关联测试用例**：`TC-FR-040-01` ~ `TC-FR-040-05`
+- **v0.1 实现状态**：匹配引擎（`AllowlistMatcher`）与策略放行已实现，白名单来源为 `.gitguard.yml` 的 `allowlist.entries`（`reason` 必填并做长度校验；SQLite `allowlist` 表已建但无管理 API）；`gitguard allowlist add/remove/list` CLI 未注册，随 v0.2 交付。
+- **关联测试用例**：配置解析见 `GitGuardConfigLoaderTests`；匹配 / 放行见 `AllowlistMatcherTests` / `PolicyEvaluatorTests`；CLI 用例随 v0.2 补充。
 
 ### 2.10 `FR-050` 绕过事件审计
 
 - **描述**：识别 `--no-verify` 与 `GITGUARD_SKIP=1` 两种显式绕过，并写入审计。
 - **处理规则**：注册轻量 `post-commit` Hook：对比最新提交的 SHA 与上一次扫描的「待提交 SHA 预测」；若未匹配，推断为绕过事件。
 - **输出**：`ScanRuns` 中新增一条 `BypassEvent` 行。
+- **v0.1 实现状态**：未实现（`post-commit` 未注册、`GITGUARD_SKIP` 未识别）；顺延 `GGD-0013`，对应 E2E 场景 S8 占位跳过。
 
 ### 2.11 `FR-060` 全量扫描
 
 - **描述**：扫描当前 HEAD 下的所有被跟踪文件；可选扫描历史提交。
 - **输入**：`gitguard scan --all [--since <commit>] [--include-history] [--max-files <N>]`。
 - **处理规则**：默认只扫描 HEAD；加 `--include-history` 时按 `git log` 顺序枚举提交，支持中断续扫（下次从上次 `commit SHA` 继续）。
+- **v0.1 实现状态**：未实现（v0.2）。CLI 未注册 `--all` / `--since` / `--max-files`，当前按未识别选项返回用法错误（退出码 7）；`scan` 仅支持 `--staged` 与 `--push`。
 
 ### 2.12 `FR-070` 配置文件
 
@@ -124,7 +134,11 @@
   - 未知字段：警告但不阻断（宽松解析），警告经 `gitguard status` 与扫描报告的 `warnings` 透出。
   - 取值越界（`scan.max_file_bytes` / `scan.timeout_ms` / `logging.file.*` / `rules.secrets.min_entropy`）→ FailClosed（退出码 13）。
   - `rules.secrets.use_gitleaks: true`（P2 未实现）→ FailClosed：无法兑现的开关静默忽略会构成 FailOpen。
+  - `exclude`：仅解析并产生警告，**尚未消费**（被排除路径仍会被扫描）；补齐登记为 `GGD-0019`。
+  - `scan.pre_commit: false` / `scan.pre_push: false`：仅警告，扫描类型开关尚未接线（Hook 分发脚本恒调用扫描）。
+  - `scan.fail_closed: false`：仅警告，MVP 行为恒为 FailClosed（DR-03）。
 - **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）。
+- **v0.1 实现状态**：除 `exclude` 与上述「仅警告」项外，其余字段均生效。
 - **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-04`
 
 ### 2.12.1 `FR-071` 用户级配置
@@ -144,6 +158,7 @@
   - 调用方式：`gitleaks detect --no-git --source <staged-tmp> --report-format json`。
   - 适配器把 Gitleaks 输出映射为 `Finding`，规则 ID 前缀 `GLK/`。
 - **关联 ADR**：`ADR-0003`
+- **v0.1 实现状态**：未实现（v0.2）。`rules.secrets.use_gitleaks: true` 时按配置无效 FailClosed（退出码 13），避免静默 FailOpen。
 
 ## 3. 数据需求
 
@@ -163,7 +178,7 @@
 | --- | --- | --- | --- |
 | 对外（CLI） | `gitguard` 命令集 | 开发者与 Hook 调用 | 冷启动 < 150ms（Native AOT 目标），单命令 FailClosed 必须 < 配置超时 |
 | 对外（配置） | `.gitguard.yml` / 用户级 config | 规则与策略 | 解析失败 → FailClosed |
-| 对外（审计导出） | `gitguard audit export --format json/csv` | 用户事后分析 | 必须脱敏，无原文 |
+| 对外（审计导出） | `gitguard audit export --format json/csv` | 用户事后分析 | 必须脱敏，无原文；**v0.1 未实现**（`audit` 子命令未注册，v0.2 候选 `GGD-0022`） |
 | 对内（Git） | `git diff --cached`、`git rev-list`、`git diff-tree`、`git log` | 读取仓库差异 | 失败即 FailClosed |
 | 对内（可选） | `gitleaks` CLI | P2 秘密检测补强 | 不可用时降级，不阻断 |
 
@@ -173,48 +188,48 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 ### 5.1 性能
 
-| 编号 | 指标 | 条件 | 目标值 | 测量方式 |
-| --- | --- | --- | --- | --- |
-| `NFR-P-001` | 冷启动时间 | Native AOT 单文件；Windows 11 NVMe | ≤ 150ms | 基准脚本 `benchmarks/startup.sh` 执行 50 次取 P95 |
-| `NFR-P-002` | 暂存区扫描 P95 | ≤ 500 行差异 | ≤ 500ms | 基准脚本 10 组样本仓库 |
-| `NFR-P-003` | 推送扫描 P95 | ≤ 50 提交 / ≤ 5000 行差异 | ≤ 2s | 同上 |
-| `NFR-P-004` | 全量扫描吞吐 | ≤ 100 MB 代码 | ≥ 20 MB/s | 单机 benchmark |
+| 编号 | 指标 | 条件 | 目标值 | 测量方式 | v0.1 状态 |
+| --- | --- | --- | --- | --- | --- |
+| `NFR-P-001` | 冷启动时间 | Native AOT 单文件；Windows 11 NVMe | ≤ 150ms | 基准脚本 `benchmarks/startup.sh` 执行 50 次取 P95 | 未测量（`GGD-0020`） |
+| `NFR-P-002` | 暂存区扫描 P95 | ≤ 500 行差异 | ≤ 500ms | 基准脚本 10 组样本仓库 | 未测量（`GGD-0020`） |
+| `NFR-P-003` | 推送扫描 P95 | ≤ 50 提交 / ≤ 5000 行差异 | ≤ 2s | 同上 | 未测量（`GGD-0020`） |
+| `NFR-P-004` | 全量扫描吞吐 | ≤ 100 MB 代码 | ≥ 20 MB/s | 单机 benchmark | 未测量（`GGD-0020`） |
 
 ### 5.2 可用性
 
-| 编号 | 指标 | 目标值 | 测量方式 |
-| --- | --- | --- | --- |
-| `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` |
-| `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 |
+| 编号 | 指标 | 目标值 | 测量方式 | v0.1 状态 |
+| --- | --- | --- | --- | --- |
+| `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` | 部分验证：E2E S6 / TC-DR-05-01 覆盖 Husky 形态文本 Hook；lefthook / pre-commit 真实矩阵未覆盖（`GGD-0021`） |
+| `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 | 已覆盖：`.github/workflows/ci.yml` 三平台矩阵（`GGD-0011`） |
 
 ### 5.3 安全
 
-| 编号 | 要求 | 验证方式 |
-| --- | --- | --- |
-| `NFR-S-001` | 本地化：无出站网络请求 | 单元测试 + CI 下 `strace`/`netstat` 验证 |
-| `NFR-S-002` | SQLite / 日志 / 临时文件无明文敏感原文 | 代码审查 + 测试用「金丝雀 Token」注入后扫文件 |
-| `NFR-S-003` | FailClosed：所有异常路径默认阻断 | 故障注入测试 `TC-FAILCLOSED-*` |
-| `NFR-S-004` | 绕过事件可追溯 | 审计表查询 |
+| 编号 | 要求 | 验证方式 | v0.1 状态 |
+| --- | --- | --- | --- |
+| `NFR-S-001` | 本地化：无出站网络请求 | 单元测试 + CI 下 `strace`/`netstat` 验证 | 已覆盖：CI Linux `strace -e trace=network` 作业（TC-DR-01-01，`GGD-0011`） |
+| `NFR-S-002` | SQLite / 日志 / 临时文件无明文敏感原文 | 代码审查 + 测试用「金丝雀 Token」注入后扫文件 | 已覆盖：TC-DR-02-01(审计库 / 日志 / 终端输出)；崩溃日志经同一脱敏流水线但无独立金丝雀用例 |
+| `NFR-S-003` | FailClosed：所有异常路径默认阻断 | 故障注入测试 `TC-FAILCLOSED-*` | 已覆盖：TC-DR-03-01~04（Git / 检测器 / 超时 / 配置） |
+| `NFR-S-004` | 绕过事件可追溯 | 审计表查询 | 未覆盖：依赖 FR-050（`GGD-0013`） |
 
 ### 5.4 合规
 
-| 编号 | 法规/标准 | 要求 | 证据 |
-| --- | --- | --- | --- |
-| `NFR-C-001` | GB/T 35273—2020 | 对手机号、身份证等个人信息采集遵循最小必要；不留原值 | 代码审查 + 数据库 Schema |
+| 编号 | 法规/标准 | 要求 | 证据 | v0.1 状态 |
+| --- | --- | --- | --- | --- |
+| `NFR-C-001` | GB/T 35273—2020 | 对手机号、身份证等个人信息采集遵循最小必要；不留原值 | 代码审查 + 数据库 Schema | 已满足：审计仅存脱敏片段与 HMAC 指纹（无原值）；无独立法规审计 |
 
 ### 5.5 可访问性与国际化
 
-| 编号 | 要求 | 验证方式 |
-| --- | --- | --- |
-| `NFR-U-001` | CLI 支持 `--no-color` 与 `--format json` | 单测 |
-| `NFR-U-002` | 终端输出默认中文（MVP）；允许 `GITGUARD_LANG=en` 切换英文 | 单测 |
+| 编号 | 要求 | 验证方式 | v0.1 状态 |
+| --- | --- | --- | --- |
+| `NFR-U-001` | CLI 支持 `--no-color` 与 `--format json` | 单测 | 已实现（`--no-color` / `NO_COLOR` / 非 TTY 自动关闭；JSON 走 stdout） |
+| `NFR-U-002` | 终端输出默认中文（MVP）；允许 `GITGUARD_LANG=en` 切换英文 | 单测 | 未实现：v0.1 仅中文；顺延 `GGD-0014`（`--language` + `GITGUARD_LANG`） |
 
 ### 5.6 可维护性与可观测性
 
-| 编号 | 要求 | 验证方式 |
-| --- | --- | --- |
-| `NFR-M-001` | 日志按 `level + category` 结构化输出 | 代码审查 |
-| `NFR-M-002` | `gitguard --verbose` 输出各规则命中耗时 | 单测 |
+| 编号 | 要求 | 验证方式 | v0.1 状态 |
+| --- | --- | --- | --- |
+| `NFR-M-001` | 日志按 `level + category` 结构化输出 | 代码审查 | 已实现：`--log-file` / `logging.file` 输出 JSON-lines（含 `level` / `category` 等字段） |
+| `NFR-M-002` | `gitguard --verbose` 输出各规则命中耗时 | 单测 | 未实现规则级耗时；v0.1 语义为 `--verbose` → Debug 日志、`--trace` → Trace 逐行匹配细节（须与 `--verbose` 同用）；登记 `GGD-0020` |
 
 ## 6. 领域规则（DR）
 
@@ -238,22 +253,29 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 ## 8. 需求追溯矩阵
 
-| 需求 ID | PRD 场景 | 设计文档 | 测试用例 |
-| --- | --- | --- | --- |
-| `FR-010` | 3.1 | `03-SAD §6 Hook 模块` / `模块设计/Hook.md` | `TC-FR-010-*` |
-| `FR-011` | 3.1 | 同上 | `TC-FR-011-*` |
-| `FR-012` | 3.1 | `模块设计/Cli.md` | `TC-FR-012-*` |
-| `FR-020` | 3.2 | `模块设计/Secret.md` / `Privacy.md` | `TC-FR-020-*` |
-| `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/Url` | `TC-FR-021-*` |
-| `FR-022` | 3.2 | `模块设计/Policy.md` | `TC-FR-022-*` |
-| `FR-023` | 3.2 | `模块设计/Cli.md` | `TC-FR-023-*` |
-| `FR-030` | 3.3 | `模块设计/Hook.md` | `TC-FR-030-*` |
-| `FR-040` | 3.4 | `模块设计/Policy.md` | `TC-FR-040-*` |
-| `FR-050` | 3.5 | `模块设计/Hook.md` | `TC-FR-050-*` |
-| `FR-060` | 3.6 | `模块设计/Cli.md` | `TC-FR-060-*` |
-| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-*` |
-| `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01` |
-| `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-*` |
+| 需求 ID | PRD 场景 | 设计文档 | 测试用例（v0.1 实际落地） | v0.1 实现状态 |
+| --- | --- | --- | --- | --- |
+| `FR-010` | 3.1 | `03-SAD §6 Hook 模块` / `模块设计/Hook.md` | `TC-FR-010-01~05`（`InstallHookUseCaseTests` / `HookEndToEndTests` / `CliHookLifecycleTests`） | 已实现 |
+| `FR-011` | 3.1 | 同上 | `TC-FR-010-04`（`UninstallHookUseCaseTests` / `HookEndToEndTests`） | 已实现 |
+| `FR-012` | 3.1 | `模块设计/Cli.md` / `模块设计/Hook.md` | `TC-FR-012-01`（`StatusUseCaseTests` / `CliHookLifecycleTests`） | 已实现 |
+| `FR-020` | 3.2 | `模块设计/Secret.md` / `Privacy.md` / `模块设计/Policy.md` | `TC-FR-020-01~05`（`ScanEndToEndTests` / `ScanStagedUseCaseTests` / `UnifiedDiffParserTests` / `CliScanCommandTests`） | 已实现 |
+| `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/LocalPathUrl.md` | `TC-FR-021-*`（`DetectorTests` / `BuiltinRuleFixtureTests` / `DetectorRobustnessTests`） | 已实现（21 条规则） |
+| `FR-022` | 3.2 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `SeverityPolicyTests` / `PolicyDecisionTests` | 已实现 |
+| `FR-023` | 3.2 | `模块设计/Cli.md` / `06-API接口设计` §4.2 | `CliScanCommandTests` + E2E S1（text / JSON） | 部分实现（无逐规则建议文案） |
+| `FR-030` | 3.3 | `模块设计/Hook.md` | `TC-FR-030-01~02`（`ScanEndToEndTests` / `ScanPushUseCaseTests` / `PushUpdateTests`） | 已实现 |
+| `FR-031` | 3.3 | `04-DDD` §4 | `TC-FR-030-01`（断言 Finding 携带 `commit_sha`） | 已实现 |
+| `FR-032` | 3.2 / 3.3 | `10-异常处理设计` | `TC-DR-03-01~04`（`GitAccessCommitTests` / `ScanEndToEndTests` / `CliScanCommandTests` / E2E S7） | 已实现（10 / 11 / 12 / 13） |
+| `FR-040` | 3.4 | `模块设计/Policy.md` | `GitGuardConfigLoaderTests` / `AllowlistEntryTests`；CLI 无 | CLI 未实现；配置文件 `allowlist.entries` 可用 |
+| `FR-041` | 3.4 | `模块设计/Policy.md` | `AllowlistMatcherTests` / `PolicyEvaluatorTests` / `GitGuardConfigLoaderTests` | 部分实现（配置文件三粒度；CLI / SQLite 管理未实现） |
+| `FR-042` | 3.4 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `CliScanCommandTests`（汇总行） | 已实现（配置文件白名单） |
+| `FR-050` | 3.5 | `模块设计/Hook.md` | 无（E2E S8 占位） | 未实现（`GGD-0013`） |
+| `FR-060` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
+| `FR-061` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
+| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~04`（`GitGuardConfigLoaderTests` / `CliScanCommandTests`） | 部分实现（`exclude` 未消费，`GGD-0019`） |
+| `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
+| `FR-080` | 3.2 | `模块设计/Policy.md` | 无 | 未实现（v0.2） |
+| `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | 无 | 未实现（v0.2） |
+| `FR-100` | 全部 | `11-前端UI设计` | 无 | 未实现（v0.3） |
 
 ## 9. 未解问题
 
@@ -270,3 +292,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.1 | 2026-10-16 | GGD-0007：§2.4 补充二进制文件跳过语义；§2.8 补充删除分支（`local-sha` 全零）跳过、空 stdin 无推送目标、跨 ref 提交去重与解析失败不回显输入 |
 | 0.1.2 | 2026-10-16 | GGD-0008：§2.1/§2.2 与实现对齐——`--force` 语义限定为二进制/符号链接接管；托管识别改前两行精确匹配；备份为复制且分发脚本直接调用（非 `exec`）并合并退出码（GitGuard 非零优先）；安装三阶段零半安装 + 并发锁（退出码 50）；审计记录为 upsert 状态翻转（非新增行）；补充未安装卸载退出码 5 |
 | 0.1.3 | 2026-10-16 | GGD-0009：§2.12 补充宽松解析（未知字段警告不阻断）、取值越界与 `use_gitleaks: true` 的 FailClosed 语义并标注实现落点；新增 §2.12.1 `FR-071` 用户级配置条目（原仅见于 PRD，追溯矩阵同步补行） |
+| 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.3 状态输出改为实际 Hook 分类与退出码 6；§2.4 / §2.8 测试用例编号按实际落地收敛；§2.5 `IEnumerable` 更正为 `IAsyncEnumerable` 并标注 21 条规则与装配顺序；§2.7 报告样例改为 v0.1 实际输出（无建议文案、文本 → stderr / JSON → stdout）；§2.9 / §2.10 / §2.11 / §2.13 标注白名单 CLI、绕过审计、全量扫描、Gitleaks 的未实现状态；§2.12 补充 `exclude` / 扫描类型开关 / `fail_closed` 仅解析告警；§4 `audit export` 标注未实现；§5 全部 NFR 表新增 v0.1 状态列（性能未测量、兼容矩阵部分、i18n 未实现等）；§8 追溯矩阵补齐 FR-031 / FR-032 / FR-041 / FR-042 / FR-061 / FR-080 / FR-100 并新增实现状态列 |

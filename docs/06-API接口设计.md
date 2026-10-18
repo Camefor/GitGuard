@@ -191,7 +191,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 
 ### 4.7 分页
 
-CLI 命令目前无需分页。`gitguard audit list` 支持 `--limit N --offset M`（默认 20）。
+CLI 命令目前无需分页。`gitguard audit list` 支持 `--limit N --offset M`（默认 20；v0.2 规划，v0.1 未注册 `audit` 子命令，见 `GGD-0022`）。
 
 ## 5. 命令清单
 
@@ -316,6 +316,8 @@ gitguard install --format json
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
+> 退出码 20 / 21 / 30 / 31 / 40 为 v0.2 的 `allowlist` / `audit` / `rules` 命令预留（`ExitCodes` 已定义常量）；v0.1 未注册对应命令，不会实际返回。
+
 ## 7. 限流与配额
 
 - **本地工具无速率限制**。
@@ -338,3 +340,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.0 | 2026-10-15 | 初始化：7 条顶级命令、15 条稳定退出码、JSON Schema `gitguard.scan.v1` |
 | 0.1.1 | 2026-10-16 | GGD-0008：§5.1/§5.2 与实现对齐（`--force` 语义限定为二进制 / 符号链接接管；uninstall 补充 `--force` 与退出码 5 / 50 契约）；§6 退出码 4/5/6 场景细化；§8 锁路径更正为 `<git-common-dir>/gitguard.install.lock`（worktree 共享） |
 | 0.1.2 | 2026-10-16 | GGD-0009：§4.2/§4.3 与实现对齐（单行紧凑 JSON、`scan_type` / `skipped_files` / `audit_write_failed` / `warnings` 字段、指纹为 64 位十六进制、`action` 取值含 `AllowedByAllowlist`）；§4.4 错误 JSON 的 `run_id` 更正为 `trace_id`；新增 §4.5 Hook 生命周期 JSON（`gitguard.install.v1` / `gitguard.uninstall.v1`）与 §4.6 状态 / 版本 JSON（`gitguard.status.v1` / `gitguard.version.v1`）；§5.1~§5.4/§5.8 补充输出分流与退出码，MVP 范围固化（`scan` 仅 `--staged` / `--push`）；新增 §5.9 全局选项表（`--format` / `--no-color` / `--verbose` / `--trace` / `--log-file`）；§6 新增退出码 7（用法错误）与 14（审计存储失败） |
+| 0.1.3 | 2026-10-18 | GGD-0012 文档回填：§4.7 `audit list` 分页标注为 v0.2 规划（`GGD-0022`）；§6 标注退出码 20 / 21 / 30 / 31 / 40 为 v0.2 命令预留，v0.1 不会实际返回 |

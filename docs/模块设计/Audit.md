@@ -23,7 +23,7 @@
 
 | 消费方 | 内容 |
 | --- | --- |
-| CLI `gitguard audit list/view/export` | 查询结果 |
+| CLI `gitguard audit list/view/export`（v0.2 规划，`GGD-0022`） | 查询结果 |
 | 桌面端（P3） | 同上，经 Application 层 |
 | 清理任务 | 按保留期删除旧数据 |
 
@@ -145,3 +145,4 @@ flowchart LR
 | 0.1.1 | 2026-10-16 | GGD-0005：`SqliteAuditStore` 落地（WAL、ScanRun + Findings + ScanCompleted 事件单事务、BUSY 3 次退避后 FailClosed）；Unix 0600 与符号链接路径拒绝（08-权限设计 §5.1/§9），Windows ACL 加固延后至 CLI 路径解析任务；`ScanRun.Restore` / `Finding.Restore` 支持读回原始身份标识 |
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：扫描管线经 `IAuditStore.SaveScanRun(run, decisions)` 单事务落库（`findings.action` 取 `PolicyDecision`）；存储层 `SqliteException` 在管线内被捕获并降级为 `AuditWriteFailed` 标志，扫描结果照常返回（§4 / §6.1） |
 | 0.1.3 | 2026-10-16 | 与 GGD-0008 实现同步：§2.1 输入补 Hook 事件；§3 新增 Hook 写事务规则；§6.3 新增 Hook 安装 / 卸载写入流程（upsert + 事件同事务，卸载 `RestoredLegacyHook` 载荷，Hook 用例不捕获 `SqliteException`）；§4 降级列补 Hook 场景；§9 勾选 Hook 事务测试项 |
+| 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.2 标注 CLI `gitguard audit list/view/export` 为 v0.2 规划（`GGD-0022`），v0.1 无审计查询命令 |
