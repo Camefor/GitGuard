@@ -12,6 +12,8 @@ public sealed class ScanStagedUseCaseTests
 {
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
     private static readonly DateTimeOffset ScanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly string[] VendorExcludePaths = { "**/vendor/**" };
+    private static readonly string[] MinJsExcludeFiles = { "*.min.js" };
 
     [Fact]
     public async Task ExecuteAsync_NoStagedChanges_ReturnsCleanWithZeroFiles()
@@ -217,6 +219,51 @@ public sealed class ScanStagedUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ExcludedPath_IsNeitherScannedNorReportedAsSkipped()
+    {
+        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffFor("vendor/lib/app.env"));
+        var detector = new StubDetector("secret", _ => new List<Finding>
+        {
+            FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical),
+        });
+        var policy = new ScanPolicy(
+            SeverityPolicy.Default,
+            Array.Empty<AllowlistEntry>(),
+            VendorExcludePaths,
+            Array.Empty<string>());
+        ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore(), policy: policy);
+
+        ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        outcome.Result.Should().Be(ScanResult.Clean);
+        outcome.ExitCode.Should().Be(0);
+        outcome.FilesScanned.Should().Be(0);
+        outcome.SkippedFiles.Should().BeEmpty();
+        detector.SeenChanges.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExcludedFileName_MatchesAtAnyDepthAndLeavesOtherFilesScanned()
+    {
+        string diff = DiffFor("dist/assets/bundle.min.js") + DiffFor("src/app.ts");
+        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => diff);
+        var detector = new StubDetector("secret", _ => Array.Empty<Finding>());
+        var policy = new ScanPolicy(
+            SeverityPolicy.Default,
+            Array.Empty<AllowlistEntry>(),
+            Array.Empty<string>(),
+            MinJsExcludeFiles);
+        ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore(), policy: policy);
+
+        ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        outcome.Result.Should().Be(ScanResult.Clean);
+        outcome.FilesScanned.Should().Be(1);
+        outcome.SkippedFiles.Should().BeEmpty();
+        detector.SeenChanges.Should().ContainSingle().Which.Path.Should().Be("src/app.ts");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_RunAggregate_CarriesRepoPathScanTypeAndClockStart()
     {
         var git = new FakeGitAccess(RepoRoot, stagedDiff: () => string.Empty);
@@ -259,11 +306,20 @@ public sealed class ScanStagedUseCaseTests
         IGitAccess gitAccess,
         IDetector detector,
         IAuditStore auditStore,
-        ScanSettings? settings = null) =>
+        ScanSettings? settings = null,
+        ScanPolicy? policy = null) =>
         new ScanStagedUseCase(
             gitAccess,
             new List<IDetector> { detector },
             auditStore,
             new FixedClock(ScanStart),
-            settings);
+            settings,
+            policy);
+
+    private static string DiffFor(string path) =>
+        $"diff --git a/{path} b/{path}\n" +
+        $"--- a/{path}\n" +
+        $"+++ b/{path}\n" +
+        "@@ -0,0 +1 @@\n" +
+        "+added line\n";
 }

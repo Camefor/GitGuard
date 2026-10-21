@@ -45,6 +45,56 @@ public sealed class CliScanCommandTests
     }
 
     [Fact]
+    public async Task StagedCanaryInExcludedPath_IsNotScanned()
+    {
+        using var harness = new CliHarness();
+        string canary = CliHarness.CreateCanaryToken();
+        harness.WriteFile("vendor/lib/app.env", $"aws_key={canary}\n");
+        harness.Stage("vendor/lib/app.env");
+        harness.WriteProjectConfig("""
+            version: 1
+            exclude:
+              paths:
+                - "**/vendor/**"
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged", "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        using var document = JsonDocument.Parse(harness.Output);
+        JsonElement root = document.RootElement;
+        root.GetProperty("result").GetString().Should().Be("Clean");
+        root.GetProperty("summary").GetProperty("files_scanned").GetInt32().Should().Be(0);
+        root.GetProperty("findings").GetArrayLength().Should().Be(0);
+        harness.Error.Should().NotContain(canary);
+    }
+
+    [Fact]
+    public async Task StagedCanaryInExcludedFile_IsNotScanned()
+    {
+        using var harness = new CliHarness();
+        string canary = CliHarness.CreateCanaryToken();
+        harness.WriteFile("dist/assets/bundle.min.js", $"aws_key={canary}\n");
+        harness.Stage("dist/assets/bundle.min.js");
+        harness.WriteProjectConfig("""
+            version: 1
+            exclude:
+              files:
+                - "*.min.js"
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged", "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        using var document = JsonDocument.Parse(harness.Output);
+        JsonElement root = document.RootElement;
+        root.GetProperty("result").GetString().Should().Be("Clean");
+        root.GetProperty("summary").GetProperty("files_scanned").GetInt32().Should().Be(0);
+        root.GetProperty("findings").GetArrayLength().Should().Be(0);
+        harness.Error.Should().NotContain(canary);
+    }
+
+    [Fact]
     public async Task StagedScan_JsonOutput_MatchesScanSchema()
     {
         using var harness = new CliHarness();

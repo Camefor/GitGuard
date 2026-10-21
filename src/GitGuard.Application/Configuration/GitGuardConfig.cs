@@ -114,6 +114,12 @@ public sealed record GitGuardConfig
     /// <summary>配置文件声明的白名单条目；参与策略判定的「ignored_by_allowlist」匹配。</summary>
     public ImmutableArray<AllowlistEntry> Allowlist { get; }
 
+    /// <summary>排除的路径 glob（<c>exclude.paths</c>，匹配仓库相对路径）；命中文件不进入扫描。</summary>
+    public ImmutableArray<string> ExcludePaths { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>排除的文件名 glob（<c>exclude.files</c>，匹配任意目录下的文件名）；命中文件不进入扫描。</summary>
+    public ImmutableArray<string> ExcludeFiles { get; init; } = ImmutableArray<string>.Empty;
+
     /// <summary>实际参与合并的配置文件路径（低优先级在前）；空表示全部使用内置默认。</summary>
     public ImmutableArray<string> LoadedConfigFiles { get; }
 

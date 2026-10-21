@@ -210,7 +210,8 @@ public sealed class GitGuardSession
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
     public StatusUseCase CreateStatus() => new StatusUseCase(GitAccess, Config, Version);
 
-    private static ScanPolicy BuildScanPolicy(GitGuardConfig config) => new ScanPolicy(config.Policy, config.Allowlist);
+    private static ScanPolicy BuildScanPolicy(GitGuardConfig config) =>
+        new ScanPolicy(config.Policy, config.Allowlist, config.ExcludePaths, config.ExcludeFiles);
 
     private GitGuardConfig LoadConfig() =>
         new GitGuardConfigLoader(_options.WorkingDirectory, _paths.UserConfigPath, _clock).Load();

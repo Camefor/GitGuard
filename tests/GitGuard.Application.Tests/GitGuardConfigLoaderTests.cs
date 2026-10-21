@@ -216,10 +216,85 @@ public sealed class GitGuardConfigLoaderTests
         GitGuardConfig config = CreateLoader(project.Root).Load();
 
         config.LogVerbose.Should().BeTrue();
+        config.ExcludePaths.Should().ContainSingle().Which.Should().Be("**/vendor/**");
         config.Warnings.Should().Contain(warning => warning.Contains("scan.pre_commit"));
         config.Warnings.Should().Contain(warning => warning.Contains("fail_closed"));
         config.Warnings.Should().Contain(warning => warning.Contains("logging.verbose"));
-        config.Warnings.Should().Contain(warning => warning.Contains("exclude"));
+        config.Warnings.Should().NotContain(warning => warning.Contains("exclude"));
+    }
+
+    [Fact]
+    public void Load_ExcludeSection_MapsPathsAndFilesWithTrimming()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            exclude:
+              paths:
+                - " **/obj/** "
+              files:
+                - "*.min.js"
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        config.ExcludePaths.Should().ContainSingle().Which.Should().Be("**/obj/**");
+        config.ExcludeFiles.Should().ContainSingle().Which.Should().Be("*.min.js");
+        config.Warnings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Load_ProjectExcludeOverridesUserExcludePerField()
+    {
+        using var project = new TempDirectory();
+        string userConfigPath = Path.Combine(project.Root, "user-config.yml");
+        const string userYaml = """
+            version: 1
+            exclude:
+              paths:
+                - "**/user/**"
+              files:
+                - "*.user"
+            """;
+        const string projectYaml = """
+            version: 1
+            exclude:
+              paths:
+                - "**/project/**"
+            """;
+        File.WriteAllText(userConfigPath, userYaml);
+        File.WriteAllText(ProjectConfigPath(project), projectYaml);
+
+        GitGuardConfig config = CreateLoader(project.Root, userConfigPath).Load();
+
+        config.ExcludePaths.Should().ContainSingle().Which.Should().Be("**/project/**");
+        config.ExcludeFiles.Should().ContainSingle().Which.Should().Be("*.user");
+    }
+
+    [Fact]
+    public void Load_ExcludeBlankItem_FailsClosed()
+    {
+        using var project = new TempDirectory();
+        const string yaml = "version: 1\nexclude:\n  files:\n    - \"  \"\n";
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        Action act = () => CreateLoader(project.Root).Load();
+
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("exclude.files");
+    }
+
+    [Fact]
+    public void Load_UnknownExcludeKey_ProducesWarning()
+    {
+        using var project = new TempDirectory();
+        const string yaml = "version: 1\nexclude:\n  path:\n    - \"**/bin/**\"\n";
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        config.ExcludePaths.Should().BeEmpty();
+        config.Warnings.Should().Contain(warning => warning.Contains("exclude.path"));
     }
 
     [Fact]

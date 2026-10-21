@@ -141,12 +141,12 @@
   - 未知字段：警告但不阻断（宽松解析），警告经 `gitguard status` 与扫描报告的 `warnings` 透出。
   - 取值越界（`scan.max_file_bytes` / `scan.timeout_ms` / `logging.file.*` / `rules.secrets.min_entropy`）→ FailClosed（退出码 13）。
   - `rules.secrets.use_gitleaks: true`（P2 未实现）→ FailClosed：无法兑现的开关静默忽略会构成 FailOpen。
-  - `exclude`：仅解析并产生警告，**尚未消费**（被排除路径仍会被扫描）；补齐登记为 `GGD-0019`。
+  - `exclude.paths`：glob 匹配仓库相对路径；`exclude.files`：glob 匹配任意目录下的文件名。命中文件在扫描管线中直接跳过（暂存区与推送共用），不产生 Finding，也不计入 `skipped_files`；空项 → 退出码 13。
   - `scan.pre_commit: false` / `scan.pre_push: false`：仅警告，扫描类型开关尚未接线（Hook 分发脚本恒调用扫描）。
   - `scan.fail_closed: false`：仅警告，MVP 行为恒为 FailClosed（DR-03）。
 - **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）。
-- **v0.1 实现状态**：除 `exclude` 与上述「仅警告」项外，其余字段均生效。
-- **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-04`
+- **v0.1 实现状态**：除上述「仅警告」项外，其余字段均生效（`exclude` 自 `GGD-0019` 起生效）。
+- **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-05`
 
 ### 2.12.1 `FR-071` 用户级配置
 
@@ -278,7 +278,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
 | `FR-061` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
-| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~04`（`GitGuardConfigLoaderTests` / `CliScanCommandTests`） | 部分实现（`exclude` 未消费，`GGD-0019`） |
+| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~05`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` | 无 | 未实现（v0.2） |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | 无 | 未实现（v0.2） |
@@ -301,3 +301,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.3 | 2026-10-16 | GGD-0009：§2.12 补充宽松解析（未知字段警告不阻断）、取值越界与 `use_gitleaks: true` 的 FailClosed 语义并标注实现落点；新增 §2.12.1 `FR-071` 用户级配置条目（原仅见于 PRD，追溯矩阵同步补行） |
 | 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.3 状态输出改为实际 Hook 分类与退出码 6；§2.4 / §2.8 测试用例编号按实际落地收敛；§2.5 `IEnumerable` 更正为 `IAsyncEnumerable` 并标注 21 条规则与装配顺序；§2.7 报告样例改为 v0.1 实际输出（无建议文案、文本 → stderr / JSON → stdout）；§2.9 / §2.10 / §2.11 / §2.13 标注白名单 CLI、绕过审计、全量扫描、Gitleaks 的未实现状态；§2.12 补充 `exclude` / 扫描类型开关 / `fail_closed` 仅解析告警；§4 `audit export` 标注未实现；§5 全部 NFR 表新增 v0.1 状态列（性能未测量、兼容矩阵部分、i18n 未实现等）；§8 追溯矩阵补齐 FR-031 / FR-032 / FR-041 / FR-042 / FR-061 / FR-080 / FR-100 并新增实现状态列 |
 | 0.1.5 | 2026-10-21 | GGD-0013：§2.10 按实现重写 FR-050（父提交 + 暂存树预测、`--record-pending` 隐藏选项、`GITGUARD_SKIP=1` 仅 Hook 模式、标记文件路径 / 原子写 / 失败语义、`NoVerify` / `GitGuardSkip` 判定、`Bypass` 运行与审计载荷、post-commit 退出码）；§5.3 NFR-S-004 标记已覆盖；§8 FR-050 追溯补齐测试类与 E2E S8；§9 Q-01 记录决议 |
+| 0.1.6 | 2026-10-21 | GGD-0019：§2.12 `exclude` 改为已消费语义（`paths` 匹配仓库相对路径、`files` 匹配任意深度文件名、命中不计入 `skipped_files`、空项 FailClosed）；§8 FR-070 追溯补 `TC-FR-070-05` 并标记已实现 |

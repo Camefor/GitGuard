@@ -20,7 +20,8 @@ namespace GitGuard.Application.Configuration;
 /// <list type="bullet">
 ///   <item><description><c>version</c> 缺失或不为 <see cref="GitGuardConfig.SUPPORTED_VERSION"/> → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
 ///   <item><description><c>policy.critical: allow</c> 违反硬下限 → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
-///   <item><description>未知字段、<c>fail_closed: false</c>、<c>exclude</c>（GGD-0009 仅解析不消费）、<c>pre_commit</c> / <c>pre_push</c>（语义接线顺延）→ 宽松处理：记入 <see cref="GitGuardConfig.Warnings"/>，不阻断。</description></item>
+///   <item><description>未知字段、<c>fail_closed: false</c>、<c>pre_commit</c> / <c>pre_push</c>（语义接线顺延）→ 宽松处理：记入 <see cref="GitGuardConfig.Warnings"/>，不阻断。</description></item>
+///   <item><description><c>exclude.paths</c> / <c>exclude.files</c> 含空项 → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
 ///   <item><description><c>rules.secrets.use_gitleaks: true</c>（P2 未实现）→ 抛 <see cref="ConfigurationException"/>：无法兑现的开关静默忽略会构成 FailOpen。</description></item>
 /// </list>
 /// </summary>
@@ -42,13 +43,14 @@ public sealed class GitGuardConfigLoader
 
     /// <summary>
     /// 各层级已知键（宽松解析的「未知字段 → 警告」依据，Policy.md §9）。
-    /// 未列出的键（含 <c>exclude</c> 之下的深层结构）不做键名校验。
+    /// 未列出的键不做键名校验。
     /// </summary>
     private static readonly ImmutableDictionary<string, ImmutableHashSet<string>> KNOWN_KEYS =
         new Dictionary<string, ImmutableHashSet<string>>(StringComparer.Ordinal)
         {
             [string.Empty] = ImmutableHashSet.Create(StringComparer.Ordinal, "version", "scan", "logging", "rules", "policy", "exclude", "allowlist"),
             ["scan"] = ImmutableHashSet.Create(StringComparer.Ordinal, "pre_commit", "pre_push", "fail_closed", "max_file_bytes", "timeout_ms"),
+            ["exclude"] = ImmutableHashSet.Create(StringComparer.Ordinal, "paths", "files"),
             ["logging"] = ImmutableHashSet.Create(StringComparer.Ordinal, "verbose", "file"),
             ["logging.file"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "path", "max_bytes", "max_files"),
             ["rules"] = ImmutableHashSet.Create(StringComparer.Ordinal, "secrets", "privacy", "local_path", "url"),
@@ -319,13 +321,10 @@ public sealed class GitGuardConfigLoader
             warnings.Add("logging.verbose 已启用：默认以 Debug 级输出（等价于常带 --verbose）。");
         }
 
-        if (merged.Exclude is { } exclude && ((exclude.Paths?.Count ?? 0) > 0 || (exclude.Files?.Count ?? 0) > 0))
-        {
-            warnings.Add("exclude 段落已解析但本版本尚未消费（GGD-0009 顺延，见模块设计/Policy.md）；被排除路径仍会被扫描。");
-        }
-
         SeverityPolicy policy = BuildPolicy(merged.Policy);
         ImmutableArray<AllowlistEntry> allowlist = BuildAllowlist(merged.Allowlist, now, createdBy);
+        ImmutableArray<string> excludePaths = NormalizeList(merged.Exclude?.Paths, "exclude.paths");
+        ImmutableArray<string> excludeFiles = NormalizeList(merged.Exclude?.Files, "exclude.files");
 
         return new GitGuardConfig(
             GitGuardConfig.SUPPORTED_VERSION,
@@ -339,7 +338,11 @@ public sealed class GitGuardConfigLoader
             merged.Logging?.Verbose ?? false,
             allowlist,
             loadedFiles,
-            warnings);
+            warnings)
+        {
+            ExcludePaths = excludePaths,
+            ExcludeFiles = excludeFiles,
+        };
     }
 
     private static void WarnDisabledScanType(bool? enabled, string key, List<string> warnings)

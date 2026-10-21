@@ -123,11 +123,19 @@ internal sealed class ScanExecutor
         }
     }
 
-    /// <summary>跳过判定：二进制 → skipped(Binary)；新增内容超限 → skipped(TooLarge)；纯删除（无新增行）不产生扫描单元。</summary>
+    /// <summary>
+    /// 跳过判定：<c>exclude</c> 命中 → 直接排除（用户显式配置，不扫描也不记 skipped）；
+    /// 二进制 → skipped(Binary)；新增内容超限 → skipped(TooLarge)；纯删除（无新增行）不产生扫描单元。
+    /// </summary>
     private void PartitionFiles(IReadOnlyList<ParsedDiffFile> parsedFiles, List<FileChange> changes, List<SkippedFile> skippedFiles)
     {
         foreach (ParsedDiffFile file in parsedFiles)
         {
+            if (_policy.IsExcluded(file.Path))
+            {
+                continue;
+            }
+
             if (file.IsBinary)
             {
                 skippedFiles.Add(new SkippedFile(file.Path, SkipReason.Binary, file.CommitSha));
