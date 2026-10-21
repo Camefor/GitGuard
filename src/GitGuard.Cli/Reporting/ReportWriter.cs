@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Hooks;
 using GitGuard.Application.Scanning;
@@ -25,6 +26,8 @@ internal sealed class ReportWriter
     private const string STATUS_SCHEMA = "gitguard.status.v1";
     private const string VERSION_SCHEMA = "gitguard.version.v1";
     private const string BYPASS_SCHEMA = "gitguard.bypass.v1";
+    private const string AUDIT_LIST_SCHEMA = "gitguard.audit.list.v1";
+    private const string AUDIT_EXPORT_SUMMARY_SCHEMA = "gitguard.audit.export.summary.v1";
 
     private readonly TextWriter _output;
     private readonly TextWriter _error;
@@ -280,6 +283,74 @@ internal sealed class ReportWriter
             _text.Format(CliTextKey.RuntimeDescription, version.FrameworkDescription, version.RuntimeIdentifier));
     }
 
+    /// <summary>渲染审计列表（<c>06-API接口设计</c> §5.6；文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="query">本次查询条件（输出分页信息）。</param>
+    /// <param name="page">查询结果。</param>
+    /// <exception cref="ArgumentNullException">任一参数为 <see langword="null"/>。</exception>
+    internal void WriteAuditList(AuditQuery query, AuditRunPage page)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(page);
+
+        if (_json)
+        {
+            WriteAuditListJson(query, page);
+            return;
+        }
+
+        _error.WriteLine(_text.Get(CliTextKey.AuditListHeader));
+        if (page.Runs.IsEmpty)
+        {
+            string emptyMessage = page.TotalCount == 0
+                ? _text.Get(CliTextKey.AuditListEmpty)
+                : _text.Format(CliTextKey.AuditListPageEmpty, page.TotalCount);
+            WriteIndented(null, emptyMessage);
+            return;
+        }
+
+        int first = query.Offset + 1;
+        int last = query.Offset + page.Runs.Length;
+        _error.WriteLine(_text.Format(CliTextKey.AuditListSummary, page.TotalCount, first, last));
+        foreach (AuditRunSummary run in page.Runs)
+        {
+            string duration = run.DurationMs is { } durationMs
+                ? string.Create(CultureInfo.InvariantCulture, $"{durationMs}ms")
+                : _text.Get(CliTextKey.UnknownDuration);
+            WriteIndented(
+                null,
+                _text.Format(
+                    CliTextKey.AuditListLine,
+                    run.RunId,
+                    FormatAuditTimestamp(run.StartedAt),
+                    ScanTypeText(run.ScanType),
+                    ScanResultText(run.Result),
+                    run.FindingCount,
+                    duration,
+                    run.RepoPath));
+        }
+    }
+
+    /// <summary>渲染审计导出摘要（文本 → stderr；JSON → stdout；文件内容由用例写入）。</summary>
+    /// <param name="report">导出结果。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="report"/> 为 <see langword="null"/>。</exception>
+    internal void WriteAuditExport(AuditExportReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        if (_json)
+        {
+            WriteAuditExportJson(report);
+            return;
+        }
+
+        WriteColored("✔ ", ConsoleColor.Green);
+        _error.WriteLine(_text.Get(CliTextKey.AuditExportHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelOutputPath), report.OutputPath);
+        WriteIndented(_text.Get(CliTextKey.LabelFormat), report.Format == AuditExportFormat.Json ? "json" : "csv");
+        WriteIndented(_text.Get(CliTextKey.LabelRunCount), report.RunCount.ToString(CultureInfo.InvariantCulture));
+        WriteIndented(_text.Get(CliTextKey.LabelFindingCount), report.FindingCount.ToString(CultureInfo.InvariantCulture));
+    }
+
     /// <summary>渲染错误报告（文本 → stderr；JSON → stdout）。</summary>
     /// <param name="exitCode">退出码。</param>
     /// <param name="errorCode">错误码（<c>10-异常处理设计</c> §4 登记值）。</param>
@@ -405,6 +476,9 @@ internal sealed class ReportWriter
         ExitCodes.CONFIG_INVALID => text.Get(CliTextKey.HintConfigInvalid),
         _ => text.Get(CliTextKey.HintScanIncomplete),
     };
+
+    private static string FormatAuditTimestamp(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
 
     private static void WriteFindingJson(
         Utf8JsonWriter writer,
@@ -771,6 +845,64 @@ internal sealed class ReportWriter
             writer.WriteEndArray();
 
             writer.WriteBoolean("needs_attention", report.NeedsAttention);
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteAuditListJson(AuditQuery query, AuditRunPage page)
+    {
+        var buffer = new ArrayBufferWriter<byte>(1024);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", AUDIT_LIST_SCHEMA);
+            writer.WriteNumber("total", page.TotalCount);
+            writer.WriteNumber("limit", query.Limit);
+            writer.WriteNumber("offset", query.Offset);
+            writer.WriteNumber("count", page.Runs.Length);
+            writer.WriteStartArray("runs");
+            foreach (AuditRunSummary run in page.Runs)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("run_id", run.RunId.ToString());
+                writer.WriteString("repo_path", run.RepoPath);
+                writer.WriteString("scan_type", run.ScanType.ToString());
+                writer.WriteString("started_at", FormatAuditTimestamp(run.StartedAt));
+                if (run.DurationMs is { } duration)
+                {
+                    writer.WriteNumber("duration_ms", duration);
+                }
+                else
+                {
+                    writer.WriteNull("duration_ms");
+                }
+
+                writer.WriteString("result", ScanResultText(run.Result));
+                writer.WriteNumber("exit_code", run.ExitCode);
+                writer.WriteNumber("findings_count", run.FindingCount);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteAuditExportJson(AuditExportReport report)
+    {
+        var buffer = new ArrayBufferWriter<byte>(256);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", AUDIT_EXPORT_SUMMARY_SCHEMA);
+            writer.WriteString("output_path", report.OutputPath);
+            writer.WriteString("format", report.Format == AuditExportFormat.Json ? "json" : "csv");
+            writer.WriteNumber("run_count", report.RunCount);
+            writer.WriteNumber("finding_count", report.FindingCount);
             writer.WriteEndObject();
         }
 

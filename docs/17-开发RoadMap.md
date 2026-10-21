@@ -17,7 +17,7 @@
 - **目标**：在本机 CLI 层形成完整的 commit/push 拦截闭环，`16-测试方案.md` §12 的 8 条场景全通过。
 - **交付物**：
   - `GitGuard.sln` 项目骨架（Core / Detection / Application / Infrastructure / Cli / tests）。
-  - `gitguard install / uninstall / status / scan / version` 五条命令。
+  - `gitguard install / uninstall / status / scan / audit list / audit export / version` 命令集。
   - 四类检测器（Secret / Privacy / LocalPath / Url）内置规则共 21 条（Secret 8 / Privacy 5 / LocalPath 4 / Url 4）；「各 ≥ 10 条」目标顺延到 v0.2 规则升级。
   - SQLite 审计 Schema v1；迁移器可用。
   - CI 多平台构建矩阵；Native AOT 发行物。
@@ -127,3 +127,4 @@ flowchart LR
 | 0.1.2 | 2026-10-21 | GGD-0013：§1 v0.1 范围纳入 FR-050；§2.1 退出条件「8 条 MVP 必过场景」勾选（S1~S8 全部通过） |
 | 0.1.3 | 2026-10-21 | GGD-0020：§2.1 性能退出条件回填实测状态（P-002 达标；P-001 / P-003 受宿主进程创建开销影响未达标，登记 `GGD-0023`） |
 | 0.1.4 | 2026-10-21 | GGD-0023：§2.1 性能退出条件回填——P-003 经批量取差异优化后 P95 669.78 ms 达标；P-001 仍需正常宿主复测 |
+| 0.1.5 | 2026-10-21 | GGD-0022：§2.1 交付物补 `audit list` / `audit export`（审计查询与脱敏导出提前落地） |

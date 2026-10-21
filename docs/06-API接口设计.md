@@ -210,7 +210,93 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 
 ### 4.8 分页
 
-CLI 命令目前无需分页。`gitguard audit list` 支持 `--limit N --offset M`（默认 20；v0.2 规划，v0.1 未注册 `audit` 子命令，见 `GGD-0022`）。
+`gitguard audit list` 支持 `--limit N --offset M`：`N` 取值 1~1000（默认 20），`M` ≥ 0。结果排序固定为 `started_at DESC, rowid DESC`（同一毫秒内后写入者在前）；`--since` / `--result` 筛选与分页均在 SQLite 查询层完成，`total` 为筛选后的总数。`gitguard audit view` 尚未注册（v0.2，退出码 30 预留）。
+
+### 4.9 审计查询与导出输出（JSON / CSV）
+
+`gitguard audit list --format json` 输出 `gitguard.audit.list.v1`（stdout 单行紧凑）：
+
+```json
+{
+  "schema": "gitguard.audit.list.v1",
+  "total": 42,
+  "limit": 20,
+  "offset": 0,
+  "count": 20,
+  "runs": [
+    {
+      "run_id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33",
+      "repo_path": "D:/work/my-project",
+      "scan_type": "PreCommit",
+      "started_at": "2026-10-21T08:00:00.000Z",
+      "duration_ms": 91,
+      "result": "Blocked",
+      "exit_code": 1,
+      "findings_count": 1
+    }
+  ]
+}
+```
+
+- `total`：筛选后的记录总数；`count`：当前页条数（可为 0）。
+- `scan_type` / `result`：`ScanType` / `ScanResult` 枚举名；`started_at` 为 UTC ISO 8601（毫秒 + `Z`）。
+- `duration_ms`：Bypass 等未记录耗时的运行为 `null`。
+- 查询范围为整个本地审计库（含所有仓库）；命令不要求当前目录是 Git 仓库。
+
+`gitguard audit export --output <path>` 写出 `gitguard.audit.export.v1`（JSON）或 CSV；文件只包含 `snippet_masked` 与 HMAC 指纹，不包含原文：
+
+```json
+{
+  "schema": "gitguard.audit.export.v1",
+  "exported_at": "2026-10-21T08:00:00.000Z",
+  "run_count": 1,
+  "finding_count": 1,
+  "runs": [
+    {
+      "run_id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33",
+      "repo_path": "D:/work/my-project",
+      "scan_type": "PreCommit",
+      "started_at": "2026-10-21T08:00:00.000Z",
+      "duration_ms": 91,
+      "result": "Blocked",
+      "exit_code": 1,
+      "findings": [
+        {
+          "finding_id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c34",
+          "rule_id": "GGD/SECRET/AWS-AKID",
+          "file_path": "config/app.env",
+          "line_number": 1,
+          "severity": "Critical",
+          "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "snippet_masked": "AK****************42",
+          "commit_sha": null
+        }
+      ]
+    }
+  ]
+}
+```
+
+CSV 契约：
+
+- UTF-8 with BOM、CRLF；表头固定为
+  `run_id,repo_path,scan_type,started_at,duration_ms,result,exit_code,finding_id,rule_id,file_path,line_number,severity,fingerprint,snippet_masked,commit_sha`。
+- 每个 Finding 一行；无 Finding 的运行保留一行运行级数据（Finding 相关列为空）。
+- 含逗号 / 双引号 / CR / LF 的字段按 RFC 4180 加双引号并转义内部双引号；以 `= + - @ \t \r` 开头的字段前置 `'` 防电子表格公式注入。
+
+导出摘要（stdout，`gitguard.audit.export.summary.v1`）：
+
+```json
+{
+  "schema": "gitguard.audit.export.summary.v1",
+  "output_path": "D:/backup/audit.json",
+  "format": "json",
+  "run_count": 1,
+  "finding_count": 1
+}
+```
+
+写入采用同目录临时文件 + 原子替换：目标已存在时覆盖；路径不可写 / 为目录 / IO 失败 → 退出码 31，且不残留临时文件。
 
 ## 5. 命令清单
 
@@ -273,13 +359,22 @@ gitguard install --format json
 - **退出码**：0 成功；20 校验失败；21 条目不存在。
 - **关联 FR**：`FR-040, FR-041`。
 
-### 5.6 `gitguard audit` — 本地审计查看
+### 5.6 `gitguard audit` — 本地审计查看与导出
 
 - **子命令**：
-  - `list --limit 20 --offset 0 [--since <date>] [--result Blocked]`
-  - `view <run-id>`
-  - `export --output <path> --format json|csv`
-- **退出码**：0 成功；30 run_id 不存在；31 导出失败。
+  - `list [--limit N] [--offset M] [--since <date>] [--result <Clean|Warned|Blocked|Failed>]`
+    - `--limit` 1~1000（默认 20）；`--offset` ≥ 0（默认 0）。
+    - `--since` 接受 ISO 8601 时间；无时区偏移时按 UTC 解释，带偏移时先转换为 UTC；非法时间 → 退出码 7。
+    - `--result` 只接受枚举名（大小写不敏感），拒绝数字取值 → 退出码 7。
+  - `export --output <path> [--format json|csv]`
+    - `--output` 必填；相对路径按当前工作目录解析，`~` 展开为用户主目录。
+    - 子命令后的局部 `--format` 表示**导出文件格式**（默认 `json`）；全局输出格式须置于 `export` 之前（如 `gitguard --format json audit export --output a.json`）。
+  - `view <run-id>`：尚未注册（v0.2，退出码 30 预留）。
+- **输入**：无（查询整个本地审计库，含所有仓库；不要求当前目录是 Git 仓库）。
+- **输出**：文本摘要 → stderr；`--format json` 时列表 / 导出摘要 → stdout（Schema 见 §4.9）；导出文件由用例直接写入 `--output`。
+- **脱敏**：导出与列表只包含 `snippet_masked` 与 HMAC 指纹，不恢复、不写入任何原文（DR-02）。
+- **退出码**：0 成功；7 参数非法；14 审计库读取失败；31 导出写入失败。
+- **关联需求**：SRS §4 审计导出接口；`DR-02`。
 
 ### 5.7 `gitguard rules` — 规则查看
 
@@ -346,7 +441,7 @@ gitguard install --format json
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
-> 退出码 20 / 21 / 30 / 31 / 40 为 v0.2 的 `allowlist` / `audit` / `rules` 命令预留（`ExitCodes` 已定义常量）；v0.1 未注册对应命令，不会实际返回。
+> 退出码 20 / 21 / 30 / 40 仍为 v0.2 的 `allowlist` / `audit view` / `rules` 命令预留（`ExitCodes` 已定义常量），对应命令未注册。退出码 31 已由 `audit export` 实际使用（`AUDIT_EXPORT_FAILED`）。
 
 ## 7. 限流与配额
 
@@ -372,3 +467,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.2 | 2026-10-16 | GGD-0009：§4.2/§4.3 与实现对齐（单行紧凑 JSON、`scan_type` / `skipped_files` / `audit_write_failed` / `warnings` 字段、指纹为 64 位十六进制、`action` 取值含 `AllowedByAllowlist`）；§4.4 错误 JSON 的 `run_id` 更正为 `trace_id`；新增 §4.5 Hook 生命周期 JSON（`gitguard.install.v1` / `gitguard.uninstall.v1`）与 §4.6 状态 / 版本 JSON（`gitguard.status.v1` / `gitguard.version.v1`）；§5.1~§5.4/§5.8 补充输出分流与退出码，MVP 范围固化（`scan` 仅 `--staged` / `--push`）；新增 §5.9 全局选项表（`--format` / `--no-color` / `--verbose` / `--trace` / `--log-file`）；§6 新增退出码 7（用法错误）与 14（审计存储失败） |
 | 0.1.3 | 2026-10-18 | GGD-0012 文档回填：§4.7 `audit list` 分页标注为 v0.2 规划（`GGD-0022`）；§6 标注退出码 20 / 21 / 30 / 31 / 40 为 v0.2 命令预留，v0.1 不会实际返回 |
 | 0.1.4 | 2026-10-21 | GGD-0013：新增 §4.7 `gitguard.bypass.v1` 契约（分页顺延为 §4.8）；§5.1/§5.2 `--hook` 取值补 `post-commit`；§5.4 新增隐藏选项 `--record-pending` 与 `GITGUARD_SKIP=1`（仅 Hook 模式）语义；新增 §5.9 隐藏命令 `hook post-commit`（全局选项 / 帮助顺延为 §5.10 / §5.11） |
+| 0.1.5 | 2026-10-21 | GGD-0022：§4.8 落地 `audit list` 分页（上限 1000，`started_at DESC, rowid DESC`）；新增 §4.9 审计列表 / 导出 JSON Schema（`gitguard.audit.list.v1` / `gitguard.audit.export.v1` / `gitguard.audit.export.summary.v1`）与 CSV 转义 / 公式注入防护契约；§5.6 重写 `audit list` / `export` 选项、输出分流与退出码（7 / 14 / 31），`view` 保持 v0.2 预留；§6 退出码 31 转为已使用 |

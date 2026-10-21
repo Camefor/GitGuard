@@ -136,6 +136,18 @@ public sealed class SqliteAuditStore : IAuditStore
     }
 
     /// <inheritdoc />
+    public AuditRunPage QueryScanRuns(AuditQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        return ExecuteWithBusyRetry("查询审计运行", connection => SelectScanRunPage(connection, query));
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<ScanRun> ListScanRunsForExport() =>
+        ExecuteWithBusyRetry("读取审计导出数据", SelectAllScanRuns);
+
+    /// <inheritdoc />
     public void SaveHookInstallation(HookInstallation installation)
     {
         ArgumentNullException.ThrowIfNull(installation);
@@ -475,6 +487,82 @@ public sealed class SqliteAuditStore : IAuditStore
                 "SELECT id FROM scan_runs WHERE repo_path = $repo_path ORDER BY started_at DESC, rowid DESC LIMIT $limit;";
             command.Parameters.AddWithValue("$repo_path", repoPath);
             command.Parameters.AddWithValue("$limit", limit);
+
+            using SqliteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                runIds.Add(Guid.Parse(reader.GetString(0)));
+            }
+        }
+
+        var runs = new List<ScanRun>(runIds.Count);
+        foreach (Guid runId in runIds)
+        {
+            ScanRun? run = SelectScanRun(connection, runId);
+            if (run is not null)
+            {
+                runs.Add(run);
+            }
+        }
+
+        return runs;
+    }
+
+    private static AuditRunPage SelectScanRunPage(SqliteConnection connection, AuditQuery query)
+    {
+        object since = (object?)query.Since?.ToUnixTimeMilliseconds() ?? DBNull.Value;
+        object result = (object?)query.Result?.ToString() ?? DBNull.Value;
+
+        int totalCount;
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                "SELECT COUNT(*) FROM scan_runs " +
+                "WHERE ($since IS NULL OR started_at >= $since) AND ($result IS NULL OR result = $result);";
+            command.Parameters.AddWithValue("$since", since);
+            command.Parameters.AddWithValue("$result", result);
+            totalCount = checked((int)(long)(command.ExecuteScalar() ?? 0L));
+        }
+
+        var runs = new List<AuditRunSummary>(query.Limit);
+        using (var command = connection.CreateCommand())
+        {
+            // Finding 计数用相关子查询：摘要页只需数量，不加载明细
+            command.CommandText =
+                "SELECT r.id, r.repo_path, r.scan_type, r.started_at, r.duration_ms, r.result, r.exit_code, " +
+                "(SELECT COUNT(*) FROM findings f WHERE f.run_id = r.id) " +
+                "FROM scan_runs r " +
+                "WHERE ($since IS NULL OR r.started_at >= $since) AND ($result IS NULL OR r.result = $result) " +
+                "ORDER BY r.started_at DESC, r.rowid DESC LIMIT $limit OFFSET $offset;";
+            command.Parameters.AddWithValue("$since", since);
+            command.Parameters.AddWithValue("$result", result);
+            command.Parameters.AddWithValue("$limit", query.Limit);
+            command.Parameters.AddWithValue("$offset", query.Offset);
+
+            using SqliteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                runs.Add(new AuditRunSummary(
+                    Guid.Parse(reader.GetString(0)),
+                    reader.GetString(1),
+                    Enum.Parse<ScanType>(reader.GetString(2)),
+                    DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(3)),
+                    reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                    Enum.Parse<ScanResult>(reader.GetString(5)),
+                    reader.GetInt32(6),
+                    checked((int)reader.GetInt64(7))));
+            }
+        }
+
+        return new AuditRunPage(runs, totalCount);
+    }
+
+    private static List<ScanRun> SelectAllScanRuns(SqliteConnection connection)
+    {
+        var runIds = new List<Guid>();
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT id FROM scan_runs ORDER BY started_at DESC, rowid DESC;";
 
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())

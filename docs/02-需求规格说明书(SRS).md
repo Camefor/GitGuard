@@ -185,7 +185,7 @@
 | --- | --- | --- | --- |
 | 对外（CLI） | `gitguard` 命令集 | 开发者与 Hook 调用 | 冷启动 < 150ms（Native AOT 目标），单命令 FailClosed 必须 < 配置超时 |
 | 对外（配置） | `.gitguard.yml` / 用户级 config | 规则与策略 | 解析失败 → FailClosed |
-| 对外（审计导出） | `gitguard audit export --format json/csv` | 用户事后分析 | 必须脱敏，无原文；**v0.1 未实现**（`audit` 子命令未注册，v0.2 候选 `GGD-0022`） |
+| 对外（审计查询 / 导出） | `gitguard audit list` / `gitguard audit export --output <path> --format json/csv` | 用户事后分析 | 已实现（`GGD-0022`）：分页 / 时间 / 结果筛选，导出仅含脱敏片段与 HMAC 指纹；`audit view` 仍为 v0.2 |
 | 对内（Git） | `git diff --cached`、`git rev-list`、`git log --no-walk=unsorted --stdin` | 读取仓库差异 | 失败即 FailClosed |
 | 对内（可选） | `gitleaks` CLI | P2 秘密检测补强 | 不可用时降级，不阻断 |
 
@@ -305,3 +305,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.7 | 2026-10-21 | GGD-0014：§5.5 `NFR-U-002` 标记已实现（`--language` 优先于 `GITGUARD_LANG`，环境变量别名与 JSON / 日志不变约定） |
 | 0.1.8 | 2026-10-21 | GGD-0020：§5.1 性能 NFR 回填实测结果（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标并登记 `GGD-0023`）；§5.6 `NFR-M-002` 标记已实现（`--verbose` 输出 `Scan.RuleTiming`） |
 | 0.1.9 | 2026-10-21 | GGD-0023：§2.8 / §4 推送差异来源改为一次批量 `git log --no-walk=unsorted --stdin`；§5.1 P-003 回填复测 P95 669.78 ms 达标（较 4687.07 ms 下降约 86%），P-001 / P-002 / P-004 同步最新实测 |
+| 0.1.10 | 2026-10-21 | GGD-0022：§4 审计查询 / 导出接口标记已实现（`audit list` 分页 / 筛选，`audit export` 仅脱敏字段；`audit view` 仍为 v0.2） |

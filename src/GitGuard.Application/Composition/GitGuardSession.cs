@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Reflection;
+using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
@@ -219,6 +220,16 @@ public sealed class GitGuardSession
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
     public UninstallHookUseCase CreateUninstall() => new UninstallHookUseCase(GitAccess, AuditStore, _clock, Version);
+
+    /// <summary>装配审计列表用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的列表用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public AuditListUseCase CreateAuditList() => new AuditListUseCase(AuditStore);
+
+    /// <summary>装配审计导出用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的导出用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public AuditExportUseCase CreateAuditExport() => new AuditExportUseCase(AuditStore, _clock);
 
     /// <summary>装配状态查询用例（只读：不触发审计打开与检测器装配）。</summary>
     /// <returns>已接线的状态用例（配置加载链来自 <see cref="Config"/>）。</returns>

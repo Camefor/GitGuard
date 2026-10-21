@@ -41,6 +41,7 @@ public sealed class ExitCodeMapperTests
         ExitCodeMapper.Map(new ConfigurationException("坏 YAML")).Should().Be(ExitCodes.CONFIG_INVALID);
         ExitCodeMapper.Map(new DetectionException("检测器异常")).Should().Be(ExitCodes.DETECTOR_FAILED);
         ExitCodeMapper.Map(new SqliteException("审计库打开失败")).Should().Be(ExitCodes.AUDIT_STORE_FAILED);
+        ExitCodeMapper.Map(new AuditExportException("导出写入失败")).Should().Be(ExitCodes.AUDIT_EXPORT_FAILED);
         ExitCodeMapper.Map(new OperationCanceledException()).Should().Be(ExitCodes.SCAN_TIMEOUT);
         ExitCodeMapper.Map(new InvalidOperationException("未分类")).Should().Be(ExitCodes.UNKNOWN_ERROR);
     }
@@ -58,6 +59,8 @@ public sealed class ExitCodeMapperTests
             .Should().Be(DetectionException.DETECTOR_FAILED);
         ExitCodeMapper.ErrorCodeOf(new SqliteException("审计库打开失败"))
             .Should().Be(SqliteException.AUDIT_STORE_FAILED);
+        ExitCodeMapper.ErrorCodeOf(new AuditExportException("导出写入失败"))
+            .Should().Be(AuditExportException.AUDIT_EXPORT_FAILED);
         ExitCodeMapper.ErrorCodeOf(new OperationCanceledException())
             .Should().Be(ExitCodeMapper.SCAN_TIMEOUT);
         ExitCodeMapper.ErrorCodeOf(new InvalidOperationException("未分类"))

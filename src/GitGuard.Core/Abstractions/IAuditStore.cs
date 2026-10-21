@@ -54,6 +54,24 @@ public interface IAuditStore
     IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit);
 
     /// <summary>
+    /// 按分页与筛选条件查询扫描运行摘要（<c>started_at</c> 倒序，不加载 Finding 明细），
+    /// 并返回同一筛选条件下的总记录数（<c>06-API接口设计</c> §5.6）。
+    /// </summary>
+    /// <param name="query">分页与筛选条件。</param>
+    /// <returns>当前页运行摘要与总数。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="query"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="SqliteException">读取失败。</exception>
+    AuditRunPage QueryScanRuns(AuditQuery query);
+
+    /// <summary>
+    /// 读取全部扫描运行（含 Finding 明细，<c>started_at</c> 倒序），供 <c>gitguard audit export</c> 导出。
+    /// 返回的 <see cref="Finding.SnippetMasked"/> 保持脱敏，不包含原文。
+    /// </summary>
+    /// <returns>全部扫描运行（可能为空）。</returns>
+    /// <exception cref="SqliteException">读取失败。</exception>
+    IReadOnlyList<ScanRun> ListScanRunsForExport();
+
+    /// <summary>
     /// 写入 Hook 安装记录：<c>hook_installations</c> 以 (repo_path, hook_type) 复合主键 upsert
     /// （刷新 installed_at / version / 备份路径并置 <c>Active</c>）+ <c>HookInstalled</c> 审计事件
     /// （category = <c>Hook</c>，08-权限设计 §7），单事务提交。

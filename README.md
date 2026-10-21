@@ -20,6 +20,7 @@
 - `gitguard install` / `uninstall` / `status`：安装、卸载与查询 Hook（`pre-commit` / `pre-push` / `post-commit`）
 - `gitguard scan --staged`：暂存区扫描（严格基于 `git diff --cached`）
 - `gitguard scan --push`：推送范围扫描（覆盖范围内全部提交，一次批量取差异，Finding 带来源 commit SHA）
+- `gitguard audit list` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）与脱敏 JSON / CSV 导出
 - 21 条内置规则：Secret 8 / Privacy 5 / LocalPath 4 / Url 4
 - 文本 / JSON 报告、严重度策略、配置文件白名单、`exclude` 路径排除
 - `--no-verify` 与 `GITGUARD_SKIP=1` 绕过检测及 SQLite 审计落库
@@ -29,7 +30,7 @@
 
 - `scan --all` 全量扫描与基线文件（v0.2）
 - `allowlist` 的 CLI / SQLite 管理（目前通过 `.gitguard.yml` 配置）
-- `audit list` / `audit export` 查询导出 CLI（规划中，可先用 `sqlite3` 直接查看数据库）
+- `audit view <run-id>` 单次运行明细（v0.2）
 - 自定义正则规则、GitleaksAdapter（v0.2）
 - Avalonia 桌面端（v0.3）
 
@@ -195,7 +196,25 @@ printf 'refs/heads/master %s refs/heads/master %s\n' \
 
 `remote-sha` 全零表示新分支，扫描从 `local-sha` 可达的全部提交。
 
-### 5. 卸载
+### 5. 审计查询与导出
+
+`audit` 查询整个本地审计库（包含所有仓库），不要求当前目录是 Git 仓库：
+
+```bash
+gitguard audit list                          # 最近 20 条（文本 → stderr）
+gitguard audit list --limit 50 --offset 50   # 分页（limit 1~1000）
+gitguard audit list --since 2026-10-01 --result Blocked
+gitguard --format json audit list            # 机器可读 JSON → stdout
+
+gitguard audit export --output ~/gitguard-audit.json --format json
+gitguard audit export --output ~/gitguard-audit.csv --format csv
+```
+
+- 导出文件只包含脱敏片段与 HMAC 指纹，不含任何原文；目标文件已存在时原子覆盖。
+- `audit export` 后面的 `--format` 表示**导出文件格式**（`json` 默认 / `csv`）；若要让导出摘要以 JSON 输出，把全局 `--format json` 放在 `audit` 之前。
+- `--result` 只接受 `Clean` / `Warned` / `Blocked` / `Failed`；非法参数退出码 7，导出写入失败退出码 31。
+
+### 6. 卸载
 
 ```bash
 gitguard uninstall    # 移除 GitGuard Hook 并还原被包裹的原 Hook
@@ -246,7 +265,7 @@ exclude:
 | 指纹盐 | 数据目录下 `cache/fingerprint.salt` |
 | 用户配置 | `~/.config/gitguard/config.yml` |
 
-审计库只保存脱敏片段与 HMAC 指纹，不保存敏感原文。当前没有查询 CLI，可直接用 `sqlite3` 查看 `audit.db`。
+审计库只保存脱敏片段与 HMAC 指纹，不保存敏感原文。可用 `gitguard audit list` 查询、`gitguard audit export` 导出（均为脱敏字段），也可直接用 `sqlite3` 查看 `audit.db`。
 
 ## 发布 Native AOT 单文件（可选）
 

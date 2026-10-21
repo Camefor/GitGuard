@@ -231,6 +231,31 @@ internal sealed class RecordingAuditStore : IAuditStore
     public IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit) =>
         SavedRuns.Where(run => run.RepoPath == repoPath).Take(limit).ToList();
 
+    public AuditRunPage QueryScanRuns(AuditQuery query)
+    {
+        var matching = SavedRuns
+            .Where(run => query.Since is not { } since || run.StartedAt >= since)
+            .Where(run => query.Result is not { } result || run.Result == result)
+            .ToList();
+
+        var summaries = matching
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .Select(static run => new AuditRunSummary(
+                run.Id,
+                run.RepoPath,
+                run.ScanType,
+                run.StartedAt,
+                run.DurationMs,
+                run.Result,
+                run.ExitCode,
+                run.Findings.Length));
+
+        return new AuditRunPage(summaries, matching.Count);
+    }
+
+    public IReadOnlyList<ScanRun> ListScanRunsForExport() => SavedRuns.ToList();
+
     public void SaveHookInstallation(HookInstallation installation) => SavedHookInstallations.Add(installation);
 
     public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook) =>
@@ -249,6 +274,12 @@ internal sealed class FailingAuditStore : IAuditStore
     public ScanRun? FindScanRun(Guid runId) => null;
 
     public IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit) => Array.Empty<ScanRun>();
+
+    public AuditRunPage QueryScanRuns(AuditQuery query) =>
+        throw new SqliteException("审计读取失败（测试注入）。");
+
+    public IReadOnlyList<ScanRun> ListScanRunsForExport() =>
+        throw new SqliteException("审计读取失败（测试注入）。");
 
     public void SaveHookInstallation(HookInstallation installation) =>
         throw new SqliteException("审计写入失败（测试注入）。");

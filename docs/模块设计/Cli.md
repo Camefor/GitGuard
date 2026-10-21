@@ -23,9 +23,9 @@
 
 | 消费方 | 内容 |
 | --- | --- |
-| 用户 / Git | stderr 的人类可读报告 + 退出码 |
-| 脚本调用方 | stdout 的 JSON（`--format json`） |
-| Audit | 一次 CLI 调用对应一个 `ScanRun` |
+| 用户 / Git | stderr 的人类可读报告 + 退出码（`audit list` 文本、`audit export` 摘要同样走 stderr） |
+| 脚本调用方 | stdout 的 JSON（`--format json`；含 `audit list` / `audit export` 摘要） |
+| Audit | 一次扫描调用对应一个 `ScanRun`；`audit list` / `audit export` 只读查询，不产生 `ScanRun` |
 
 ## 3. 核心规则
 
@@ -33,7 +33,8 @@
 | --- | --- |
 | 退出码契约 | 严格按 `06-API接口设计.md` §6 的退出码表；常量唯一来源为 `ExitCodes`，禁止就地写字面量 |
 | 解析失败 | 未知命令 / 未知选项 / 受限取值非法 / 参数组合非法 → 退出码 7（`CLI_USAGE_ERROR`），在命令动作执行前返回，不触碰仓库与配置 |
-| JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` / `bypass.v1` 版本号；单行紧凑、中文不转义 |
+| JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` / `bypass.v1` / `audit.list.v1` / `audit.export.summary.v1` 版本号；单行紧凑、中文不转义 |
+| 审计格式化 | `audit export` 的文件格式由子命令 `--format json\|csv` 决定，与全局 `--format text\|json` 同名但作用于不同层级；导出为同目录临时文件 + 原子替换，失败映射 31 |
 | 隐藏命令 | `hook post-commit`（FR-050）：仅供分发的 `post-commit` 脚本调用，不出现在 `--help`；恒返回 0，审计失败映射 14 |
 | 隐藏选项 | `scan --record-pending`：仅供 `pre-commit` 脚本调用，记录待提交预测；不能与 `--push` 组合（退出码 7） |
 | 全局 catch | 任何未分类异常走退出码 99；并写 crash 日志（脱敏；写入失败静默跳过） |
@@ -139,6 +140,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 - [x] 绕过检测命令链（GGD-0013）：`--record-pending` 标记写入 / 清理 / 阻断清理、`GITGUARD_SKIP=1` 仅 Hook 模式生效、`hook post-commit` 的 `gitguard.bypass.v1` 字段与恒 0 退出码（`CliBypassTests`）。
 - [x] 输出语言（GGD-0014）：默认中文、`--language en-US`（子命令前后 / `=` 形式）、`GITGUARD_LANG=en`、命令行覆盖环境变量、非法取值回退、英文帮助与用法错误、JSON 契约不变（`CliLocalizationTests`）。
 - [x] 规则级耗时（GGD-0020）：`--verbose` 输出 `Scan.RuleTiming`（`rule_id` / `duration_us`）、默认级别不输出、英文文案（`CliRuleTimingTests`）。
+- [x] 审计查询与导出（GGD-0022）：`audit list` 分页 / `--since` / `--result`、`audit export` JSON / CSV 脱敏、全局与子命令 `--format` 区分、非法参数 7、写入失败 31（`CliAuditCommandTests`）。
 - [ ] `--help` 覆盖所有命令（随 Shell 补全一并补测）。
 
 ## 10. 演进与扩展位
@@ -156,3 +158,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | 0.1.2 | 2026-10-21 | GGD-0013：§2.1 `GITGUARD_SKIP` 标记已实现（仅 Hook 模式）；§3 JSON Schema 补 `bypass.v1`，新增隐藏命令 / 隐藏选项规则；新增 §6.2 post-commit 入口与 `--record-pending` 处理（原全局异常捕获顺延为 §6.3）；§9 勾选绕过检测命令链测试项 |
 | 0.1.3 | 2026-10-21 | GGD-0014：§2.1 `GITGUARD_LANG` 标记已实现；§7 `--language` 标注已注册与解析期校验；§9 勾选输出语言测试项；§10 标注文案表落点 |
 | 0.1.4 | 2026-10-21 | GGD-0020：§7 `--verbose` 说明补充规则耗时摘要；§8 冷启动标注实测入口；§9 勾选规则耗时测试项（`CliRuleTimingTests`） |
+| 0.1.5 | 2026-10-21 | GGD-0022：§2.2 输出补审计查询 / 导出；§3 JSON Schema 补 `audit.list.v1` / `audit.export.summary.v1` 并新增审计格式化规则；§9 勾选审计查询与导出测试项（`CliAuditCommandTests`） |

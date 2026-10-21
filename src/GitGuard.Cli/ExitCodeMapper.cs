@@ -37,6 +37,7 @@ public static class ExitCodeMapper
             ConfigurationException => ExitCodes.CONFIG_INVALID,
             DetectionException => ExitCodes.DETECTOR_FAILED,
             SqliteException => ExitCodes.AUDIT_STORE_FAILED,
+            AuditExportException => ExitCodes.AUDIT_EXPORT_FAILED,
             OperationCanceledException => ExitCodes.SCAN_TIMEOUT,
             _ => ExitCodes.UNKNOWN_ERROR,
         };
@@ -57,6 +58,7 @@ public static class ExitCodeMapper
             ConfigurationException configuration => configuration.ErrorCode,
             DetectionException detection => detection.ErrorCode,
             SqliteException => SqliteException.AUDIT_STORE_FAILED,
+            AuditExportException export => export.ErrorCode,
             OperationCanceledException => SCAN_TIMEOUT,
             _ => UNKNOWN_ERROR,
         };

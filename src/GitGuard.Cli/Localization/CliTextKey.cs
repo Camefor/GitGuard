@@ -25,6 +25,15 @@ internal enum CliTextKey
     InstallHookDescription,
     UninstallForceDescription,
     UninstallHookDescription,
+    AuditDescription,
+    AuditListDescription,
+    AuditExportDescription,
+    AuditListLimitDescription,
+    AuditListOffsetDescription,
+    AuditListSinceDescription,
+    AuditListResultDescription,
+    AuditExportOutputDescription,
+    AuditExportFormatOptionDescription,
 
     // 通用标签与分隔符
     LabelRepo,
@@ -50,6 +59,10 @@ internal enum CliTextKey
     LabelGit,
     LabelHooksPath,
     LabelGitGuard,
+    LabelOutputPath,
+    LabelFormat,
+    LabelRunCount,
+    LabelFindingCount,
     ValueSeparator,
 
     // 用法错误
@@ -60,6 +73,11 @@ internal enum CliTextKey
     ScanScopeRequired,
     RecordPendingRequiresStaged,
     UnknownHook,
+    AuditLimitInvalid,
+    AuditOffsetInvalid,
+    AuditSinceInvalid,
+    AuditResultInvalid,
+    AuditOutputRequired,
     ErrorJoinSeparator,
 
     // 扫描报告
@@ -77,6 +95,14 @@ internal enum CliTextKey
     HintScanTimeout,
     HintConfigInvalid,
     HintScanIncomplete,
+
+    // 审计查询
+    AuditListHeader,
+    AuditListSummary,
+    AuditListEmpty,
+    AuditListPageEmpty,
+    AuditListLine,
+    AuditExportHeader,
 
     // 绕过检测
     BypassDetected,
@@ -129,6 +155,8 @@ internal enum CliTextKey
     LogVersionReported,
     LogBypassDetected,
     LogBypassChecked,
+    LogAuditListed,
+    LogAuditExported,
     LogCrashLogWritten,
     LogFileWriteFailed,
 

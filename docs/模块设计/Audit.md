@@ -23,7 +23,7 @@
 
 | 消费方 | 内容 |
 | --- | --- |
-| CLI `gitguard audit list/view/export`（v0.2 规划，`GGD-0022`） | 查询结果 |
+| CLI `gitguard audit list/export`（`GGD-0022`；`view` 仍为 v0.2） | 分页查询结果 / 脱敏导出文件 |
 | 桌面端（P3） | 同上，经 Application 层 |
 | 清理任务 | 按保留期删除旧数据 |
 
@@ -36,7 +36,10 @@
 | 绕过写事务 | `SaveBypassEvent(run, reason, commitSha)`：`scan_runs`（Bypass / Clean / 退出码 0 / 无 Finding）+ `BypassDetected` 事件同事务提交，`occurred_at` 取 `run.StartedAt`（GGD-0013）；写入失败不吞异常，CLI 映射退出码 14 |
 | 脱敏强制 | `Finding.snippet_masked` 构造函数拒绝原文；写入 SQLite 前 CHECK 约束兜底 |
 | 保留期清理 | 启动期后台任务清理 180 天前数据；可通过 `audit.retention_days` 覆写 |
-| 导出脱敏 | `audit export` 必须保持脱敏，不恢复原文 |
+| 导出脱敏 | `audit export` 只写 `snippet_masked` / HMAC 指纹，不恢复原文；JSON / CSV 两种格式共用同一脱敏字段集 |
+| 导出原子性 | 同目录临时文件写完后再 `File.Move(overwrite)`；失败清理临时文件并抛 `AuditExportException`（CLI 退出码 31） |
+| CSV 防护 | UTF-8 BOM + CRLF；字段含 `,` / `"` / CR / LF 时按 RFC 4180 转义；以 `= + - @ \t \r` 开头时前置 `'` 防公式注入 |
+| 查询分页 | `started_at DESC, rowid DESC`；`--since` / `--result` 在 SQL 层筛选；`total` 为筛选后总数 |
 | 并发安全 | WAL 模式 + 短写锁；对 `BUSY` 做指数退避 3 次 |
 
 ## 4. 外部依赖
@@ -113,7 +116,32 @@ sequenceDiagram
 
 > 绕过事件不是扫描：不写 `findings`，`duration_ms` / `summary_json` 均为 `NULL`；提交 SHA 与原因只存在于 `audit_logs` 载荷。
 
-### 6.4 启动期保留清理
+### 6.4 查询与导出
+
+```mermaid
+sequenceDiagram
+    participant CLI
+    participant List as AuditListUseCase
+    participant Export as AuditExportUseCase
+    participant Store as SqliteAuditStore
+    participant File as 输出文件
+
+    CLI->>List: Execute(AuditQuery)
+    List->>Store: QueryScanRuns(query)
+    Store-->>List: AuditRunPage（total + 当前页）
+    List-->>CLI: 摘要（文本 / JSON）
+
+    CLI->>Export: Execute(outputPath, format)
+    Export->>Store: ListScanRunsForExport()
+    Store-->>Export: ScanRun[]（含 Finding）
+    Export->>File: 临时文件写入 JSON / CSV
+    Export->>File: 原子替换为 outputPath
+    Export-->>CLI: AuditExportReport
+```
+
+> 查询范围为整个审计库（所有仓库），只读且不要求当前目录是 Git 仓库；不触发配置加载与检测器装配。读取 / 写入失败分别映射退出码 14 / 31。原启动期清理流程顺延为 §6.5。
+
+### 6.5 启动期保留清理
 
 ```mermaid
 flowchart LR
@@ -149,13 +177,15 @@ flowchart LR
 - [ ] 金丝雀 Token 不入库（DR-02）。
 - [ ] `BUSY` 重试逻辑：3 次指数退避；仍失败则发 `AuditWriteFailed`。
 - [ ] 清理阈值生效。
-- [ ] `audit export` 输出不含原文。
+- [x] `audit list` 分页、排序（`started_at DESC, rowid DESC`）与 `--since` / `--result` 筛选（GGD-0022：`SqliteAuditStoreQueryTests` + `CliAuditCommandTests`）。
+- [x] `audit export` 输出不含原文；JSON / CSV 脱敏字段、CSV 转义与公式注入防护、原子覆盖（GGD-0022：`AuditUseCaseTests` + `CliAuditCommandTests`）。
+- [x] `AuditExportException` → CLI 退出码 31（`ExitCodeMapperTests`）。
 - [ ] 迁移 V001 幂等执行。
 
 ## 10. 演进与扩展位
 
 - `IAuditStore` 抽象：未来可能替换为 LiteDB（跨平台单文件）或内嵌 DuckDB。
-- 导出格式：MVP 支持 JSON；P2 增加 CSV / SARIF（代码扫描标准）。
+- 导出格式：本版本支持 JSON / CSV（`GGD-0022`）；P2 增加 SARIF（代码扫描标准）。
 
 ## 11. 变更记录
 
@@ -167,3 +197,4 @@ flowchart LR
 | 0.1.3 | 2026-10-16 | 与 GGD-0008 实现同步：§2.1 输入补 Hook 事件；§3 新增 Hook 写事务规则；§6.3 新增 Hook 安装 / 卸载写入流程（upsert + 事件同事务，卸载 `RestoredLegacyHook` 载荷，Hook 用例不捕获 `SqliteException`）；§4 降级列补 Hook 场景；§9 勾选 Hook 事务测试项 |
 | 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.2 标注 CLI `gitguard audit list/view/export` 为 v0.2 规划（`GGD-0022`），v0.1 无审计查询命令 |
 | 0.1.5 | 2026-10-21 | GGD-0013：§2.1 输入改为 `Bypass` 运行 + `BypassDetected` 事件；§3 新增绕过写事务规则；§6.3 新增写入流程（无 Finding、duration/summary 为 NULL、载荷含 Reason；原 Hook / 清理流程顺延为 §6.2 / §6.4）；§9 勾选绕过事件落库测试 |
+| 0.1.6 | 2026-10-21 | GGD-0022：§2.2 落地 `audit list/export`（`view` 保持 v0.2）；§3 新增导出原子性、CSV 防护与查询分页规则；§6.4 新增查询 / 导出流程（原清理流程顺延为 §6.5）；§9 勾选分页筛选、导出脱敏与退出码 31 测试；§10 导出格式更新为 JSON / CSV |
