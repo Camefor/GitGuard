@@ -46,30 +46,125 @@
 dotnet build GitGuard.sln -c Release
 ```
 
-构建产物：
+构建产物（相对 GitGuard 仓库根目录）：
 
-- Windows：`src/GitGuard.Cli/bin/Release/net10.0/gitguard.exe`
+- Windows：`src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe`
 - Linux / macOS：`src/GitGuard.Cli/bin/Release/net10.0/gitguard`
 
-建议将该目录加入 `PATH`；下文统一以 `gitguard` 代指该可执行文件。先确认版本：
+构建产物目录**不会自动加入 `PATH`**。如果没有配置 PATH，每次运行都必须使用可执行文件的绝对路径。以本机为例，产物绝对路径为：
+
+```text
+D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe
+```
+
+#### 方式 A：直接使用绝对路径（推荐，临时试用最省事）
+
+Windows cmd：
+
+```bat
+D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe version
+```
+
+Windows PowerShell（路径含空格时必须用 `&` 调用）：
+
+```powershell
+& "D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe" version
+```
+
+Git Bash / Linux / macOS：
 
 ```bash
-gitguard version
+/path/to/GitGuard/src/GitGuard.Cli/bin/Release/net10.0/gitguard version
 ```
+
+#### 方式 B：把产物目录加入 PATH
+
+配置后可直接使用 `gitguard` 命令（以下仅对当前终端会话生效）：
+
+```powershell
+# Windows PowerShell
+$env:PATH = "D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0;$env:PATH"
+```
+
+```bash
+# Git Bash / Linux / macOS
+export PATH="/path/to/GitGuard/src/GitGuard.Cli/bin/Release/net10.0:$PATH"
+```
+
+> 下文示例统一写作 `gitguard`。**如果没有配置 PATH，请把 `gitguard` 替换为 `gitguard.exe` 的绝对路径**，不要直接输入 `gitguard`。
 
 ### 3. 在仓库中启用
 
+先进入你的目标 Git 仓库，再执行安装。以下是**未配置 PATH** 时的完整写法：
+
+Windows cmd：
+
+```bat
+cd /d D:\work\my-project
+D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe install
+D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe status
+```
+
+Windows PowerShell：
+
+```powershell
+cd D:\work\my-project
+& "D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe" install
+& "D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe" status
+```
+
+Git Bash / Linux / macOS：
+
 ```bash
 cd /path/to/your/repo
+/path/to/GitGuard/src/GitGuard.Cli/bin/Release/net10.0/gitguard install
+/path/to/GitGuard/src/GitGuard.Cli/bin/Release/net10.0/gitguard status
+```
+
+如果已将产物目录加入 PATH，则可以简写为：
+
+```bash
 gitguard install      # 注册 pre-commit / pre-push / post-commit
 gitguard status       # 查看 Hook 状态、Git 版本与配置加载链
 ```
 
 安装后按正常流程 `git commit` / `git push` 即可，命中阻断规则时命令会失败并输出脱敏报告。
 
-> `gitguard install` 会把**当前可执行文件的绝对路径**写入 Hook。若之后移动了可执行文件，或从 Debug 切换到 Release / AOT 产物，重新执行一次 `gitguard install` 刷新即可。Docker、临时目录等无法长期保留路径的场景请使用 AOT 单文件。
+> `gitguard install` 会把**本次执行的可执行文件绝对路径**写入 Hook。通过绝对路径安装时，Hook 中固化的也是该绝对路径；若之后移动了可执行文件，或从 Debug 切换到 Release / AOT 产物，请在目标仓库重新执行一次 `install` 刷新。Docker、临时目录等无法长期保留路径的场景请使用 AOT 单文件。
 
 ### 4. 快速验证
+
+以下命令中的 `gitguard` 均指可执行文件；未配置 PATH 时请替换为绝对路径。
+
+Windows cmd：
+
+```bat
+cd /d D:\work\my-project
+> leak-test.txt echo aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+git add leak-test.txt
+git commit -m "test"
+
+D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe scan --staged
+
+git reset HEAD leak-test.txt
+del leak-test.txt
+```
+
+Windows PowerShell：
+
+```powershell
+cd D:\work\my-project
+Set-Content -Path leak-test.txt -Value 'aws_access_key_id = AKIAIOSFODNN7EXAMPLE'
+git add leak-test.txt
+git commit -m "test"          # 预期：被 pre-commit 阻断，退出码 1
+
+& "D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe" scan --staged
+
+git reset HEAD leak-test.txt
+Remove-Item leak-test.txt
+```
+
+Git Bash / Linux / macOS：
 
 ```bash
 # 构造一个会被拦截的示例密钥（AWS 官方文档中的假值，非真实凭据）
@@ -81,7 +176,16 @@ gitguard scan --staged        # 手动扫描，报告输出到 stderr
 git reset HEAD leak-test.txt && rm leak-test.txt   # 清理
 ```
 
-推送扫描由 `pre-push` 自动触发；也可手动构造 Git 的 stdin 约定来执行：
+推送扫描由 `pre-push` 自动触发；也可手动构造 Git 的 stdin 约定来执行。
+
+Windows PowerShell（未配置 PATH 的绝对路径写法）：
+
+```powershell
+"refs/heads/master $(git rev-parse HEAD) refs/heads/master 0000000000000000000000000000000000000000" |
+  & "D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe" scan --push
+```
+
+Git Bash / Linux / macOS：
 
 ```bash
 printf 'refs/heads/master %s refs/heads/master %s\n' \
@@ -95,6 +199,13 @@ printf 'refs/heads/master %s refs/heads/master %s\n' \
 
 ```bash
 gitguard uninstall    # 移除 GitGuard Hook 并还原被包裹的原 Hook
+```
+
+未配置 PATH 时（Windows cmd）：
+
+```bat
+cd /d D:\work\my-project
+D:\PersonalSpace\repo\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe uninstall
 ```
 
 ## 配置

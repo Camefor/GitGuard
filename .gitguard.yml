@@ -1,0 +1,7 @@
+version: 1
+
+allowlist:
+  entries:
+    - rule_id: GGD/SECRET/AWS-AKID
+      path_pattern: README.md
+      reason: "README 中的 AWS 官方文档示例 Access Key 非真实凭据"
