@@ -113,9 +113,16 @@
 ### 2.10 `FR-050` 绕过事件审计
 
 - **描述**：识别 `--no-verify` 与 `GITGUARD_SKIP=1` 两种显式绕过，并写入审计。
-- **处理规则**：注册轻量 `post-commit` Hook：对比最新提交的 SHA 与上一次扫描的「待提交 SHA 预测」；若未匹配，推断为绕过事件。
-- **输出**：`ScanRuns` 中新增一条 `BypassEvent` 行。
-- **v0.1 实现状态**：未实现（`post-commit` 未注册、`GITGUARD_SKIP` 未识别）；顺延 `GGD-0013`，对应 E2E 场景 S8 占位跳过。
+- **预测机制**：提交 SHA 在 `pre-commit` 阶段无法可靠预测（提交信息、时间戳尚未确定），因此以「父提交（`pre-commit` 时 HEAD，首个提交为 `null`）+ 暂存树（`git write-tree`）」作为待提交预测。
+- **处理规则**：
+  - `pre-commit` 分发脚本以隐藏选项 `--record-pending` 调用 `scan --staged`：扫描通过后写入标记 `{ parent_sha, tree_sha, skipped, recorded_at }`；扫描阻断或失败时清理旧标记，避免残留掩盖后续真实绕过。
+  - `GITGUARD_SKIP=1` **仅在 Hook 模式**（`--record-pending`）生效：不执行扫描，写入 `skipped = true` 的标记并退出 0；手动 `scan --staged` 忽略该变量。
+  - `install` 默认注册 `post-commit`，分发脚本调用隐藏命令 `gitguard hook post-commit`：读取实际提交的树与首个父提交，与标记比对。
+  - 匹配且未跳过 → 正常提交，消费标记，不写审计；匹配且 `skipped` → `GitGuardSkip`；无标记 / 不匹配 / 标记损坏 → `NoVerify`。同时使用 `--no-verify` 与 `GITGUARD_SKIP=1` 时只登记一次 `NoVerify`。
+- **标记存储**：`<git-dir>/gitguard/pending-scan.json`（每个 worktree 独立），原子写（临时文件 + 改名）、UTF-8 无 BOM、Unix `0600`；读取失败或内容损坏按「无标记」处理（宁可多记，不可漏记）。
+- **输出**：`scan_runs` 新增一条 `scan_type = Bypass` 行（`result = Clean`、`exit_code = 0`、`duration_ms = NULL`、无 Finding），并追加 `audit_logs` 的 `category = Bypass` / `event_type = BypassDetected` 事件，载荷 `{ RunId, CommitSha, DetectedAt, Reason }`（`Reason ∈ NoVerify | GitGuardSkip`）。`hook post-commit` 始终以 0 返回（Git 忽略其退出码）；审计写入失败 → FailClosed 退出码 14。
+- **v0.1 实现状态**：已实现（`GGD-0013`）；E2E 场景 S8 通过。
+- **关联测试用例**：`TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8）
 
 ### 2.11 `FR-060` 全量扫描
 
@@ -209,7 +216,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `NFR-S-001` | 本地化：无出站网络请求 | 单元测试 + CI 下 `strace`/`netstat` 验证 | 已覆盖：CI Linux `strace -e trace=network` 作业（TC-DR-01-01，`GGD-0011`） |
 | `NFR-S-002` | SQLite / 日志 / 临时文件无明文敏感原文 | 代码审查 + 测试用「金丝雀 Token」注入后扫文件 | 已覆盖：TC-DR-02-01(审计库 / 日志 / 终端输出)；崩溃日志经同一脱敏流水线但无独立金丝雀用例 |
 | `NFR-S-003` | FailClosed：所有异常路径默认阻断 | 故障注入测试 `TC-FAILCLOSED-*` | 已覆盖：TC-DR-03-01~04（Git / 检测器 / 超时 / 配置） |
-| `NFR-S-004` | 绕过事件可追溯 | 审计表查询 | 未覆盖：依赖 FR-050（`GGD-0013`） |
+| `NFR-S-004` | 绕过事件可追溯 | 审计表查询 | 已覆盖：TC-FR-050-01 / TC-DR-06-01（`scan_runs` + `audit_logs` 直读断言；E2E S8 覆盖 `--no-verify` / `GITGUARD_SKIP=1` / 两者并用） |
 
 ### 5.4 合规
 
@@ -268,7 +275,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-040` | 3.4 | `模块设计/Policy.md` | `GitGuardConfigLoaderTests` / `AllowlistEntryTests`；CLI 无 | CLI 未实现；配置文件 `allowlist.entries` 可用 |
 | `FR-041` | 3.4 | `模块设计/Policy.md` | `AllowlistMatcherTests` / `PolicyEvaluatorTests` / `GitGuardConfigLoaderTests` | 部分实现（配置文件三粒度；CLI / SQLite 管理未实现） |
 | `FR-042` | 3.4 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `CliScanCommandTests`（汇总行） | 已实现（配置文件白名单） |
-| `FR-050` | 3.5 | `模块设计/Hook.md` | 无（E2E S8 占位） | 未实现（`GGD-0013`） |
+| `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
 | `FR-061` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
 | `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~04`（`GitGuardConfigLoaderTests` / `CliScanCommandTests`） | 部分实现（`exclude` 未消费，`GGD-0019`） |
@@ -281,7 +288,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 | # | 问题 | 影响 | 决策人 | 期限 |
 | --- | --- | --- | --- | --- |
-| Q-01 | 是否对 `--no-verify` 加 `post-commit` 探测，还是走 reflog 对比 | 中 | 项目负责人 | MVP 启动前 |
+| Q-01 | 是否对 `--no-verify` 加 `post-commit` 探测，还是走 reflog 对比 | 中 | 项目负责人 | 已决议（GGD-0013）：`post-commit` +「父提交 + 暂存树」预测；reflog 无法区分正常 Hook 链且格式不稳定 |
 | Q-02 | 自定义正则是否支持命名捕获组用于更精确上下文 | 低 | 项目负责人 | P2 启动前 |
 
 ## 10. 变更记录
@@ -293,3 +300,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.2 | 2026-10-16 | GGD-0008：§2.1/§2.2 与实现对齐——`--force` 语义限定为二进制/符号链接接管；托管识别改前两行精确匹配；备份为复制且分发脚本直接调用（非 `exec`）并合并退出码（GitGuard 非零优先）；安装三阶段零半安装 + 并发锁（退出码 50）；审计记录为 upsert 状态翻转（非新增行）；补充未安装卸载退出码 5 |
 | 0.1.3 | 2026-10-16 | GGD-0009：§2.12 补充宽松解析（未知字段警告不阻断）、取值越界与 `use_gitleaks: true` 的 FailClosed 语义并标注实现落点；新增 §2.12.1 `FR-071` 用户级配置条目（原仅见于 PRD，追溯矩阵同步补行） |
 | 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.3 状态输出改为实际 Hook 分类与退出码 6；§2.4 / §2.8 测试用例编号按实际落地收敛；§2.5 `IEnumerable` 更正为 `IAsyncEnumerable` 并标注 21 条规则与装配顺序；§2.7 报告样例改为 v0.1 实际输出（无建议文案、文本 → stderr / JSON → stdout）；§2.9 / §2.10 / §2.11 / §2.13 标注白名单 CLI、绕过审计、全量扫描、Gitleaks 的未实现状态；§2.12 补充 `exclude` / 扫描类型开关 / `fail_closed` 仅解析告警；§4 `audit export` 标注未实现；§5 全部 NFR 表新增 v0.1 状态列（性能未测量、兼容矩阵部分、i18n 未实现等）；§8 追溯矩阵补齐 FR-031 / FR-032 / FR-041 / FR-042 / FR-061 / FR-080 / FR-100 并新增实现状态列 |
+| 0.1.5 | 2026-10-21 | GGD-0013：§2.10 按实现重写 FR-050（父提交 + 暂存树预测、`--record-pending` 隐藏选项、`GITGUARD_SKIP=1` 仅 Hook 模式、标记文件路径 / 原子写 / 失败语义、`NoVerify` / `GitGuardSkip` 判定、`Bypass` 运行与审计载荷、post-commit 退出码）；§5.3 NFR-S-004 标记已覆盖；§8 FR-050 追溯补齐测试类与 E2E S8；§9 Q-01 记录决议 |

@@ -189,7 +189,26 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 
 - `git_version` / `git_failure`：探测成功时 `git_failure` 为 `null`，失败时 `git_version` 为 `null` 且 `git_failure` 携带原因（命令退出码仍为 0）。
 
-### 4.7 分页
+### 4.7 绕过检测输出（JSON）
+
+隐藏命令 `gitguard hook post-commit` 的 `--format json` 输出（`gitguard.bypass.v1`）：
+
+```json
+{
+  "schema": "gitguard.bypass.v1",
+  "detected": true,
+  "reason": "NoVerify",
+  "commit_sha": "4f3c2a1b9d8e7f60514233241506f7e8d9c0b1a2",
+  "run_id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33"
+}
+```
+
+- `reason`：`NoVerify`（无待提交标记 / 标记不匹配，含 `--no-verify`）或 `GitGuardSkip`（`GITGUARD_SKIP=1` 且标记匹配）；未检测到绕过时为 `null`。
+- `run_id`：绕过事件对应的 `scan_runs.id`；未检测到绕过时为 `null`。
+- `detected = false` 时文本模式保持静默（不刷屏）；`detected = true` 时向 stderr 输出中文警告与原因。
+- 命令**始终以 0 返回**（Git 忽略 `post-commit` 退出码）；审计写入失败按 FailClosed 映射退出码 14。
+
+### 4.8 分页
 
 CLI 命令目前无需分页。`gitguard audit list` 支持 `--limit N --offset M`（默认 20；v0.2 规划，v0.1 未注册 `audit` 子命令，见 `GGD-0022`）。
 
@@ -199,10 +218,10 @@ CLI 命令目前无需分页。`gitguard audit list` 支持 `--limit N --offset 
 
 ### 5.1 `gitguard install` — 安装 Hook
 
-- **用途**：在当前仓库注入 pre-commit / pre-push 分发脚本。
+- **用途**：在当前仓库注入 `pre-commit` / `pre-push` / `post-commit` 分发脚本（`post-commit` 用于 FR-050 绕过检测）。
 - **选项**：
   - `--force` 允许接管无法安全包裹的既有 Hook（二进制 / 符号链接形态）；普通文本 Hook 自动备份包裹，无需 `--force`；「遗留 `.local.bak` + 非托管目标」冲突不可用 `--force` 绕过。
-  - `--hook <name>` 仅安装某个 Hook：`pre-commit` 或 `pre-push`（默认全部；其他取值 → 退出码 7）。
+  - `--hook <name>` 仅安装某个 Hook：`pre-commit` / `pre-push` / `post-commit`（默认全部；其他取值 → 退出码 7）。
 - **输入**：当前工作目录（必须是 Git 仓库）。
 - **输出**：安装摘要（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.5）。
 - **退出码**：0 成功；2 非 Git 仓库；3 写入权限不足；4 目标 Hook 无法安全包裹（需 `--force` 或不可接管）；7 参数非法；50 已有并发 install / uninstall 持锁。
@@ -217,7 +236,7 @@ gitguard install --format json
 ### 5.2 `gitguard uninstall` — 卸载 Hook
 
 - **选项**：
-  - `--hook <name>` 仅卸载某个 Hook：`pre-commit` 或 `pre-push`（默认全部；其他取值 → 退出码 7）。
+  - `--hook <name>` 仅卸载某个 Hook：`pre-commit` / `pre-push` / `post-commit`（默认全部；其他取值 → 退出码 7）。
   - `--force` 仅当备份仍存在时，允许接管被手工替换的非托管目标并还原备份。
 - **输出**：卸载摘要（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.5）。
 - **退出码**：0 成功；2 非 Git 仓库；5 未发现 GitGuard 安装痕迹（不动文件、不写审计，仅提示）；7 参数非法；50 已有并发 install / uninstall 持锁。
@@ -236,11 +255,13 @@ gitguard install --format json
 - **子选项**：
   - `--staged`：扫描暂存区（Hook 内部调用；用户也可手动调用）。
   - `--push`：扫描推送范围；从 stdin 读取 `<local-ref> <local-sha> <remote-ref> <remote-sha>` 行（Git 调用约定）。
+  - `--record-pending`（隐藏）：Hook 模式专用，只能与 `--staged` 同用（否则退出码 7）。扫描通过后记录待提交预测（父提交 + 暂存树）供 `post-commit` 比对；扫描阻断 / 失败时清理旧标记。标记写入失败仅产生警告，不阻断提交。
+- **`GITGUARD_SKIP=1`**：仅在 `--record-pending` 模式识别——跳过扫描、写入 `skipped` 标记、退出码 0（终端提示本次提交将登记为绕过事件）；手动 `scan --staged` 忽略该变量。
 - **MVP 范围**：`--staged` / `--push` 二者必选且互斥（缺失或同时给出 → 退出码 7）；`--all` / `--since` / `--max-files` 属 v0.2（见 `17-开发RoadMap`），本版本未注册。
 - **输入**：Git 仓库 + 可选 stdin（`--push`）。
 - **输出**：扫描报告（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.2 / §4.3）。
 - **退出码**：0 Clean/Warned；1 Blocked；2 非 Git 仓库；7 参数非法；10 Git 错误；11 检测器异常；12 超时；13 配置错误。
-- **关联 FR**：`FR-020, FR-030, FR-060`。
+- **关联 FR**：`FR-020, FR-030, FR-050, FR-060`。
 
 ### 5.5 `gitguard allowlist` — 白名单管理
 
@@ -274,7 +295,16 @@ gitguard install --format json
 - **输出**：GitGuard 版本、规则库版本、Git 版本、运行时信息（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.6）。
 - **退出码**：0（含 git 探测失败：原因经 `git_failure` 字段输出）。
 
-### 5.9 全局选项（所有子命令共用）
+### 5.9 `gitguard hook post-commit` — 绕过检测（隐藏）
+
+- **用途**：由 GitGuard 安装的 `post-commit` 分发脚本调用；比对实际提交与 `pre-commit` 记录的待提交预测，判定 `--no-verify` / `GITGUARD_SKIP=1` 绕过并写入审计。
+- **可见性**：`hook` 命令组与 `post-commit` 子命令均为隐藏（不出现在 `--help`），供分发脚本内部使用。
+- **输入**：当前工作目录（Git 仓库）；无参数、无 stdin。
+- **输出**：文本模式未检测到绕过时静默，检测到则向 stderr 输出提交 SHA、原因与运行 ID；JSON 模式见 §4.7。
+- **退出码**：始终 0（Git 忽略 `post-commit` 退出码）；审计写入失败 → 14；Git 读取失败 → 10。
+- **关联 FR**：`FR-050`。
+
+### 5.10 全局选项（所有子命令共用）
 
 递归挂载于根命令，可出现在子命令前后任意位置：
 
@@ -286,7 +316,7 @@ gitguard install --format json
 | `--trace` | 日志级别降到 Trace（逐行匹配细节）；必须与 `--verbose` 同用，否则退出码 7 |
 | `--log-file <path>` | 启用文件日志并写入指定路径（JSON-lines，按 `logging.file` 的 `max_bytes` / `max_files` 滚动）；`~` 展开为用户主目录 |
 
-### 5.10 `gitguard --help`
+### 5.11 `gitguard --help`
 
 - 全局 `--help` 由 System.CommandLine 自动生成。所有子命令都应支持 `--help` 独立说明。
 
@@ -341,3 +371,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.1 | 2026-10-16 | GGD-0008：§5.1/§5.2 与实现对齐（`--force` 语义限定为二进制 / 符号链接接管；uninstall 补充 `--force` 与退出码 5 / 50 契约）；§6 退出码 4/5/6 场景细化；§8 锁路径更正为 `<git-common-dir>/gitguard.install.lock`（worktree 共享） |
 | 0.1.2 | 2026-10-16 | GGD-0009：§4.2/§4.3 与实现对齐（单行紧凑 JSON、`scan_type` / `skipped_files` / `audit_write_failed` / `warnings` 字段、指纹为 64 位十六进制、`action` 取值含 `AllowedByAllowlist`）；§4.4 错误 JSON 的 `run_id` 更正为 `trace_id`；新增 §4.5 Hook 生命周期 JSON（`gitguard.install.v1` / `gitguard.uninstall.v1`）与 §4.6 状态 / 版本 JSON（`gitguard.status.v1` / `gitguard.version.v1`）；§5.1~§5.4/§5.8 补充输出分流与退出码，MVP 范围固化（`scan` 仅 `--staged` / `--push`）；新增 §5.9 全局选项表（`--format` / `--no-color` / `--verbose` / `--trace` / `--log-file`）；§6 新增退出码 7（用法错误）与 14（审计存储失败） |
 | 0.1.3 | 2026-10-18 | GGD-0012 文档回填：§4.7 `audit list` 分页标注为 v0.2 规划（`GGD-0022`）；§6 标注退出码 20 / 21 / 30 / 31 / 40 为 v0.2 命令预留，v0.1 不会实际返回 |
+| 0.1.4 | 2026-10-21 | GGD-0013：新增 §4.7 `gitguard.bypass.v1` 契约（分页顺延为 §4.8）；§5.1/§5.2 `--hook` 取值补 `post-commit`；§5.4 新增隐藏选项 `--record-pending` 与 `GITGUARD_SKIP=1`（仅 Hook 模式）语义；新增 §5.9 隐藏命令 `hook post-commit`（全局选项 / 帮助顺延为 §5.10 / §5.11） |

@@ -12,7 +12,7 @@ public enum HookType
     /// <summary>推送前 Hook（FR-010）。</summary>
     PrePush = 1,
 
-    /// <summary>提交后 Hook（FR-050 绕过检测的承载者，实现顺延至 GGD-0013）；当前仅用于匹配库表 CHECK 取值。</summary>
+    /// <summary>提交后 Hook（FR-050 绕过检测的承载者：对比待提交预测与实际提交）。</summary>
     PostCommit = 2,
 }
 

@@ -191,6 +191,18 @@ internal sealed class AcceptanceHarness : IDisposable
     /// <returns>进程结果快照。</returns>
     internal ProcessResult RunGit(params string[] arguments) => RunProcess("git", arguments, string.Empty);
 
+    /// <summary>在附加单个环境变量的情况下执行 git 命令（变量经 Hook 子进程继承，如 <c>GITGUARD_SKIP=1</c>）。</summary>
+    /// <param name="environmentName">环境变量名。</param>
+    /// <param name="environmentValue">环境变量值。</param>
+    /// <param name="arguments">git 参数。</param>
+    /// <returns>进程结果快照。</returns>
+    internal ProcessResult RunGitWithEnvironment(string environmentName, string environmentValue, params string[] arguments) =>
+        RunProcess(
+            "git",
+            arguments,
+            string.Empty,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [environmentName] = environmentValue });
+
     /// <summary>执行 git 命令并要求成功；失败抛 <see cref="InvalidOperationException"/>（夹具装配错误）。</summary>
     /// <param name="arguments">git 参数。</param>
     /// <returns>stdout（已裁剪）。</returns>
@@ -351,7 +363,11 @@ internal sealed class AcceptanceHarness : IDisposable
         return Path.Combine(_xdgDataDirectory, "gitguard");
     }
 
-    private ProcessResult RunProcess(string executable, IReadOnlyList<string> arguments, string standardInput)
+    private ProcessResult RunProcess(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string standardInput,
+        IReadOnlyDictionary<string, string>? additionalEnvironment = null)
     {
         var startInfo = new ProcessStartInfo(executable)
         {
@@ -369,6 +385,13 @@ internal sealed class AcceptanceHarness : IDisposable
         }
 
         ApplyIsolatedEnvironment(startInfo);
+        if (additionalEnvironment is not null)
+        {
+            foreach ((string name, string value) in additionalEnvironment)
+            {
+                startInfo.Environment[name] = value;
+            }
+        }
 
         using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException($"无法启动进程：{executable}");
         process.StandardInput.Write(standardInput);

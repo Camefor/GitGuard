@@ -23,6 +23,22 @@ public interface IAuditStore
     /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽）；调用方按 AuditWriteFailed 降级处理。</exception>
     void SaveScanRun(ScanRun run, IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions);
 
+    /// <summary>
+    /// 以单一事务写入一次绕过事件（SRS FR-050 / DR-06）：<c>scan_runs</c> 行（<c>scan_type = Bypass</c>，
+    /// 按 DDD §4.2 不携带 Finding）+ <c>BypassDetected</c> 审计事件
+    /// （category = <c>Bypass</c>，载荷 <c>{ RunId, CommitSha, DetectedAt, Reason }</c>）。
+    /// </summary>
+    /// <param name="run">绕过事件对应的扫描运行聚合（必须为 <see cref="ScanType.Bypass"/>）。</param>
+    /// <param name="reason">绕过原因（<c>--no-verify</c> / <c>GITGUARD_SKIP=1</c>）。</param>
+    /// <param name="commitSha">被判定为绕过扫描的提交 SHA。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="run"/> 或 <paramref name="commitSha"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="run"/> 不是 Bypass 类型、携带 Finding，或 <paramref name="commitSha"/> 为空 / 非十六进制。
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="reason"/> 取值未定义。</exception>
+    /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽）；调用方按 FailClosed 处理（退出码 14）。</exception>
+    void SaveBypassEvent(ScanRun run, BypassReason reason, string commitSha);
+
     /// <summary>按运行身份标识读取扫描运行聚合（含 Findings）。</summary>
     /// <param name="runId">运行身份标识（<c>scan_runs.id</c>）。</param>
     /// <returns>存在则返回重建的聚合（身份标识与原始写入一致）；不存在返回 <see langword="null"/>。</returns>

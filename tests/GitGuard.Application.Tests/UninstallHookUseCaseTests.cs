@@ -145,7 +145,7 @@ public sealed class UninstallHookUseCaseTests
 
         HookUninstallReport report = CreateUseCase(repo, store).Execute();
 
-        report.Results.Should().HaveCount(2);
+        report.Results.Should().HaveCount(3);
         report.Results.Should().OnlyContain(result => result.Disposition == HookUninstallDisposition.NotInstalled);
         store.SavedHookUninstallations.Should().BeEmpty();
     }
@@ -214,13 +214,19 @@ public sealed class UninstallHookUseCaseTests
     }
 
     [Fact]
-    public void Execute_PostCommitHook_ThrowsUntilGgd0013()
+    public void Execute_PostCommitHook_RemovesBypassDetectionScript()
     {
         using var repo = new TempGitRepository();
+        InstallManagedHooks(repo, new RecordingAuditStore());
+        string hookPath = Path.Combine(repo.Root, ".git", "hooks", "post-commit");
+        File.Exists(hookPath).Should().BeTrue();
 
-        Action act = () => CreateUseCase(repo, new RecordingAuditStore()).Execute(hooks: new[] { HookType.PostCommit });
+        HookUninstallReport report = CreateUseCase(repo, new RecordingAuditStore())
+            .Execute(hooks: new[] { HookType.PostCommit });
 
-        act.Should().Throw<ArgumentOutOfRangeException>().WithMessage("*GGD-0013*");
+        report.Results.Should().ContainSingle()
+            .Which.Disposition.Should().Be(HookUninstallDisposition.Removed);
+        File.Exists(hookPath).Should().BeFalse();
     }
 
     private static UninstallHookUseCase CreateUseCase(TempGitRepository repo, RecordingAuditStore store) =>

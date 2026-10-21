@@ -15,7 +15,7 @@
 | 来源 | 内容 |
 | --- | --- |
 | 命令行参数 | `gitguard <command> [options]` |
-| 环境变量 | `GITGUARD_SKIP`（Hook 绕过，归 `GGD-0013`）、`GITGUARD_LANG`（i18n，归 `GGD-0014`）、`NO_COLOR`（已实现） |
+| 环境变量 | `GITGUARD_SKIP`（已实现：仅 `scan --staged --record-pending` Hook 模式识别，`GGD-0013`）、`GITGUARD_LANG`（i18n，归 `GGD-0014`）、`NO_COLOR`（已实现） |
 | stdin（仅 `scan --push`） | Git push 信息行 |
 | 配置文件 | 由 Policy 模块加载 |
 
@@ -33,7 +33,9 @@
 | --- | --- |
 | 退出码契约 | 严格按 `06-API接口设计.md` §6 的退出码表；常量唯一来源为 `ExitCodes`，禁止就地写字面量 |
 | 解析失败 | 未知命令 / 未知选项 / 受限取值非法 / 参数组合非法 → 退出码 7（`CLI_USAGE_ERROR`），在命令动作执行前返回，不触碰仓库与配置 |
-| JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` 版本号；单行紧凑、中文不转义 |
+| JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` / `bypass.v1` 版本号；单行紧凑、中文不转义 |
+| 隐藏命令 | `hook post-commit`（FR-050）：仅供分发的 `post-commit` 脚本调用，不出现在 `--help`；恒返回 0，审计失败映射 14 |
+| 隐藏选项 | `scan --record-pending`：仅供 `pre-commit` 脚本调用，记录待提交预测；不能与 `--push` 组合（退出码 7） |
 | 全局 catch | 任何未分类异常走退出码 99；并写 crash 日志（脱敏；写入失败静默跳过） |
 | 彩色策略 | TTY + `NO_COLOR` 未设 + `--no-color` 未指定 时才启用 |
 | 输出分流 | 文本报告走 stderr；`--format json` 的机器可读结果走 stdout，日志始终走 stderr |
@@ -72,7 +74,23 @@ flowchart LR
 
 装配边界：Cli 不引用 Infrastructure；`GitGuardSession`（`GitGuard.Application.Composition`）在 Application 层完成 Infrastructure 装配并按需延迟构建（`status` / `version` 等只读命令不打开审计库、不生成指纹盐）。
 
-### 6.2 全局异常捕获
+### 6.2 `gitguard hook post-commit` 入口（FR-050）
+
+```mermaid
+flowchart LR
+    Git[post-commit 分发脚本] --> Run[CliApplication.RunAsync]
+    Run --> Parse[hook post-commit]
+    Parse -- 成功 --> Detect[BypassDetectionService.Detect]
+    Detect -- 未绕过 --> Silent[文本模式静默；退出码 0]
+    Detect -- NoVerify / GitGuardSkip --> Audit[SaveBypassEvent + 警告]
+    Audit --> E0[退出码 0]
+    Detect -- SqliteException --> E14[退出码 14]
+    Detect -- GitException --> E10[退出码 10]
+```
+
+`--record-pending` 在 `scan` 动作内处理：`GITGUARD_SKIP=1` 时绕过扫描并写入 `skipped` 标记；否则扫描通过后写入标记、阻断 / 失败时清理旧标记。标记操作失败仅降级为警告，不改变扫描退出码。
+
+### 6.3 全局异常捕获
 
 ```mermaid
 flowchart LR
@@ -116,6 +134,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 - [x] 彩色关闭策略（TTY/非 TTY/NO_COLOR）。
 - [x] 全局 catch 不会吞 ExitCode。
 - [x] 用法错误不落盘：退出码 7 时不创建审计库 / 不写 Hook 文件。
+- [x] 绕过检测命令链（GGD-0013）：`--record-pending` 标记写入 / 清理 / 阻断清理、`GITGUARD_SKIP=1` 仅 Hook 模式生效、`hook post-commit` 的 `gitguard.bypass.v1` 字段与恒 0 退出码（`CliBypassTests`）。
 - [ ] `--help` 覆盖所有命令（随 Shell 补全一并补测）。
 
 ## 10. 演进与扩展位
@@ -130,3 +149,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：命令解析入口 + 全局异常映射 + 彩色策略 |
 | 0.1.1 | 2026-10-16 | GGD-0009：§2.1 环境变量按实现标注归属（`NO_COLOR` 已实现，`GITGUARD_SKIP` → `GGD-0013`、`GITGUARD_LANG` → `GGD-0014`）；§3 新增「解析失败 → 退出码 7」「输出分流」「脱敏」规则，JSON Schema 补全为六种；§4 `System.CommandLine` 降级说明改为本层归一退出码 7；§6.1 流程与组合根装配对齐（`CliHost` / `GitGuardSession` 懒装配）；§6.2 异常映射补 `HookException` / `SqliteException` / 非仓库 2 与解析期 7；§7 `--language` 标注 v0.2 顺延；§9 勾选已覆盖测试项 |
+| 0.1.2 | 2026-10-21 | GGD-0013：§2.1 `GITGUARD_SKIP` 标记已实现（仅 Hook 模式）；§3 JSON Schema 补 `bypass.v1`，新增隐藏命令 / 隐藏选项规则；新增 §6.2 post-commit 入口与 `--record-pending` 处理（原全局异常捕获顺延为 §6.3）；§9 勾选绕过检测命令链测试项 |

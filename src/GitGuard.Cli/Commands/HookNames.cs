@@ -3,9 +3,8 @@
 namespace GitGuard.Cli.Commands;
 
 /// <summary>
-/// <c>--hook</c> 取值解析：MVP 仅支持 <c>pre-commit</c> / <c>pre-push</c>（FR-010）；
-/// <c>post-commit</c> 属 FR-050 绕过检测，顺延 GGD-0013，此处提前拦截为用法错误（7），
-/// 避免穿透到用例抛出未分类异常（99）。
+/// <c>--hook</c> 取值解析：支持 <c>pre-commit</c> / <c>pre-push</c>（FR-010）与 <c>post-commit</c>（FR-050 绕过检测）。
+/// 未知取值在此拦截为用法错误（7），避免穿透到用例抛出未分类异常（99）。
 /// </summary>
 internal static class HookNames
 {
@@ -32,9 +31,12 @@ internal static class HookNames
             return new[] { HookType.PrePush };
         }
 
-        error = string.Equals(normalized, "post-commit", StringComparison.OrdinalIgnoreCase)
-            ? "post-commit 归属 FR-050 绕过检测（顺延 GGD-0013），当前不可安装 / 卸载。"
-            : $"未知的 --hook 取值：{name}（可用：pre-commit、pre-push）。";
+        if (string.Equals(normalized, HookType.PostCommit.ToHookName(), StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { HookType.PostCommit };
+        }
+
+        error = $"未知的 --hook 取值：{name}（可用：pre-commit、pre-push、post-commit）。";
         return null;
     }
 }

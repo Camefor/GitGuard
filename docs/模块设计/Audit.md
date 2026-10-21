@@ -17,7 +17,7 @@
 | `ScanStagedUseCase` / `ScanPushUseCase` / `ScanManualUseCase` | `ScanRun` + `Findings[]` |
 | `InstallHookUseCase` / `UninstallHookUseCase` | `HookInstallation` + `HookInstalled` / `HookUninstalled` 事件（卸载附 `RestoredLegacyHook`） |
 | `AllowlistUseCase` | `AllowlistEntry` 变更 |
-| `BypassDetectionService` | `BypassEvent` |
+| `BypassDetectionService` | `ScanRun`（`ScanType.Bypass`）+ `BypassDetected` 事件（载荷含 `Reason`） |
 
 ### 2.2 输出
 
@@ -33,6 +33,7 @@
 | --- | --- |
 | 全写事务 | ScanRun + Findings 必须单事务提交；避免孤儿记录 |
 | Hook 写事务 | `hook_installations` upsert 与 `HookInstalled` / `HookUninstalled` 事件同事务提交（`SaveHookInstallation` / `SaveHookUninstallation`，GGD-0008）；`occurred_at` 安装取 `InstalledAt`、卸载取当前时刻 |
+| 绕过写事务 | `SaveBypassEvent(run, reason, commitSha)`：`scan_runs`（Bypass / Clean / 退出码 0 / 无 Finding）+ `BypassDetected` 事件同事务提交，`occurred_at` 取 `run.StartedAt`（GGD-0013）；写入失败不吞异常，CLI 映射退出码 14 |
 | 脱敏强制 | `Finding.snippet_masked` 构造函数拒绝原文；写入 SQLite 前 CHECK 约束兜底 |
 | 保留期清理 | 启动期后台任务清理 180 天前数据；可通过 `audit.retention_days` 覆写 |
 | 导出脱敏 | `audit export` 必须保持脱敏，不恢复原文 |
@@ -76,7 +77,7 @@ sequenceDiagram
     Store-->>App: ok
 ```
 
-### 6.3 写入 Hook 安装 / 卸载
+### 6.2 写入 Hook 安装 / 卸载
 
 ```mermaid
 sequenceDiagram
@@ -94,7 +95,25 @@ sequenceDiagram
 
 > 卸载对称使用 `SaveHookUninstallation(installation, restoredLegacyHook)`：upsert 保留 `installed_at` / `version` / 备份路径并翻转为 `Uninstalled`，事件 `HookUninstalled`。Hook 用例**不捕获** `SqliteException`（FailClosed 上抛）；磁盘变更先于审计写入，审计失败时盘上脚本已生效（可能产生「已安装未留痕」，由重复安装 upsert 自然修复）。
 
-### 6.2 启动期保留清理
+### 6.3 写入绕过事件
+
+```mermaid
+sequenceDiagram
+    participant App as BypassDetectionService
+    participant Store as SqliteAuditStore
+    participant DB
+
+    App->>Store: SaveBypassEvent(run, reason, commitSha)
+    Store->>DB: BEGIN
+    Store->>DB: INSERT scan_runs（Bypass / Clean / exit 0 / duration NULL）
+    Store->>DB: INSERT audit_logs（BypassDetected: RunId/CommitSha/DetectedAt/Reason）
+    Store->>DB: COMMIT
+    Store-->>App: ok
+```
+
+> 绕过事件不是扫描：不写 `findings`，`duration_ms` / `summary_json` 均为 `NULL`；提交 SHA 与原因只存在于 `audit_logs` 载荷。
+
+### 6.4 启动期保留清理
 
 ```mermaid
 flowchart LR
@@ -126,6 +145,7 @@ flowchart LR
 ## 9. 测试要点
 
 - [x] Hook 安装 / 卸载状态行与事件同事务落库（GGD-0008：`SqliteAuditStoreHookTests` 直读校验 + `HookEndToEndTests` 真实库端到端）。
+- [x] 绕过事件行与 `BypassDetected` 同事务落库；`NoVerify` / `GitGuardSkip` 载荷字段与非法输入拒绝（GGD-0013：`SqliteAuditStoreBypassTests` + E2E S8 直读）。
 - [ ] 金丝雀 Token 不入库（DR-02）。
 - [ ] `BUSY` 重试逻辑：3 次指数退避；仍失败则发 `AuditWriteFailed`。
 - [ ] 清理阈值生效。
@@ -146,3 +166,4 @@ flowchart LR
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：扫描管线经 `IAuditStore.SaveScanRun(run, decisions)` 单事务落库（`findings.action` 取 `PolicyDecision`）；存储层 `SqliteException` 在管线内被捕获并降级为 `AuditWriteFailed` 标志，扫描结果照常返回（§4 / §6.1） |
 | 0.1.3 | 2026-10-16 | 与 GGD-0008 实现同步：§2.1 输入补 Hook 事件；§3 新增 Hook 写事务规则；§6.3 新增 Hook 安装 / 卸载写入流程（upsert + 事件同事务，卸载 `RestoredLegacyHook` 载荷，Hook 用例不捕获 `SqliteException`）；§4 降级列补 Hook 场景；§9 勾选 Hook 事务测试项 |
 | 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.2 标注 CLI `gitguard audit list/view/export` 为 v0.2 规划（`GGD-0022`），v0.1 无审计查询命令 |
+| 0.1.5 | 2026-10-21 | GGD-0013：§2.1 输入改为 `Bypass` 运行 + `BypassDetected` 事件；§3 新增绕过写事务规则；§6.3 新增写入流程（无 Finding、duration/summary 为 NULL、载荷含 Reason；原 Hook / 清理流程顺延为 §6.2 / §6.4）；§9 勾选绕过事件落库测试 |

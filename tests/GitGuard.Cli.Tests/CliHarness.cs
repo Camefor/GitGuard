@@ -54,6 +54,9 @@ internal sealed class CliHarness : IDisposable
     /// <summary>隔离的用户配置目录（<c>config.yml</c> 的父目录）。</summary>
     internal string UserConfigDirectory { get; }
 
+    /// <summary>待提交扫描标记路径（<c>&lt;git-dir&gt;/gitguard/pending-scan.json</c>，FR-050）。</summary>
+    internal string PendingScanPath => ResolvePath(".git/gitguard/pending-scan.json");
+
     /// <summary>已捕获的标准输出（<c>--format json</c> 的机器可读输出）。</summary>
     internal string Output => _output.ToString();
 
@@ -86,8 +89,17 @@ internal sealed class CliHarness : IDisposable
     /// <summary>写入文本文件（相对仓库根目录；自动创建父目录）。</summary>
     /// <param name="relativePath">相对路径。</param>
     /// <param name="content">文件内容。</param>
-    internal void WriteFile(string relativePath, string content) =>
-        File.WriteAllText(ResolvePath(relativePath), content);
+    internal void WriteFile(string relativePath, string content)
+    {
+        string path = ResolvePath(relativePath);
+        string? directory = Path.GetDirectoryName(path);
+        if (directory is not null)
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(path, content);
+    }
 
     /// <summary>写入项目级配置 <c>.gitguard.yml</c>。</summary>
     /// <param name="yaml">YAML 文本。</param>
@@ -153,8 +165,9 @@ internal sealed class CliHarness : IDisposable
     /// <summary>按给定参数运行 CLI 并返回退出码。</summary>
     /// <param name="args">命令行参数（不含可执行文件名）。</param>
     /// <param name="standardInput">标准输入内容（<c>scan --push</c> 推送信息行）。</param>
+    /// <param name="skipEnvironment"><c>GITGUARD_SKIP</c> 取值（<see langword="null"/> 表示未设置）。</param>
     /// <returns>进程退出码。</returns>
-    internal Task<int> RunAsync(string[] args, string standardInput)
+    internal Task<int> RunAsync(string[] args, string standardInput, string? skipEnvironment = null)
     {
         var host = new CliHost
         {
@@ -166,6 +179,7 @@ internal sealed class CliHarness : IDisposable
             UserConfigDirectory = UserConfigDirectory,
             GitGuardVersion = TEST_VERSION,
             ExecutablePath = TEST_EXECUTABLE,
+            SkipEnvironment = skipEnvironment,
             IsErrorTerminal = false,
             NoColorEnvironment = true,
         };

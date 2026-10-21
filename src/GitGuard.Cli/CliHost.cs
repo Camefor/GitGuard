@@ -33,6 +33,9 @@ public sealed class CliHost
     /// <summary>GitGuard 可执行文件路径（写入 Hook 分发脚本）；<see langword="null"/> 取 <see cref="ResolveExecutablePath"/>。</summary>
     public string? ExecutablePath { get; init; }
 
+    /// <summary><c>GITGUARD_SKIP</c> 环境变量取值（<c>1</c> 表示 Hook 模式下显式跳过扫描，FR-050）；未设置为 <see langword="null"/>。</summary>
+    public string? SkipEnvironment { get; init; }
+
     /// <summary>stderr 是否连接到终端（彩色输出的必要条件之一）；测试注入内存流时应保持 <see langword="false"/>。</summary>
     public bool IsErrorTerminal { get; init; }
 
@@ -59,6 +62,7 @@ public sealed class CliHost
         Input = Console.In,
         GitExecutable = "git",
         ExecutablePath = ResolveExecutablePath(),
+        SkipEnvironment = Environment.GetEnvironmentVariable("GITGUARD_SKIP"),
         IsErrorTerminal = !Console.IsErrorRedirected,
         NoColorEnvironment = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")),
     };

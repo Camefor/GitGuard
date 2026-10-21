@@ -83,6 +83,41 @@ public sealed class SqliteAuditStore : IAuditStore
     }
 
     /// <inheritdoc />
+    public void SaveBypassEvent(ScanRun run, BypassReason reason, string commitSha)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentException.ThrowIfNullOrWhiteSpace(commitSha);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason), reason, "未知的 BypassReason 取值");
+        }
+
+        if (run.ScanType != ScanType.Bypass || !run.Findings.IsEmpty)
+        {
+            throw new ArgumentException("绕过事件必须使用不带 Finding 的 ScanType.Bypass 运行记录。", nameof(run));
+        }
+
+        if (!IsHexSha(commitSha))
+        {
+            throw new ArgumentException($"提交 SHA 必须是 40 或 64 位十六进制：{commitSha}", nameof(commitSha));
+        }
+
+        ExecuteWithBusyRetry("写入绕过事件", connection =>
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            InsertScanRun(connection, transaction, run);
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "Bypass",
+                "BypassDetected",
+                BuildBypassDetectedPayload(run, reason, commitSha),
+                run.StartedAt);
+            transaction.Commit();
+        });
+    }
+
+    /// <inheritdoc />
     public ScanRun? FindScanRun(Guid runId)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(runId, Guid.Empty, nameof(runId));
@@ -191,6 +226,10 @@ public sealed class SqliteAuditStore : IAuditStore
 
     private static bool IsBusy(MsSqliteException exception) =>
         exception.SqliteErrorCode is SQLITE_BUSY_ERROR_CODE or SQLITE_LOCKED_ERROR_CODE;
+
+    private static bool IsHexSha(string value) =>
+        value.Length is 40 or 64
+        && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F');
 
     private static GitGuardSqliteException CreateSqliteException(string operation, MsSqliteException exception) =>
         new GitGuardSqliteException($"{operation}失败（SQLite 错误码 {exception.SqliteErrorCode}）：{exception.Message}", exception);
@@ -323,6 +362,22 @@ public sealed class SqliteAuditStore : IAuditStore
             writer.WriteString("RepoPath", installation.RepoPath);
             writer.WriteString("HookType", installation.HookType.ToHookName());
             writer.WriteBoolean("RestoredLegacyHook", restoredLegacyHook);
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static string BuildBypassDetectedPayload(ScanRun run, BypassReason reason, string commitSha)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("RunId", run.Id.ToString());
+            writer.WriteString("CommitSha", commitSha);
+            writer.WriteNumber("DetectedAt", run.StartedAt.ToUnixTimeMilliseconds());
+            writer.WriteString("Reason", reason.ToString());
             writer.WriteEndObject();
         }
 

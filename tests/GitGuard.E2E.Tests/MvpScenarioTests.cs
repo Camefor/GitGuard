@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using System.Text.Json;
+using FluentAssertions;
 using GitGuard.Cli;
 
 namespace GitGuard.E2E.Tests;
@@ -6,7 +7,7 @@ namespace GitGuard.E2E.Tests;
 /// <summary>
 /// MVP 必过验收场景（16-测试方案 §12 S1~S8）：真实 <c>git commit</c> / <c>git push</c> 触发 Hook 分发脚本 →
 /// 拉起真实 <c>gitguard</c> 子进程扫描 → 阻断 / 放行与审计落库的全链路断言。
-/// S8（<c>--no-verify</c> 绕过留痕）依赖 GGD-0013，先以占位跳过登记，交付后回填。
+/// S8 覆盖正常提交、<c>--no-verify</c> 与 <c>GITGUARD_SKIP=1</c> 三类绕过判定（FR-050 / DR-06）。
 /// </summary>
 public sealed class MvpScenarioTests
 {
@@ -240,10 +241,80 @@ public sealed class MvpScenarioTests
         File.ReadAllText(harness.ResolvePath("stub.log")).Should().Contain("invoked", "分发脚本必须真实执行了扫描器");
     }
 
-    /// <summary>S8（16-测试方案 §12）：<c>--no-verify</c> 绕过必须留下审计痕迹；依赖 GGD-0013（绕过检测与留痕）。</summary>
+    /// <summary>
+    /// S8（16-测试方案 §12 / TC-FR-050-01 / TC-DR-06-01）：正常提交不留绕过记录；
+    /// <c>--no-verify</c> 与 <c>GITGUARD_SKIP=1</c> 分别登记为 <c>NoVerify</c> / <c>GitGuardSkip</c>，
+    /// 两者叠加时只登记一条 <c>NoVerify</c>。
+    /// </summary>
     [Fact]
-    public void S8_NoVerifyBypass_LeavesAuditTrail()
+    public void S8_BypassDetection_LeavesAuditTrailForNoVerifyAndGitGuardSkip()
     {
-        Assert.Skip("S8 依赖 GGD-0013（--no-verify 绕过留痕），待该任务交付后回填场景实现。");
+        using var harness = new AcceptanceHarness();
+
+        harness.WriteFile("README.md", "# Sample\n");
+        harness.Stage("README.md");
+        harness.CommitOrThrow("baseline");
+        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS, "install 应写入 pre-commit 与 post-commit 分发脚本");
+        File.Exists(harness.ResolvePath(".git/hooks/post-commit")).Should().BeTrue();
+
+        // 1) 正常提交：pre-commit 记录预测 → post-commit 消费标记，不产生绕过事件
+        harness.WriteFile("src/normal.txt", "normal\n");
+        harness.Stage("src/normal.txt");
+        ProcessResult normal = harness.RunGit("commit", "--quiet", "-m", "normal commit");
+        normal.ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.ReadAuditScalarLong("SELECT COUNT(*) FROM scan_runs WHERE scan_type = 'Bypass'")
+            .Should().Be(0, "正常提交不得登记绕过事件");
+        harness.ReadAuditScalarString("SELECT scan_type FROM scan_runs ORDER BY rowid DESC LIMIT 1").Should().Be("PreCommit");
+        File.Exists(harness.ResolvePath(".git/gitguard/pending-scan.json"))
+            .Should().BeFalse("正常提交必须消费待提交预测标记");
+
+        // 2) --no-verify：pre-commit 未运行，post-commit 无标记可比对 → NoVerify
+        harness.WriteFile("src/bypassed.txt", "bypassed\n");
+        harness.Stage("src/bypassed.txt");
+        ProcessResult bypassed = harness.RunGit("commit", "--quiet", "--no-verify", "-m", "bypass hooks");
+        bypassed.ExitCode.Should().Be(ExitCodes.SUCCESS);
+        string bypassedSha = harness.RunGitOrThrow("rev-parse", "HEAD");
+        harness.ReadAuditScalarLong("SELECT COUNT(*) FROM scan_runs WHERE scan_type = 'Bypass'").Should().Be(1);
+        harness.ReadAuditScalarString("SELECT result FROM scan_runs WHERE scan_type = 'Bypass'").Should().Be("Clean");
+        harness.ReadAuditScalarLong("SELECT exit_code FROM scan_runs WHERE scan_type = 'Bypass'").Should().Be(0);
+        ReadLatestBypassReason(harness).Should().Be("NoVerify");
+        ReadLatestBypassCommitSha(harness).Should().Be(bypassedSha);
+
+        // 3) GITGUARD_SKIP=1：pre-commit 跳过扫描并记录 skipped 标记 → GitGuardSkip，且不产生 PreCommit 扫描记录
+        harness.WriteFile("src/skipped.txt", "skipped\n");
+        harness.Stage("src/skipped.txt");
+        ProcessResult skipped = harness.RunGitWithEnvironment("GITGUARD_SKIP", "1", "commit", "--quiet", "-m", "explicit skip");
+        skipped.ExitCode.Should().Be(ExitCodes.SUCCESS);
+        string skippedSha = harness.RunGitOrThrow("rev-parse", "HEAD");
+        harness.ReadAuditScalarLong("SELECT COUNT(*) FROM scan_runs WHERE scan_type = 'Bypass'").Should().Be(2);
+        harness.ReadAuditScalarLong("SELECT COUNT(*) FROM scan_runs WHERE scan_type = 'PreCommit'")
+            .Should().Be(1, "GITGUARD_SKIP=1 必须跳过暂存区扫描");
+        ReadLatestBypassReason(harness).Should().Be("GitGuardSkip");
+        ReadLatestBypassCommitSha(harness).Should().Be(skippedSha);
+
+        // 4) --no-verify 与 GITGUARD_SKIP=1 叠加：pre-commit 未运行，仍归因为 NoVerify 且只登记一条
+        harness.WriteFile("src/double.txt", "double\n");
+        harness.Stage("src/double.txt");
+        ProcessResult doubled = harness.RunGitWithEnvironment(
+            "GITGUARD_SKIP", "1", "commit", "--quiet", "--no-verify", "-m", "double bypass");
+        doubled.ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.ReadAuditScalarLong("SELECT COUNT(*) FROM scan_runs WHERE scan_type = 'Bypass'").Should().Be(3);
+        ReadLatestBypassReason(harness).Should().Be("NoVerify");
+        File.Exists(harness.ResolvePath(".git/gitguard/pending-scan.json")).Should().BeFalse();
+    }
+
+    private static string ReadLatestBypassReason(AcceptanceHarness harness) =>
+        ReadLatestBypassPayload(harness).GetProperty("Reason").GetString()
+        ?? throw new InvalidOperationException("BypassDetected 载荷缺少 Reason。");
+
+    private static string ReadLatestBypassCommitSha(AcceptanceHarness harness) =>
+        ReadLatestBypassPayload(harness).GetProperty("CommitSha").GetString()
+        ?? throw new InvalidOperationException("BypassDetected 载荷缺少 CommitSha。");
+
+    private static JsonElement ReadLatestBypassPayload(AcceptanceHarness harness)
+    {
+        using var payload = JsonDocument.Parse(harness.ReadAuditScalarString(
+            "SELECT payload_json FROM audit_logs WHERE category = 'Bypass' AND event_type = 'BypassDetected' ORDER BY seq DESC LIMIT 1"));
+        return payload.RootElement.Clone();
     }
 }

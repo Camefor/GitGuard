@@ -21,7 +21,7 @@ public sealed class InstallHookUseCaseTests
     private static readonly DateTimeOffset SampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Execute_FreshRepository_InstallsBothHooksAndPersistsActiveRecords()
+    public void Execute_FreshRepository_InstallsAllHooksAndPersistsActiveRecords()
     {
         using var repo = new TempGitRepository();
         var store = new RecordingAuditStore();
@@ -32,20 +32,22 @@ public sealed class InstallHookUseCaseTests
 
         report.RepoPath.Should().Be(repo.Root);
         report.Version.Should().Be(SampleVersion);
-        report.Results.Should().HaveCount(2);
-        report.Results.Select(result => result.HookType).Should().Equal(HookType.PreCommit, HookType.PrePush);
+        report.Results.Should().HaveCount(3);
+        report.Results.Select(result => result.HookType)
+            .Should().Equal(HookType.PreCommit, HookType.PrePush, HookType.PostCommit);
         report.Results.Should().OnlyContain(result => result.Disposition == HookInstallDisposition.Installed);
         report.Results.Should().OnlyContain(result => result.BackupPath == null);
 
         string preCommitPath = Path.Combine(repo.Root, ".git", "hooks", "pre-commit");
         File.Exists(preCommitPath).Should().BeTrue();
         File.Exists(Path.Combine(repo.Root, ".git", "hooks", "pre-push")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(repo.Root, ".git", "hooks", "post-commit")).Should().Contain("hook post-commit");
         string script = File.ReadAllText(preCommitPath);
         script.Should().StartWith($"#!/bin/sh\n# gitguard-managed v{SampleVersion}\n");
         script.Should().Contain($"GITGUARD_BIN=\"{HookTestSupport.ToUnixPath(Path.GetFullPath(executablePath))}\"");
         script.Should().NotContain("\r");
 
-        store.SavedHookInstallations.Should().HaveCount(2);
+        store.SavedHookInstallations.Should().HaveCount(3);
         store.SavedHookInstallations.Should().OnlyContain(installation => installation.Status == HookInstallationStatus.Active);
         store.SavedHookInstallations.Should().OnlyContain(installation => installation.RepoPath == repo.Root);
         store.SavedHookInstallations.Should().OnlyContain(installation => installation.InstalledAt == SampleUtcNow);
@@ -277,14 +279,20 @@ public sealed class InstallHookUseCaseTests
     }
 
     [Fact]
-    public void Execute_PostCommitHook_ThrowsUntilGgd0013()
+    public void Execute_PostCommitHook_InstallsBypassDetectionScript()
     {
         using var repo = new TempGitRepository();
-        var useCase = CreateUseCase(repo, new RecordingAuditStore());
+        var store = new RecordingAuditStore();
+        var useCase = CreateUseCase(repo, store);
 
-        Action act = () => useCase.Execute(CreateExecutable(repo), hooks: new[] { HookType.PostCommit });
+        HookInstallReport report = useCase.Execute(CreateExecutable(repo), hooks: new[] { HookType.PostCommit });
 
-        act.Should().Throw<ArgumentOutOfRangeException>().WithMessage("*GGD-0013*");
+        HookInstallResult result = report.Results.Should().ContainSingle().Subject;
+        result.HookType.Should().Be(HookType.PostCommit);
+        result.Disposition.Should().Be(HookInstallDisposition.Installed);
+        File.ReadAllText(result.HookPath).Should().Contain("hook post-commit");
+        store.SavedHookInstallations.Should().ContainSingle()
+            .Which.HookType.Should().Be(HookType.PostCommit);
     }
 
     [Fact]

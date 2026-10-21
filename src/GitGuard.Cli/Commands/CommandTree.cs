@@ -4,7 +4,8 @@ namespace GitGuard.Cli.Commands;
 
 /// <summary>
 /// 命令树装配（<c>模块设计/Cli.md</c> §10）：MVP 命令集为
-/// <c>scan</c> / <c>install</c> / <c>uninstall</c> / <c>status</c> / <c>version</c>
+/// <c>scan</c> / <c>install</c> / <c>uninstall</c> / <c>status</c> / <c>version</c>，
+/// 另有隐藏的内部命令 <c>hook post-commit</c>（FR-050，不展示于帮助）；
 /// （<c>allowlist</c> / <c>audit</c> / <c>rules</c> 属 v0.2，未注册）；全局选项挂根命令并递归下发。
 /// 每次运行构建全新命令树，命令实例不跨调用共享（并行测试安全）。
 /// </summary>
@@ -21,6 +22,7 @@ internal static class CommandTree
         ArgumentNullException.ThrowIfNull(globalOptions);
 
         var root = new RootCommand("GitGuard：本地 Git 密钥 / 隐私泄露检测（扫描暂存区与推送范围，安装仓库 Hook）");
+        root.Subcommands.Add(HookCommand.Create(runtime));
         root.Subcommands.Add(ScanCommand.Create(runtime));
         root.Subcommands.Add(InstallCommand.Create(runtime));
         root.Subcommands.Add(UninstallCommand.Create(runtime));

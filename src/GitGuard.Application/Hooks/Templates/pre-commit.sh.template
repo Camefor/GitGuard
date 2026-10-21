@@ -14,7 +14,7 @@ HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 LEGACY_HOOK="$HOOK_DIR/{{HOOK_NAME}}.local.bak"
 
 GUARD_EXIT=0
-"$GITGUARD_BIN" scan --staged || GUARD_EXIT=$?
+"$GITGUARD_BIN" scan --staged --record-pending || GUARD_EXIT=$?
 
 LEGACY_EXIT=0
 if [ -x "$LEGACY_HOOK" ]; then

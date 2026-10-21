@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
+using GitGuard.Core.Model;
 
 namespace GitGuard.Infrastructure.Git;
 
@@ -23,6 +24,7 @@ public sealed class GitAccess : IGitAccess
 
     // 07-缓存设计 §4：Git 元数据（hooks 路径 / HEAD）在单次进程内只查询一次，缓存于 Lazy
     private readonly Lazy<string> _gitCommonDirectory;
+    private readonly Lazy<string> _gitDirectory;
     private readonly Lazy<string?> _configuredHooksPath;
     private readonly Lazy<string> _headCommitSha;
 
@@ -46,6 +48,7 @@ public sealed class GitAccess : IGitAccess
         _gitExecutable = gitExecutable;
         _repositoryRoot = ResolveRepositoryRoot(Path.GetFullPath(repositoryPath));
         _gitCommonDirectory = new Lazy<string>(ResolveGitCommonDirectory);
+        _gitDirectory = new Lazy<string>(ResolveGitDirectory);
         _configuredHooksPath = new Lazy<string?>(ResolveConfiguredHooksPath);
         _headCommitSha = new Lazy<string>(ResolveHeadCommitSha);
     }
@@ -55,6 +58,9 @@ public sealed class GitAccess : IGitAccess
 
     /// <inheritdoc />
     public string GetGitCommonDirectory() => _gitCommonDirectory.Value;
+
+    /// <inheritdoc />
+    public string GetGitDirectory() => _gitDirectory.Value;
 
     /// <inheritdoc />
     public string? GetConfiguredHooksPath() => _configuredHooksPath.Value;
@@ -69,6 +75,46 @@ public sealed class GitAccess : IGitAccess
 
     /// <inheritdoc />
     public string GetHeadCommitSha() => _headCommitSha.Value;
+
+    /// <inheritdoc />
+    public string? TryGetHeadCommitSha()
+    {
+        // --verify --quiet：HEAD 缺失（尚无提交）时退出码 1 且无输出，区别于真正的 git 失败
+        var result = RunGit("rev-parse", "--verify", "--quiet", "HEAD");
+        if (result.ExitCode == 0)
+        {
+            return result.StandardOutput.Trim();
+        }
+
+        if (result.ExitCode == 1)
+        {
+            return null;
+        }
+
+        throw new GitException(
+            GitException.GIT_COMMAND_FAILED,
+            $"git rev-parse --verify --quiet HEAD 失败（退出码 {result.ExitCode}）。",
+            result.ExitCode,
+            result.StandardError);
+    }
+
+    /// <inheritdoc />
+    public string GetStagedTreeSha()
+    {
+        var result = RunGit("write-tree");
+        EnsureGitSucceeded(result, "write-tree");
+        return result.StandardOutput.Trim();
+    }
+
+    /// <inheritdoc />
+    public CommitMetadata GetCommitMetadata(string commitSha)
+    {
+        ValidateRevisionArgument(commitSha, nameof(commitSha));
+
+        var result = RunGit("cat-file", "-p", commitSha);
+        EnsureGitSucceeded(result, $"cat-file -p {commitSha}");
+        return ParseCommitMetadata(commitSha, result.StandardOutput);
+    }
 
     /// <inheritdoc />
     public string GetStagedDiff()
@@ -151,6 +197,48 @@ public sealed class GitAccess : IGitAccess
         }
     }
 
+    /// <summary>解析 commit 对象头部：只提取 tree 与 parent 行（跳过 author / committer / 签名等字段）。</summary>
+    private static CommitMetadata ParseCommitMetadata(string commitSha, string commitObject)
+    {
+        string? treeSha = null;
+        var parents = new List<string>();
+        foreach (string line in commitObject.Split('\n'))
+        {
+            if (line.Length == 0)
+            {
+                break;
+            }
+
+            if (line.StartsWith("tree ", StringComparison.Ordinal))
+            {
+                treeSha = line.Substring("tree ".Length).Trim();
+            }
+            else if (line.StartsWith("parent ", StringComparison.Ordinal))
+            {
+                parents.Add(line.Substring("parent ".Length).Trim());
+            }
+        }
+
+        if (treeSha is null)
+        {
+            throw new GitException(
+                GitException.GIT_COMMAND_FAILED,
+                $"git cat-file -p {commitSha} 输出缺少 tree 行，无法解析提交元数据。");
+        }
+
+        try
+        {
+            return new CommitMetadata(commitSha, treeSha, parents);
+        }
+        catch (GitGuard.Core.Domain.InvariantViolationException ex)
+        {
+            throw new GitException(
+                GitException.GIT_COMMAND_FAILED,
+                $"git cat-file -p {commitSha} 输出格式非法：{ex.Message}",
+                ex);
+        }
+    }
+
     /// <summary>预检仓库有效性并解析工作区根目录：非 Git 工作区抛 <c>NOT_A_GIT_REPOSITORY</c>（CLI 映射退出码 2）。</summary>
     private string ResolveRepositoryRoot(string workingDirectory)
     {
@@ -173,6 +261,14 @@ public sealed class GitAccess : IGitAccess
         var result = RunGit("rev-parse", "--git-common-dir");
         EnsureGitSucceeded(result, "rev-parse --git-common-dir");
         return Path.GetFullPath(Path.Combine(_repositoryRoot, result.StandardOutput.Trim()));
+    }
+
+    /// <summary>解析当前工作树专属 Git 目录（linked worktree 下为 .git/worktrees/&lt;name&gt;）。</summary>
+    private string ResolveGitDirectory()
+    {
+        var result = RunGit("rev-parse", "--absolute-git-dir");
+        EnsureGitSucceeded(result, "rev-parse --absolute-git-dir");
+        return Path.GetFullPath(result.StandardOutput.Trim());
     }
 
     /// <summary>读取 core.hooksPath；未设置（git 退出码 1）或显式置空时返回 null（调用方回退 .git/hooks）。</summary>

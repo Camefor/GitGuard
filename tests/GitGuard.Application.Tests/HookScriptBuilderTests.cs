@@ -21,7 +21,7 @@ public sealed class HookScriptBuilderTests
         // 首两行即托管标记（HookFileOperations.Inspect 的识别窗口）
         script.Should().StartWith("#!/bin/sh\n# gitguard-managed v1.2.3\n");
         script.Should().Contain("GITGUARD_BIN=\"/opt/gitguard/gitguard\"");
-        script.Should().Contain("scan --staged");
+        script.Should().Contain("scan --staged --record-pending");
         script.Should().Contain("pre-commit.local.bak");
         script.Should().NotContain("{{");
         script[0].Should().Be('#');
@@ -75,11 +75,16 @@ public sealed class HookScriptBuilderTests
     }
 
     [Fact]
-    public void Render_PostCommit_ThrowsNotSupportedUntilGgd0013()
+    public void Render_PostCommit_CallsBypassDetectionWithOwnLegacyBackup()
     {
-        Action act = () => HookScriptBuilder.Render(HookType.PostCommit, SampleExecutable, SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PostCommit, SampleExecutable, SampleVersion);
 
-        act.Should().Throw<ArgumentOutOfRangeException>().WithMessage("*GGD-0013*");
+        // FR-050：post-commit 只做绕过检测，不再触发暂存区扫描
+        script.Should().Contain("hook post-commit");
+        script.Should().NotContain("scan --staged");
+        script.Should().Contain("post-commit.local.bak");
+        script.Should().Contain("# gitguard-managed v1.2.3");
+        script.Should().NotContain("\r");
     }
 
     [Fact]

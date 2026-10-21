@@ -29,6 +29,7 @@
          仓库内按 13-开发规范 存储（UTF-8 with BOM + CRLF），渲染时归一化为 LF + 无 BOM（POSIX sh 拒绝 BOM/CR）。 -->
     <EmbeddedResource Include="Hooks\Templates\pre-commit.sh.template" LogicalName="GitGuard.Application.Hooks.Templates.pre-commit.sh.template" WithCulture="false" />
     <EmbeddedResource Include="Hooks\Templates\pre-push.sh.template" LogicalName="GitGuard.Application.Hooks.Templates.pre-push.sh.template" WithCulture="false" />
+    <EmbeddedResource Include="Hooks\Templates\post-commit.sh.template" LogicalName="GitGuard.Application.Hooks.Templates.post-commit.sh.template" WithCulture="false" />
   </ItemGroup>
 
 </Project>

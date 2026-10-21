@@ -11,7 +11,7 @@ namespace GitGuard.Cli.Tests;
 public sealed class CliHookLifecycleTests
 {
     [Fact]
-    public async Task Install_WritesManagedDispatchScriptsForBothHooks()
+    public async Task Install_WritesManagedDispatchScriptsForAllHooks()
     {
         using var harness = new CliHarness();
 
@@ -21,7 +21,7 @@ public sealed class CliHookLifecycleTests
         harness.Output.Should().BeEmpty();
         harness.Error.Should().Contain("GitGuard Hook 安装完成");
 
-        foreach (string hook in new[] { "pre-commit", "pre-push" })
+        foreach (string hook in new[] { "pre-commit", "pre-push", "post-commit" })
         {
             string script = File.ReadAllText(harness.ResolvePath($".git/hooks/{hook}"));
             script.Should().Contain($"# gitguard-managed v{CliHarness.TEST_VERSION}");
@@ -80,6 +80,7 @@ public sealed class CliHookLifecycleTests
             .Should().OnlyContain(hook => hook.GetProperty("disposition").GetString() == "Removed");
         File.Exists(harness.ResolvePath(".git/hooks/pre-commit")).Should().BeFalse();
         File.Exists(harness.ResolvePath(".git/hooks/pre-push")).Should().BeFalse();
+        File.Exists(harness.ResolvePath(".git/hooks/post-commit")).Should().BeFalse();
     }
 
     [Fact]

@@ -69,13 +69,15 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 
 - **触发**：开发者判断本次拦截为误报且无法立即登记白名单，使用 `git commit --no-verify`。
 - **主流程**：
-  1. GitGuard Hook 根本不运行（Git 行为），但 GitGuard 会在下次 Hook 运行时识别到上一次是绕过。
-  2. 推荐实现：GitGuard 另外注册 `post-commit` 轻量 Hook 侦测绕过事件，追加到审计。
-  3. 审计记录「skipped」且带「上一次 commit SHA」。
+  1. `pre-commit` 扫描通过后，分发脚本（隐藏选项 `--record-pending`）记录「父提交 + 暂存树」预测；扫描阻断或失败时清理旧标记。
+  2. `git commit --no-verify` 跳过分发脚本，预测标记缺失或与实际提交不匹配。
+  3. Git 仍执行 GitGuard 安装的 `post-commit` 轻量 Hook：比对实际提交的树与首个父提交，判定为 `NoVerify`。
+  4. 使用 `GITGUARD_SKIP=1 git commit` 时，`pre-commit` 记录 `skipped` 标记且不执行扫描，`post-commit` 判定为 `GitGuardSkip`。
+  5. 两种情况均写入 `scan_runs`（`Bypass` / `Clean` / 退出码 0）与 `audit_logs`（`BypassDetected`），载荷含 `RunId`、`CommitSha`、`DetectedAt`、`Reason`。
 - **成功指标**：绕过事件可被查询；不伪装为「扫描通过」。
-- **失败分支**：开发者同时用 `--no-verify` 和 `GITGUARD_SKIP=1`，仍登记一次。
+- **失败分支**：同时用 `--no-verify` 和 `GITGUARD_SKIP=1` 时只登记一次 `NoVerify`（无标记优先）。
 - **对应功能需求**：`FR-050`
-- **v0.1 落地状态**：顺延至 `GGD-0013`；`post-commit` Hook 未注册，`GITGUARD_SKIP` 环境变量未识别。
+- **v0.1 落地状态**：已实现（`GGD-0013`）：`install` 默认注册 `post-commit`；`GITGUARD_SKIP=1` 仅在 Hook 模式（`--record-pending`）生效；E2E S8 覆盖正常提交 / `--no-verify` / `GITGUARD_SKIP=1` / 两者并用。
 
 ### 3.6 场景「仓库全量扫描 / 基线建立」
 
@@ -107,7 +109,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | `FR-040` | 白名单登记 `gitguard allowlist add/remove/list` | P1 | 3.4 | 必填 reason；写入 SQLite | 未实现 CLI；v0.1 仅支持配置文件 `allowlist.entries` |
 | `FR-041` | 白名单匹配粒度：规则 / 路径 / 指纹 | P1 | 3.4 | 三种匹配均可独立启用 | 部分实现：配置文件三粒度匹配可用，CLI / SQLite 管理未实现 |
 | `FR-042` | 已忽略项仍在终端汇总 | P1 | 3.4 | 每次扫描输出 `ignored N / blocked M / warned K` | 已实现：汇总行含「白名单忽略 N」 |
-| `FR-050` | 绕过事件审计 | P1 | 3.5 | 识别 `--no-verify` 与 `GITGUARD_SKIP=1`，记录为独立事件 | 未实现（顺延 GGD-0013） |
+| `FR-050` | 绕过事件审计 | P1 | 3.5 | 识别 `--no-verify` 与 `GITGUARD_SKIP=1`，记录为独立事件 | 已实现（GGD-0013：`post-commit` + 父提交 / 暂存树预测） |
 | `FR-060` | 全量扫描 `gitguard scan --all` | P1 | 3.6 | 支持 `--since` / `--max-files` 分段 | 未实现（v0.2） |
 | `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 | 未实现（v0.2） |
 | `FR-070` | 配置：`.gitguard.yml` 项目级 | P0 | 全部 | 支持规则开关、严重度覆写、exclude 路径 | 部分实现：`exclude` 已解析但未消费（被排除路径仍会被扫描，GGD-0019） |
@@ -135,7 +137,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - [x] 普通公开 URL、正常示例代码不被无差别拦截（E2E S5）。
 - [x] 已存在的文本 Hook 在安装后仍能被触发，退出码正确传播（DR-05；E2E S6）。
 - [x] 扫描器崩溃 / 超时时默认阻断（DR-03；E2E S7a / S7b + TC-DR-03）。
-- [ ] `--no-verify` 本地绕过被记录为独立审计事件（DR-06；顺延 `GGD-0013`）。
+- [x] `--no-verify` 与 `GITGUARD_SKIP=1` 本地绕过被记录为独立审计事件（DR-06；E2E S8、TC-DR-06-01）。
 - [ ] 白名单登记必填 reason，可按规则 / 路径 / 指纹豁免（配置文件 `allowlist.entries` 已可用；CLI / SQLite 登记随 v0.2）。
 - [x] SQLite 中无任何 Token / 密码 / 完整敏感行原文（DR-02；TC-DR-02-01）。
 - [ ] lefthook / pre-commit 真实框架兼容矩阵（NFR-A-001；`GGD-0021`）。
@@ -143,7 +145,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 
 ## 7. 产品路线与版本计划
 
-- **v0.1 MVP**：场景 3.1-3.3 + 3.5；FR-010 ~ FR-032、FR-070、FR-071；配置文件级白名单匹配（`allowlist.entries`）可用。其中场景 3.5 / FR-050 尚待 `GGD-0013`；FR-040 ~ FR-042 的 CLI / SQLite 管理、FR-060 / FR-061 全量扫描不在 v0.1 范围；无 GitleaksAdapter；无桌面端。
+- **v0.1 MVP**：场景 3.1-3.3 + 3.5；FR-010 ~ FR-032、FR-050、FR-070、FR-071；配置文件级白名单匹配（`allowlist.entries`）可用。FR-040 ~ FR-042 的 CLI / SQLite 管理、FR-060 / FR-061 全量扫描不在 v0.1 范围；无 GitleaksAdapter；无桌面端。
 - **v0.2**：场景 3.4 和 3.6；FR-040 ~ FR-061、FR-080、FR-090；全历史扫描与基线。
 - **v0.3**：Avalonia 桌面端 FR-100；组织级配置。
 
@@ -153,7 +155,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 
 | # | 问题 | 影响 | 需要决策人 | 期限 |
 | --- | --- | --- | --- | --- |
-| Q-01 | `post-commit` 探测 `--no-verify` 绕过是否足够可靠？是否需要同时结合 reflog 比对？ | 中（DR-06 实现方式） | 项目负责人 | MVP 启动前 |
+| Q-01 | `post-commit` 探测 `--no-verify` 绕过是否足够可靠？是否需要同时结合 reflog 比对？ | 中（DR-06 实现方式） | 项目负责人 | 已决议（GGD-0013）：采用 `post-commit` +「父提交 + 暂存树」预测比对；不引入 reflog（无法区分正常 Hook 链，且输出格式不稳定） |
 | Q-02 | 桌面端是否打包成 MSIX / dmg / AppImage？还是仅发行 CLI 由桌面独立安装？ | 低（分发策略） | 项目负责人 | v0.3 启动前 |
 
 ## 9. 变更记录
@@ -162,3 +164,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：定义 6 个核心场景、20 条 FR 及 10 条 MVP 验收 |
 | 0.1.1 | 2026-10-18 | GGD-0012 文档回填：§3.1~§3.6 按实现校正 status 状态分类、`--force` 语义、报告字段、新分支降级与未落地范围；§4 新增「v0.1 实现状态」列（21 条规则分布、白名单仅配置文件可用、`exclude` 未消费等）；§5 `--json` 更正为 `--format json`、平台矩阵对齐 NFR-A-002；§6 勾选 S1~S7 与 DR-02 验收并登记未过项；§7 v0.1 范围与 RoadMap 对齐 |
+| 0.1.2 | 2026-10-21 | GGD-0013：§3.5 按实现重写绕过检测流程（`--record-pending` 待提交预测、`post-commit` 比对父提交 / 暂存树、`NoVerify` / `GitGuardSkip` 两类原因、两者并用只记一次）；§4 FR-050 标记已实现；§6 勾选 DR-06 验收；§7 v0.1 范围纳入 FR-050；§8 Q-01 记录决议 |

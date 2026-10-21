@@ -26,7 +26,7 @@ public sealed class StatusUseCaseTests
         report.RepoPath.Should().Be(repo.Root);
         report.GitVersion.Should().StartWith("git version");
         report.GitGuardVersion.Should().Be(SampleVersion);
-        report.Hooks.Should().HaveCount(2);
+        report.Hooks.Should().HaveCount(3);
         report.Hooks.Should().OnlyContain(hook => hook.Kind == HookStatusKind.Missing);
         report.Hooks.Should().OnlyContain(hook => hook.ManagedVersion == null);
         report.NeedsAttention.Should().BeFalse();
@@ -39,7 +39,7 @@ public sealed class StatusUseCaseTests
         using var repo = new TempGitRepository();
         var git = new GitAccess(repo.Root);
         new InstallHookUseCase(git, new RecordingAuditStore(), new SystemClock(), SampleVersion)
-            .Execute("/opt/gitguard/gitguard", hooks: new[] { HookType.PreCommit, HookType.PrePush });
+            .Execute("/opt/gitguard/gitguard");
 
         StatusReport report = CreateUseCase(repo).Execute();
 

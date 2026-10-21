@@ -14,9 +14,9 @@ namespace GitGuard.Application.Hooks;
 /// </summary>
 public sealed class StatusUseCase
 {
-    /// <summary>MVP 安装 / 检查的 Hook 集合（FR-010：pre-commit + pre-push；post-commit 顺延 GGD-0013）。</summary>
+    /// <summary>安装 / 检查的 Hook 集合（FR-010：pre-commit + pre-push；FR-050：post-commit）。</summary>
     private static readonly ImmutableArray<HookType> INSPECTED_HOOKS =
-        ImmutableArray.Create(HookType.PreCommit, HookType.PrePush);
+        ImmutableArray.Create(HookType.PreCommit, HookType.PrePush, HookType.PostCommit);
 
     private readonly IGitAccess _gitAccess;
     private readonly GitGuardConfig _config;

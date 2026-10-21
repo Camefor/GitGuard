@@ -98,7 +98,7 @@ flowchart LR
 | 事件 | 触发条件 | 载荷字段 | 消费方 |
 | --- | --- | --- | --- |
 | `ScanCompleted` | 一次 `ScanRun` 聚合落库完成 | `{ RunId, Type, Result, ExitCode, FindingsCount, BlockedCount }` | 本地审计 Sink、未来桌面端通知面板 |
-| `BypassDetected` | `post-commit` 探测到上一次是 `--no-verify` | `{ RunId, CommitSha, DetectedAt }` | 审计 Sink |
+| `BypassDetected` | `post-commit` 判定提交未经过扫描的 `GITGUARD_SKIP=1`（`GitGuardSkip`）或 `--no-verify`（`NoVerify`） | `{ RunId, CommitSha, DetectedAt, Reason }` | 审计 Sink |
 | `HookInstalled` | `InstallHookUseCase` 成功 | `{ RepoPath, HookType, Version, HadLegacyHook }` | 审计 Sink |
 | `HookUninstalled` | `UninstallHookUseCase` 成功 | `{ RepoPath, HookType, RestoredLegacyHook }` | 审计 Sink |
 | `AllowlistChanged` | 白名单 Add / Remove | `{ EntryId, Action, RuleId?, PathPattern?, Fingerprint?, Reason }` | 审计 Sink |
@@ -114,6 +114,8 @@ flowchart LR
 | `Masker` | 把原文裁剪为 `SnippetMasked`（保留前后 2 字符，中间 `*`，总长不超 32） | - |
 | `SanitizingLogger` | 日志脱敏流水线：敏感字段经 `Masker` 掩码、文本经 `TerminalSanitizer` 去控制字符、路径经 `PathAnonymizer` 匿名化；由 Infrastructure 日志 Sink 调用 | - |
 | `HookScriptBuilder` | 根据 Hook 类型渲染 POSIX sh 分发脚本（嵌入式模板 + `{{VERSION}}` / `{{GITGUARD_BIN}}` / `{{HOOK_NAME}}` 替换，LF + 无 BOM 归一化；PowerShell 变体已撤销，GGD-0008）。实现落在 `GitGuard.Application.Hooks`（依赖嵌入资源，属应用关注点而非纯领域逻辑） | - |
+| `PendingScanRecorder` | pre-commit 记录待提交预测：读取 HEAD（可为空）与 `git write-tree`，写入 `PendingScan`（或按 `GITGUARD_SKIP=1` 标记 `skipped`） | `IGitAccess`、`IPendingScanStore`、`IClock` |
+| `BypassDetectionService` | post-commit 判定绕过：读取 HEAD 提交的树与首个父提交，与待提交预测比对；匹配且未跳过 → 消费标记；否则登记 `BypassDetected`（`NoVerify` / `GitGuardSkip`） | `IGitAccess`、`IAuditStore`、`IPendingScanStore`、`IClock` |
 | `AllowlistMatcher` | 判断一个 Finding 是否命中白名单（三条件组合） | - |
 
 ## 7. 领域规则（DR）
@@ -163,8 +165,13 @@ flowchart LR
 
 - **规则描述**：`--no-verify` 和 `GITGUARD_SKIP=1` 都必须被审计。
 - **适用聚合**：ScanRun（`Bypass` 类型）。
-- **违反处理**：`post-commit` Hook 在每次成功提交后检查「上一次预测待提交 SHA」是否与实际 HEAD 匹配；不匹配即判定为绕过。
-- **关联测试**：`TC-DR-06-01`。
+- **实现细化（2026-10-21，GGD-0013）**：
+  - 预测身份为 `PendingScan { ParentSha?, TreeSha, Skipped, RecordedAt }`：提交 SHA 在 pre-commit 阶段不可预测，改以「父提交 + `git write-tree` 暂存树」比对实际提交的首个父提交与树。
+  - 标记位于 `<git-dir>/gitguard/pending-scan.json`（每个 worktree 独立），原子写、UTF-8 无 BOM、Unix `0600`；读取失败或内容损坏按「无标记」处理——宁可把提交登记为 `NoVerify`，也不漏记。
+  - 判定矩阵：匹配且 `Skipped = false` → 正常提交（消费标记、不写审计）；匹配且 `Skipped = true` → `GitGuardSkip`；无标记 / 树或父提交不匹配 → `NoVerify`。`--no-verify` + `GITGUARD_SKIP=1` 因无标记而只登记一次 `NoVerify`。
+  - 绕过事件落库为 `ScanType.Bypass` 的 `ScanRun`（`Clean` / 退出码 0 / `DurationMs = null` / 无 Finding）+ `BypassDetected` 事件；审计写入失败 FailClosed（退出码 14）。
+  - `GITGUARD_SKIP=1` 仅在 Hook 模式（`scan --staged --record-pending`）识别，手动扫描不受影响。
+- **关联测试**：`TC-DR-06-01`（`BypassDetectionServiceTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8）。
 
 ## 8. 领域语言（术语 ↔ 代码命名）
 
@@ -196,6 +203,11 @@ flowchart LR
 | 检测器 | `IDetector` | `GitGuard.Core.Abstractions` |
 | Hook 安装 | `HookInstallation` | `GitGuard.Core.Model` |
 | Hook 分发器脚本构建 | `HookScriptBuilder` | `GitGuard.Application.Hooks` |
+| 待提交扫描标记 | `PendingScan` | `GitGuard.Core.Model` |
+| 绕过原因 | `BypassReason`（enum：`NoVerify` / `GitGuardSkip`） | `GitGuard.Core.Model` |
+| 待提交标记存储 | `IPendingScanStore` / `FilePendingScanStore` | `GitGuard.Core.Abstractions` / `GitGuard.Infrastructure.FileSystem` |
+| 待提交预测记录器 | `PendingScanRecorder` | `GitGuard.Application.Bypass` |
+| 绕过检测服务 | `BypassDetectionService` | `GitGuard.Application.Bypass` |
 
 ## 9. 反模式提醒
 
@@ -215,3 +227,4 @@ flowchart LR
 | 0.1.3 | 2026-10-16 | 与 GGD-0006 实现同步：DetectionRule 成员与 `RulePattern` 值对象补入声明式校验器（`Validators`；未知名称在检测器构造期拒绝，FailClosed） |
 | 0.1.4 | 2026-10-16 | 与 GGD-0007 实现同步：`IClock` 抽象（`GitGuard.Core.Abstractions`）与 `SystemClock`（`GitGuard.Infrastructure.Time`）落地；`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`（白名单优先、过期条目不生效），§6 依赖列同步；术语表补「时钟抽象」 |
 | 0.1.5 | 2026-10-16 | 与 GGD-0008 实现同步：§3.4 修正重装语义为 upsert（`Replaced` 预留无写入方）、补备份文件名 / 路径 / UTC 约束；§6 `HookScriptBuilder` 更正为仅渲染 POSIX sh 分发脚本（撤销 PowerShell 变体），注明落地于 Application 层 |
+| 0.1.6 | 2026-10-21 | 与 GGD-0013 实现同步：§5 `BypassDetected` 载荷补 `Reason` 并区分 `GitGuardSkip` / `NoVerify`；§6 新增 `PendingScanRecorder` / `BypassDetectionService`；§7.6 展开 DR-06 预测身份、标记文件语义、判定矩阵与落库形态；§8 术语表补 `PendingScan` / `BypassReason` / `IPendingScanStore` 等 |

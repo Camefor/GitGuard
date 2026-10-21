@@ -12,6 +12,9 @@ internal sealed class FakeGitAccess : IGitAccess
     private readonly Func<string> _stagedDiff;
     private readonly Func<string, IReadOnlyList<string>> _listCommitShas;
     private readonly Func<string, string> _commitDiff;
+    private readonly Func<string?> _headCommitSha;
+    private readonly Func<string> _stagedTreeSha;
+    private readonly Func<string, CommitMetadata> _commitMetadata;
     private readonly string? _hooksPath;
 
     internal FakeGitAccess(
@@ -19,13 +22,19 @@ internal sealed class FakeGitAccess : IGitAccess
         Func<string>? stagedDiff = null,
         Func<string, IReadOnlyList<string>>? listCommitShas = null,
         Func<string, string>? commitDiff = null,
-        string? hooksPath = null)
+        string? hooksPath = null,
+        Func<string?>? headCommitSha = null,
+        Func<string>? stagedTreeSha = null,
+        Func<string, CommitMetadata>? commitMetadata = null)
     {
         RepositoryRoot = repositoryRoot;
         _stagedDiff = stagedDiff ?? (() => string.Empty);
         _listCommitShas = listCommitShas ?? (_ => Array.Empty<string>());
         _commitDiff = commitDiff ?? (_ => string.Empty);
         _hooksPath = hooksPath;
+        _headCommitSha = headCommitSha ?? (() => new string('0', 40));
+        _stagedTreeSha = stagedTreeSha ?? (() => new string('1', 40));
+        _commitMetadata = commitMetadata ?? (sha => new CommitMetadata(sha, _stagedTreeSha(), Array.Empty<string>()));
     }
 
     internal string RepositoryRoot { get; }
@@ -40,17 +49,25 @@ internal sealed class FakeGitAccess : IGitAccess
 
     public string GetGitCommonDirectory() => Path.Combine(RepositoryRoot, ".git");
 
+    public string GetGitDirectory() => Path.Combine(RepositoryRoot, ".git");
+
     public string? GetConfiguredHooksPath() => _hooksPath;
 
     public string GetVersion() => "git version 0.0.0-fake";
 
-    public string GetHeadCommitSha() => new string('0', 40);
+    public string GetHeadCommitSha() => _headCommitSha() ?? throw new GitException(GitException.GIT_COMMAND_FAILED, "HEAD 缺失（测试替身）。");
+
+    public string? TryGetHeadCommitSha() => _headCommitSha();
 
     public string GetStagedDiff()
     {
         StagedDiffCalls++;
         return _stagedDiff();
     }
+
+    public string GetStagedTreeSha() => _stagedTreeSha();
+
+    public CommitMetadata GetCommitMetadata(string commitSha) => _commitMetadata(commitSha);
 
     public IReadOnlyList<string> ListCommitShas(string revisionRange)
     {
@@ -131,11 +148,17 @@ internal sealed class RecordingAuditStore : IAuditStore
     internal List<(HookInstallation Installation, bool RestoredLegacyHook)> SavedHookUninstallations { get; } =
         new List<(HookInstallation, bool)>();
 
+    internal List<(ScanRun Run, BypassReason Reason, string CommitSha)> SavedBypassEvents { get; } =
+        new List<(ScanRun, BypassReason, string)>();
+
     public void SaveScanRun(ScanRun run, IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions)
     {
         SavedRuns.Add(run);
         LastDecisions = findingDecisions;
     }
+
+    public void SaveBypassEvent(ScanRun run, BypassReason reason, string commitSha) =>
+        SavedBypassEvents.Add((run, reason, commitSha));
 
     public ScanRun? FindScanRun(Guid runId) => SavedRuns.FirstOrDefault(run => run.Id == runId);
 
@@ -154,6 +177,9 @@ internal sealed class FailingAuditStore : IAuditStore
     public void SaveScanRun(ScanRun run, IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions) =>
         throw new SqliteException("审计写入失败（测试注入）。");
 
+    public void SaveBypassEvent(ScanRun run, BypassReason reason, string commitSha) =>
+        throw new SqliteException("审计写入失败（测试注入）。");
+
     public ScanRun? FindScanRun(Guid runId) => null;
 
     public IReadOnlyList<ScanRun> ListRecentScanRuns(string repoPath, int limit) => Array.Empty<ScanRun>();
@@ -163,6 +189,46 @@ internal sealed class FailingAuditStore : IAuditStore
 
     public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook) =>
         throw new SqliteException("审计写入失败（测试注入）。");
+}
+
+/// <summary>测试用待提交标记存储：记录写入 / 清理次数，并可按需注入 IO 失败。</summary>
+internal sealed class RecordingPendingScanStore : IPendingScanStore
+{
+    internal PendingScan? Stored { get; set; }
+
+    internal List<PendingScan> Writes { get; } = new List<PendingScan>();
+
+    internal int ClearCalls { get; private set; }
+
+    internal Exception? ReadException { get; set; }
+
+    internal Exception? WriteException { get; set; }
+
+    internal Exception? ClearException { get; set; }
+
+    public PendingScan? Read() => ReadException is null ? Stored : throw ReadException;
+
+    public void Write(PendingScan pendingScan)
+    {
+        if (WriteException is not null)
+        {
+            throw WriteException;
+        }
+
+        Writes.Add(pendingScan);
+        Stored = pendingScan;
+    }
+
+    public void Clear()
+    {
+        ClearCalls++;
+        if (ClearException is not null)
+        {
+            throw ClearException;
+        }
+
+        Stored = null;
+    }
 }
 
 /// <summary>测试用发现项构造：固定指纹盐与脱敏片段，只关注严重度 / 路径 / 提交归属。</summary>

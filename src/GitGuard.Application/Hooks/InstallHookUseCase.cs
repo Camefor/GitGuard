@@ -15,7 +15,7 @@ namespace GitGuard.Application.Hooks;
 public sealed class InstallHookUseCase
 {
     private static readonly ImmutableArray<HookType> DEFAULT_HOOKS =
-        ImmutableArray.Create(HookType.PreCommit, HookType.PrePush);
+        ImmutableArray.Create(HookType.PreCommit, HookType.PrePush, HookType.PostCommit);
 
     private readonly IGitAccess _gitAccess;
     private readonly IAuditStore _auditStore;
@@ -46,10 +46,10 @@ public sealed class InstallHookUseCase
     /// <see langword="true"/> 允许接管二进制文件 / 符号链接目标（TC-FR-010-05）；
     /// 普通文本脚本与已托管脚本无需该开关。
     /// </param>
-    /// <param name="hooks">要安装的 Hook 列表；<see langword="null"/> 等价于 pre-commit + pre-push。</param>
+    /// <param name="hooks">要安装的 Hook 列表；<see langword="null"/> 等价于 pre-commit + pre-push + post-commit。</param>
     /// <returns>安装报告（逐 Hook 处置与备份路径）。</returns>
     /// <exception cref="ArgumentException"><paramref name="executablePath"/> 为空或全空白；<paramref name="hooks"/> 为空集合或含重复项。</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="hooks"/> 含未知取值或 post-commit（顺延 GGD-0013）。</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="hooks"/> 含未知取值。</exception>
     /// <exception cref="HookException">写入失败（退出码 3 / 4）或安装锁冲突（退出码 50）。</exception>
     /// <exception cref="SqliteException">审计写入失败（FailClosed，磁盘变更已生效）。</exception>
     public HookInstallReport Execute(string executablePath, bool force = false, IReadOnlyList<HookType>? hooks = null)
@@ -170,14 +170,6 @@ public sealed class InstallHookUseCase
             if (!Enum.IsDefined(hookType))
             {
                 throw new ArgumentOutOfRangeException(nameof(hooks), hookType, "未知的 HookType 取值");
-            }
-
-            if (hookType == HookType.PostCommit)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(hooks),
-                    hookType,
-                    "post-commit 的安装（FR-050 绕过检测）顺延至 GGD-0013，当前不可安装");
             }
 
             if (builder.Contains(hookType))

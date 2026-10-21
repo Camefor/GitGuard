@@ -76,18 +76,14 @@ public sealed partial class CliUsageErrorTests
     }
 
     [Fact]
-    public async Task UnsupportedHook_FailsFastWithDeferralReason()
+    public async Task UnknownHook_FailsFastWithAvailableValues()
     {
         using var harness = new CliHarness();
 
-        // FR-050 绕过检测顺延 GGD-0013：post-commit 提前拦截为用法错误，不得穿透为 99
-        int deferral = await harness.RunAsync("install", "--hook", "post-commit");
-        deferral.Should().Be(ExitCodes.USAGE_ERROR);
-        harness.Error.Should().Contain("GGD-0013");
-
         int unknown = await harness.RunAsync("install", "--hook", "pre-receive");
+
         unknown.Should().Be(ExitCodes.USAGE_ERROR);
-        harness.Error.Should().Contain("可用：pre-commit、pre-push");
+        harness.Error.Should().Contain("可用：pre-commit、pre-push、post-commit");
     }
 
     [Fact]
@@ -117,7 +113,7 @@ public sealed partial class CliUsageErrorTests
     {
         using var harness = new CliHarness();
 
-        int exitCode = await harness.RunAsync("install", "--hook", "post-commit");
+        int exitCode = await harness.RunAsync("install", "--hook", "pre-receive");
 
         exitCode.Should().Be(ExitCodes.USAGE_ERROR);
         Directory.EnumerateFileSystemEntries(harness.DataDirectory).Should().BeEmpty("用法错误不得触发审计库或缓存落盘");

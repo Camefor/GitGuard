@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using GitGuard.Application.Bypass;
 using GitGuard.Application.Hooks;
 using GitGuard.Application.Scanning;
 using GitGuard.Core.Model;
@@ -22,6 +23,7 @@ internal sealed class ReportWriter
     private const string UNINSTALL_SCHEMA = "gitguard.uninstall.v1";
     private const string STATUS_SCHEMA = "gitguard.status.v1";
     private const string VERSION_SCHEMA = "gitguard.version.v1";
+    private const string BYPASS_SCHEMA = "gitguard.bypass.v1";
 
     private readonly TextWriter _output;
     private readonly TextWriter _error;
@@ -62,6 +64,65 @@ internal sealed class ReportWriter
         else
         {
             WriteScanText(outcome, warnings);
+        }
+    }
+
+    /// <summary>渲染 post-commit 绕过检测结果（未检测到绕过时文本模式保持静默，避免每次提交刷屏）。</summary>
+    /// <param name="result">检测结果。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="result"/> 为 <see langword="null"/>。</exception>
+    internal void WriteBypass(BypassDetectionResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (_json)
+        {
+            var buffer = new ArrayBufferWriter<byte>(256);
+            using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("schema", BYPASS_SCHEMA);
+                writer.WriteBoolean("detected", result.Detected);
+                if (result.Reason is { } reason)
+                {
+                    writer.WriteString("reason", reason.ToString());
+                }
+                else
+                {
+                    writer.WriteNull("reason");
+                }
+
+                writer.WriteString("commit_sha", result.CommitSha);
+                if (result.RunId is { } runId)
+                {
+                    writer.WriteString("run_id", runId.ToString());
+                }
+                else
+                {
+                    writer.WriteNull("run_id");
+                }
+
+                writer.WriteEndObject();
+            }
+
+            _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+            return;
+        }
+
+        if (!result.Detected)
+        {
+            return;
+        }
+
+        WriteColored("⚠ ", ConsoleColor.Yellow);
+        _error.WriteLine("GitGuard 检测到绕过扫描的提交（已写入审计）");
+        string reasonText = result.Reason == BypassReason.GitGuardSkip
+            ? "GITGUARD_SKIP=1（显式跳过扫描）"
+            : "--no-verify（未经过 pre-commit 扫描）";
+        WriteIndented("提交", result.CommitSha);
+        WriteIndented("原因", reasonText);
+        if (result.RunId is { } id)
+        {
+            WriteIndented("运行", id.ToString());
         }
     }
 

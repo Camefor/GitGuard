@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Reflection;
+using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
 using GitGuard.Application.Scanning;
@@ -178,6 +179,19 @@ public sealed class GitGuardSession
         return new ScanPushUseCase(GitAccess, _detectors.Value.Detectors, AuditStore, _clock, config.Scan, BuildScanPolicy(config));
     }
 
+    /// <summary>装配待提交预测记录器（FR-050：pre-commit 扫描通过 / 按 GITGUARD_SKIP 跳过后记录）。</summary>
+    /// <returns>已接线的记录器（不触发审计库打开，标记存储按当前工作树隔离）。</returns>
+    /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
+    public PendingScanRecorder CreatePendingScanRecorder() =>
+        new PendingScanRecorder(GitAccess, CreatePendingScanStore(), _clock);
+
+    /// <summary>装配绕过检测服务（FR-050：post-commit 比对预测并登记绕过事件）。</summary>
+    /// <returns>已接线的绕过检测服务（标记存储按当前工作树隔离）。</returns>
+    /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public BypassDetectionService CreateBypassDetection() =>
+        new BypassDetectionService(GitAccess, AuditStore, CreatePendingScanStore(), _clock);
+
     /// <summary>装配 Hook 安装用例。</summary>
     /// <returns>已接线的安装用例（版本取 <see cref="Version"/>）。</returns>
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
@@ -204,6 +218,9 @@ public sealed class GitGuardSession
     private GitAccess CreateGitAccess() => new GitAccess(_options.WorkingDirectory, _options.GitExecutable);
 
     private SqliteAuditStore CreateAuditStore() => new SqliteAuditStore(_paths.AuditDatabasePath, Version);
+
+    private FilePendingScanStore CreatePendingScanStore() =>
+        new FilePendingScanStore(Path.Combine(GitAccess.GetGitDirectory(), "gitguard"));
 
     private FingerprintSaltLoadResult CreateSalt() =>
         new FingerprintSaltStore(_paths.FingerprintSaltPath, _secretRandom).LoadOrCreate();

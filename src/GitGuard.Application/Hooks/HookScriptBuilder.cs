@@ -15,7 +15,7 @@ public static class HookScriptBuilder
     private const string HOOK_NAME_PLACEHOLDER = "{{HOOK_NAME}}";
 
     /// <summary>渲染指定 Hook 类型的分发脚本。</summary>
-    /// <param name="hookType">Hook 类型；<see cref="HookType.PostCommit"/> 无模板（顺延至 GGD-0013）。</param>
+    /// <param name="hookType">Hook 类型。</param>
     /// <param name="executablePath">GitGuard 可执行文件路径（安装时固化到脚本内，08-权限设计 §6）。</param>
     /// <param name="version">写入托管标记行的 GitGuard 版本（安装识别依赖首两行的 <c># gitguard-managed v</c> 标记）。</param>
     /// <returns>LF 行尾、无 BOM 的 POSIX sh 脚本全文（含末尾换行）。</returns>
@@ -41,10 +41,11 @@ public static class HookScriptBuilder
     {
         HookType.PreCommit => "GitGuard.Application.Hooks.Templates.pre-commit.sh.template",
         HookType.PrePush => "GitGuard.Application.Hooks.Templates.pre-push.sh.template",
+        HookType.PostCommit => "GitGuard.Application.Hooks.Templates.post-commit.sh.template",
         _ => throw new ArgumentOutOfRangeException(
             nameof(hookType),
             hookType,
-            "该 Hook 类型没有分发脚本模板；post-commit（FR-050 绕过检测）顺延至 GGD-0013"),
+            "该 Hook 类型没有分发脚本模板"),
     };
 
     private static string LoadTemplate(HookType hookType)
