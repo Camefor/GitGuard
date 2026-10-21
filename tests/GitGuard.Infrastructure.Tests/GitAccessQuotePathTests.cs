@@ -29,7 +29,7 @@ public sealed class GitAccessQuotePathTests
     }
 
     [Fact]
-    public void GetCommitDiff_NonAsciiPath_ReturnsRawUtf8Path()
+    public void GetCommitDiffs_NonAsciiPath_ReturnsRawUtf8Path()
     {
         using var repo = new TempGitRepository();
         repo.WriteFile("文档/说明.txt", "内容\n");
@@ -37,7 +37,7 @@ public sealed class GitAccessQuotePathTests
         string commitSha = repo.Commit("add cjk file");
         var access = new GitAccess(repo.Root);
 
-        string diff = access.GetCommitDiff(commitSha);
+        string diff = access.GetCommitDiffs(new[] { commitSha }).Should().ContainSingle().Subject.DiffText;
 
         diff.Should().Contain("+++ b/文档/说明.txt");
         diff.Should().NotContain("\\346");

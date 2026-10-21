@@ -212,9 +212,9 @@ sequenceDiagram
     Cli->>App: ScanPushUseCase.Execute(stdin)
     App->>Git: git rev-list local..remote
     Git-->>App: 提交 SHA 列表
-    loop 每个提交
-        App->>Git: git diff-tree -p -U0 --root --no-commit-id <sha>
-        Git-->>App: 差异
+    App->>Git: git log --no-walk=unsorted --stdin -p -U0 --root --format=%H
+    Git-->>App: 多提交差异（SHA 头分隔）
+    loop 每个提交差异
         App->>Det: Detect(diff)
         Det-->>App: Findings
     end
@@ -317,3 +317,4 @@ flowchart LR
 | 0.1.0 | 2026-10-15 | 初始化：锁定技术栈、分层、扩展点与 Native AOT 发行形态 |
 | 0.1.1 | 2026-10-16 | GGD-0009：§5.1 结构树与实现对齐——Application 补 `Configuration/`（配置加载）与 `Composition/`（`GitGuardSession` 组合根，承接「Cli 不得引用 Infrastructure」的装配职责）；Cli 补 `Commands/` / `Reporting/` / `Logging/` 子目录；tests 补 `GitGuard.Cli.Tests/` |
 | 0.1.2 | 2026-10-21 | GGD-0020：§5.1 结构树更新 benchmarks 实际内容（自研 harness + startup / run 脚本），移除未落地的 `scripts/` 占位（AOT 发布由 `.github/workflows/release.yml` 承担） |
+| 0.1.3 | 2026-10-21 | GGD-0023：§7.2 推送扫描时序图改为一次批量 `git log --no-walk=unsorted --stdin` 取回全部提交差异，再逐提交解析与检测 |

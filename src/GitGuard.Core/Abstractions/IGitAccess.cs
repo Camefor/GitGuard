@@ -73,10 +73,16 @@ public interface IGitAccess
     /// <exception cref="GitException">区间无法解析或 git 命令失败时抛出（FailClosed）。</exception>
     IReadOnlyList<string> ListCommitShas(string revisionRange);
 
-    /// <summary>获取单个提交的差异（<c>git diff-tree -p -U0 --root &lt;sha&gt;</c>），用于 FR-030 逐提交扫描。</summary>
-    /// <param name="commitSha">提交 SHA（通常来自 <see cref="ListCommitShas"/>）。</param>
-    /// <returns>unified-0 格式的差异文本（不含提交头行）；提交无差异时为空字符串。</returns>
-    /// <exception cref="ArgumentException"><paramref name="commitSha"/> 为空、空白或以 <c>-</c> 开头。</exception>
-    /// <exception cref="GitException">提交不存在或 git 命令失败时抛出（FailClosed）。</exception>
-    string GetCommitDiff(string commitSha);
+    /// <summary>
+    /// 批量获取多个提交的差异（一次 <c>git log --no-walk=unsorted --stdin -p -U0 --root</c>），
+    /// 用于 FR-030 推送扫描；替代逐提交子进程以降低 NFR-P-003 的进程创建开销。
+    /// </summary>
+    /// <param name="commitShas">去重后的提交 SHA 列表（通常来自 <see cref="ListCommitShas"/>）。</param>
+    /// <returns>与输入顺序一致的提交差异列表；空提交的差异文本为空字符串。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="commitShas"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="ArgumentException">任一 SHA 为空、空白、以 <c>-</c> 开头、非 40 / 64 位十六进制，或列表含重复项。</exception>
+    /// <exception cref="GitException">
+    /// 提交不存在、git 命令失败，或输出无法完整归属到请求提交时抛出（FailClosed，禁止静默漏扫）。
+    /// </exception>
+    IReadOnlyList<CommitDiff> GetCommitDiffs(IReadOnlyList<string> commitShas);
 }

@@ -34,6 +34,7 @@ public sealed class ScanPushUseCaseTests
         outcome.Run.ScanType.Should().Be(ScanType.PrePush);
         git.RequestedRanges.Should().BeEmpty();
         git.RequestedCommitShas.Should().BeEmpty();
+        git.CommitDiffBatchCalls.Should().Be(0);
     }
 
     [Fact]
@@ -49,6 +50,7 @@ public sealed class ScanPushUseCaseTests
         ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
 
         git.RequestedRanges.Should().ContainSingle().Which.Should().Be(LOCAL_SHA);
+        git.CommitDiffBatchCalls.Should().Be(1);
         outcome.FilesScanned.Should().Be(1);
     }
 
@@ -99,7 +101,23 @@ public sealed class ScanPushUseCaseTests
 
         git.RequestedCommitShas.Should().ContainInOrder(COMMIT_A, COMMIT_B, COMMIT_C);
         git.RequestedCommitShas.Should().HaveCount(3);
+        git.CommitDiffBatchCalls.Should().Be(1);
         outcome.FilesScanned.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoCommitsInRange_SkipsBatchDiffCall()
+    {
+        string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {REMOTE_SHA}\n";
+        var git = new FakeGitAccess(RepoRoot);
+        ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
+
+        ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
+
+        outcome.Result.Should().Be(ScanResult.Clean);
+        outcome.FilesScanned.Should().Be(0);
+        git.RequestedRanges.Should().ContainSingle();
+        git.CommitDiffBatchCalls.Should().Be(0);
     }
 
     [Fact]
@@ -160,7 +178,7 @@ public sealed class ScanPushUseCaseTests
         var git = new FakeGitAccess(
             RepoRoot,
             listCommitShas: _ => new[] { COMMIT_A },
-            commitDiff: _ => throw new GitException(GitException.GIT_COMMAND_FAILED, "diff-tree 失败（测试注入）。"));
+            commitDiff: _ => throw new GitException(GitException.GIT_COMMAND_FAILED, "批量差异失败（测试注入）。"));
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);

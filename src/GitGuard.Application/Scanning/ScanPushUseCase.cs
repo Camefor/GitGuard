@@ -5,7 +5,8 @@ namespace GitGuard.Application.Scanning;
 
 /// <summary>
 /// 推送扫描用例（FR-030 / SAD §7.2）：解析 pre-push stdin 推送信息行 → 逐推送取版本区间 →
-/// <c>git rev-list</c> 枚举提交（跨引用去重、保持 git 顺序）→ 逐提交 <c>git diff-tree -p -U0 --root --no-commit-id</c> 扫描。
+/// <c>git rev-list</c> 枚举提交（跨引用去重、保持 git 顺序）→ 一次批量取回全部提交差异
+/// （<c>git log --no-walk=unsorted --stdin -p -U0 --root</c>）后扫描。
 /// 退出码与 <see cref="ScanStagedUseCase"/> 一致；stdin 解析失败按 FailClosed 计（→ 10）。
 /// </summary>
 public sealed class ScanPushUseCase
@@ -51,7 +52,7 @@ public sealed class ScanPushUseCase
         return _executor.RunAsync(ScanType.PrePush, _ => AcquireDiffFiles(pushStdin), cancellationToken);
     }
 
-    /// <summary>获取全部待扫描提交的差异：枚举各推送区间 → 去重 → 逐提交解析（发现项经 FileChange 绑定提交 SHA）。</summary>
+    /// <summary>获取全部待扫描提交的差异：枚举各推送区间 → 去重 → 一次批量取回 → 逐提交解析（发现项经 FileChange 绑定提交 SHA）。</summary>
     private List<ParsedDiffFile> AcquireDiffFiles(string pushStdin)
     {
         IReadOnlyList<PushUpdate> updates = PushUpdate.ParseAll(pushStdin);
@@ -75,9 +76,14 @@ public sealed class ScanPushUseCase
         }
 
         var files = new List<ParsedDiffFile>();
-        foreach (string sha in orderedShas)
+        if (orderedShas.Count == 0)
         {
-            files.AddRange(UnifiedDiffParser.Parse(_gitAccess.GetCommitDiff(sha), sha));
+            return files;
+        }
+
+        foreach (CommitDiff commitDiff in _gitAccess.GetCommitDiffs(orderedShas))
+        {
+            files.AddRange(UnifiedDiffParser.Parse(commitDiff.DiffText, commitDiff.Sha));
         }
 
         return files;

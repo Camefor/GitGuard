@@ -121,7 +121,7 @@ internal static class BenchmarkScenarios
             metric,
             PUSH_TARGET_MS,
             higherIsBetter: false,
-            "NFR-P-003：推送扫描 P95 ≤ 2 s（50 提交 / 5000 行；含进程启动与逐提交 git diff-tree）。",
+            "NFR-P-003：推送扫描 P95 ≤ 2 s（50 提交 / 5000 行；含进程启动与一次批量 git log）。",
             options,
             workspace,
             repository,

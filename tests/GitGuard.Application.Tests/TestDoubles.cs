@@ -43,6 +43,8 @@ internal sealed class FakeGitAccess : IGitAccess
 
     internal List<string> RequestedCommitShas { get; } = new List<string>();
 
+    internal int CommitDiffBatchCalls { get; private set; }
+
     internal int StagedDiffCalls { get; private set; }
 
     public string GetRepositoryRoot() => RepositoryRoot;
@@ -75,10 +77,18 @@ internal sealed class FakeGitAccess : IGitAccess
         return _listCommitShas(revisionRange);
     }
 
-    public string GetCommitDiff(string commitSha)
+    public IReadOnlyList<CommitDiff> GetCommitDiffs(IReadOnlyList<string> commitShas)
     {
-        RequestedCommitShas.Add(commitSha);
-        return _commitDiff(commitSha);
+        CommitDiffBatchCalls++;
+        RequestedCommitShas.AddRange(commitShas);
+
+        var diffs = new List<CommitDiff>(commitShas.Count);
+        foreach (string sha in commitShas)
+        {
+            diffs.Add(new CommitDiff(sha, _commitDiff(sha)));
+        }
+
+        return diffs;
     }
 }
 

@@ -8,7 +8,7 @@ namespace GitGuard.Application.Scanning;
 
 /// <summary>
 /// unified diff 解析器（<c>模块设计/Secret.md §2.1</c>：Hunk 在解析层按行号展开为逐文件变更）：
-/// 把 <c>git diff --cached -U0</c> / <c>git diff-tree -p -U0 --root --no-commit-id</c> 的输出
+/// 把 <c>git diff --cached -U0</c> / <c>git log --no-walk=unsorted --stdin -p -U0 --root</c> 的输出
 /// 解析为 <see cref="ParsedDiffFile"/> 列表。纯文本处理，不读取工作区（DR-04）。
 /// FailClosed：git 输出不符合 unified 格式（如 hunk 头无法解析）时抛 <see cref="GitException"/>（GIT_COMMAND_FAILED → 退出码 10），
 /// 异常消息不回显差异内容（DR-02）。

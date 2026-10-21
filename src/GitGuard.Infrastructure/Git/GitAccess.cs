@@ -137,16 +137,40 @@ public sealed class GitAccess : IGitAccess
     }
 
     /// <inheritdoc />
-    public string GetCommitDiff(string commitSha)
+    public IReadOnlyList<CommitDiff> GetCommitDiffs(IReadOnlyList<string> commitShas)
     {
-        ValidateRevisionArgument(commitSha, nameof(commitSha));
+        ArgumentNullException.ThrowIfNull(commitShas);
+        if (commitShas.Count == 0)
+        {
+            return Array.Empty<CommitDiff>();
+        }
 
-        // --root 将初始提交视为全量新增（否则其差异恒为空，新分支 pre-push 会漏扫）；
-        // --no-commit-id 抑制 diff 前的裸提交 SHA 行，保证输出即标准 unified diff；
-        // -c core.quotepath=false 语义同 GetStagedDiff
-        var result = RunGit("-c", "core.quotepath=false", "diff-tree", "-p", "-U0", "--root", "--no-commit-id", "--no-color", "--no-ext-diff", "--no-textconv", commitSha);
-        EnsureGitSucceeded(result, $"diff-tree {commitSha}");
-        return result.StandardOutput;
+        ValidateCommitShas(commitShas);
+
+        // --no-walk=unsorted：只输出 stdin 列出的提交且保持输入顺序；
+        // --format=%H：每个提交都输出完整 SHA 头（空提交也有），未知提交直接失败而非静默跳过；
+        // --root 将初始提交视为全量新增（否则新分支仅含根提交时漏扫）；
+        // -c log.showSignature=false 中和用户配置，保证输出以 SHA 头开始。
+        string standardInput = string.Join('\n', commitShas) + "\n";
+        var result = RunGitAt(
+            _repositoryRoot,
+            standardInput,
+            "-c",
+            "core.quotepath=false",
+            "-c",
+            "log.showSignature=false",
+            "log",
+            "--no-walk=unsorted",
+            "--stdin",
+            "-p",
+            "-U0",
+            "--root",
+            "--format=%H",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv");
+        EnsureGitSucceeded(result, "log --no-walk=unsorted --stdin");
+        return ParseCommitDiffs(commitShas, result.StandardOutput);
     }
 
     /// <summary>终止超时的 git 子进程；进程恰好已退出或无权限终止时静默兜底。</summary>
@@ -197,6 +221,110 @@ public sealed class GitAccess : IGitAccess
         }
     }
 
+    /// <summary>校验批量提交 SHA：格式合法且无重复，避免输出归属歧义。</summary>
+    private static void ValidateCommitShas(IReadOnlyList<string> commitShas)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string sha in commitShas)
+        {
+            ValidateRevisionArgument(sha, nameof(commitShas));
+
+            if (sha is not { Length: 40 or 64 } || !sha.All(char.IsAsciiHexDigit))
+            {
+                throw new ArgumentException($"提交 SHA 必须为 40 / 64 位十六进制：{sha}", nameof(commitShas));
+            }
+
+            if (!seen.Add(sha))
+            {
+                throw new ArgumentException($"提交 SHA 列表包含重复项：{sha}", nameof(commitShas));
+            }
+        }
+    }
+
+    /// <summary>构造批量差异输出解析失败的 FailClosed 异常。</summary>
+    private static GitException CreateBatchParseException(string message) =>
+        new GitException(GitException.GIT_COMMAND_FAILED, $"git log --no-walk=unsorted --stdin 输出解析失败：{message}");
+
+    /// <summary>
+    /// 严格解析 <c>git log --format=%H -p</c> 的批量输出：按 SHA 头切分提交段，
+    /// 每个请求提交必须恰好出现一次，输出存在任何无法归属的内容即 FailClosed。
+    /// </summary>
+    private static List<CommitDiff> ParseCommitDiffs(IReadOnlyList<string> commitShas, string output)
+    {
+        var requested = new HashSet<string>(commitShas, StringComparer.Ordinal);
+        var builders = new Dictionary<string, StringBuilder>(commitShas.Count, StringComparer.Ordinal);
+        StringBuilder? current = null;
+        bool diffStarted = false;
+        bool separatorSkipped = false;
+
+        string[] lines = output.Split('\n');
+        for (int index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index];
+            if (index == lines.Length - 1 && line.Length == 0)
+            {
+                // 末尾换行产生的空段：不追加，保持与原单提交差异一致的收尾
+                break;
+            }
+
+            string candidate = line.EndsWith('\r') ? line.Substring(0, line.Length - 1) : line;
+            if (requested.Contains(candidate))
+            {
+                if (!builders.TryAdd(candidate, new StringBuilder()))
+                {
+                    throw CreateBatchParseException("同一提交头重复出现");
+                }
+
+                current = builders[candidate];
+                diffStarted = false;
+                separatorSkipped = false;
+                continue;
+            }
+
+            if (current is null)
+            {
+                if (candidate.Length == 0)
+                {
+                    continue;
+                }
+
+                throw CreateBatchParseException("首个提交头之前存在意外内容");
+            }
+
+            if (!diffStarted)
+            {
+                // git log 在 SHA 头与补丁之间插入一个空行；空提交没有补丁
+                if (candidate.Length == 0 && !separatorSkipped)
+                {
+                    separatorSkipped = true;
+                    continue;
+                }
+
+                if (!candidate.StartsWith("diff --git ", StringComparison.Ordinal))
+                {
+                    throw CreateBatchParseException("提交段缺少 diff --git 起始行");
+                }
+
+                diffStarted = true;
+            }
+
+            current.Append(line).Append('\n');
+        }
+
+        if (builders.Count != commitShas.Count)
+        {
+            throw CreateBatchParseException("未覆盖全部请求提交");
+        }
+
+        var diffs = new List<CommitDiff>(commitShas.Count);
+        foreach (string sha in commitShas)
+        {
+            diffs.Add(new CommitDiff(sha, builders[sha].ToString()));
+        }
+
+        return diffs;
+    }
+
     /// <summary>解析 commit 对象头部：只提取 tree 与 parent 行（跳过 author / committer / 签名等字段）。</summary>
     private static CommitMetadata ParseCommitMetadata(string commitSha, string commitObject)
     {
@@ -242,7 +370,7 @@ public sealed class GitAccess : IGitAccess
     /// <summary>预检仓库有效性并解析工作区根目录：非 Git 工作区抛 <c>NOT_A_GIT_REPOSITORY</c>（CLI 映射退出码 2）。</summary>
     private string ResolveRepositoryRoot(string workingDirectory)
     {
-        var result = RunGitAt(workingDirectory, "rev-parse", "--show-toplevel");
+        var result = RunGitAt(workingDirectory, standardInput: null, "rev-parse", "--show-toplevel");
         if (result.ExitCode != 0)
         {
             throw new GitException(
@@ -303,18 +431,23 @@ public sealed class GitAccess : IGitAccess
     /// <summary>在工作区根目录执行 git 命令。</summary>
     private (int ExitCode, string StandardOutput, string StandardError) RunGit(params string[] arguments)
     {
-        return RunGitAt(_repositoryRoot, arguments);
+        return RunGitAt(_repositoryRoot, standardInput: null, arguments);
     }
 
     /// <summary>
     /// 在指定目录启动 git 子进程并同步等待其结束；
+    /// <paramref name="standardInput"/> 非 <see langword="null"/> 时写入子进程 stdin 并关闭；
     /// 超时（DR-03）终止进程树后抛 <see cref="GitException"/>，绝不重试。
     /// </summary>
-    private (int ExitCode, string StandardOutput, string StandardError) RunGitAt(string workingDirectory, params string[] arguments)
+    private (int ExitCode, string StandardOutput, string StandardError) RunGitAt(
+        string workingDirectory,
+        string? standardInput,
+        params string[] arguments)
     {
         var startInfo = new ProcessStartInfo(_gitExecutable)
         {
             WorkingDirectory = workingDirectory,
+            RedirectStandardInput = standardInput is not null,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8,
@@ -329,6 +462,19 @@ public sealed class GitAccess : IGitAccess
         using Process process = StartGitProcess(startInfo);
         Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
         Task<string> standardError = process.StandardError.ReadToEndAsync();
+
+        if (standardInput is not null)
+        {
+            try
+            {
+                process.StandardInput.Write(standardInput);
+                process.StandardInput.Close();
+            }
+            catch (IOException)
+            {
+                // git 提前退出（如未知提交）时管道可能已关闭；退出码与 stderr 由下方统一处理
+            }
+        }
 
         if (!process.WaitForExit((int)_commandTimeout.TotalMilliseconds))
         {

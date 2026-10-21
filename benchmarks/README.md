@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | `NFR-P-001` | `startup` | 50 次 | 发布版 Native AOT 可执行文件运行 `gitguard version` 的进程墙钟耗时（含进程启动；该命令内部会探测 `git --version`） | P95 ≤ 150 ms |
 | `NFR-P-002` | `staged` | 10 次 | `gitguard scan --staged` 端到端墙钟耗时，暂存区 500 行差异（含进程启动与真实 `git diff`） | P95 ≤ 500 ms |
-| `NFR-P-003` | `push` | 10 次 | `gitguard scan --push` 端到端墙钟耗时，50 提交 × 100 行 = 5000 行差异（含进程启动与逐提交 `git diff-tree`） | P95 ≤ 2000 ms |
+| `NFR-P-003` | `push` | 10 次 | `gitguard scan --push` 端到端墙钟耗时，50 提交 × 100 行 = 5000 行差异（含进程启动、每个推送区间一次 `git rev-list` 与一次批量 `git log --no-walk=unsorted --stdin`） | P95 ≤ 2000 ms |
 | `NFR-P-004` | `throughput` | 3 次 | 进程内驱动 Secret → Privacy → LocalPath → Url 检测器管线，扫描 100 MiB 语料 | P50 ≥ 20 MB/s |
 | `NFR-M-002` | — | — | `gitguard scan --staged --verbose` 输出 `Scan.RuleTiming` 日志（`rule_id` / `duration_us`） | 单测 + 人工验证 |
 
@@ -91,14 +91,14 @@ JSON 包含运行环境快照（时间 / OS / 运行时 / 架构 / 核数 / 可�
 
 ## 6. 最新实测结果（2026-10-21）
 
-环境：Windows 11（10.0.26200）、.NET 10.0.11 win-x64 Native AOT（单文件 6.6 MB）、14 逻辑核；运行时间 `2026-10-21T08:40:10Z`。
+环境：Windows 11（10.0.26200）、.NET 10.0.11 win-x64 Native AOT（单文件 6.6 MB）、14 逻辑核；运行时间 `2026-10-21T09:31:49Z`。
 
 | 场景 | 样本 | P50 | P95 | min / max | 目标 | 判定 |
 | --- | --- | --- | --- | --- | --- | --- |
-| startup（`gitguard version`） | 50 | 228.51 ms | 265.86 ms | 179.85 / 290.82 ms | P95 ≤ 150 ms | **FAIL** |
-| staged（500 行差异） | 10 | 317.25 ms | 443.66 ms | 295.93 / 443.66 ms | P95 ≤ 500 ms | **PASS** |
-| push（50 提交 / 5000 行） | 10 | 3803.99 ms | 4687.07 ms | 3676.28 / 4687.07 ms | P95 ≤ 2 s | **FAIL** |
-| throughput（100 MiB，1326 文件） | 3 | 26.64 MB/s | 27.03 MB/s | 26.40 / 27.03 MB/s | P50 ≥ 20 MB/s | **PASS** |
+| startup（`gitguard version`） | 50 | 184.78 ms | 200.44 ms | 172.59 / 231.76 ms | P95 ≤ 150 ms | **FAIL** |
+| staged（500 行差异） | 10 | 307.00 ms | 311.05 ms | 295.77 / 311.05 ms | P95 ≤ 500 ms | **PASS** |
+| push（50 提交 / 5000 行） | 10 | 604.15 ms | 669.78 ms | 581.66 / 669.78 ms | P95 ≤ 2 s | **PASS** |
+| throughput（100 MiB，1326 文件） | 3 | 26.08 MB/s | 28.81 MB/s | 25.95 / 28.81 MB/s | P50 ≥ 20 MB/s | **PASS** |
 
 **宿主进程创建基线**（PowerShell `Measure-Command`，各 5 次，独立于本 harness）：
 
@@ -110,10 +110,10 @@ JSON 包含运行环境快照（时间 / OS / 运行时 / 架构 / 核数 / 可�
 
 **结果解读**：
 
-- `NFR-P-001`：本机仅创建 `cmd.exe` 的基线就约 170 ms，已高于 150 ms 阈值；AOT 进程自身开销约 50 – 60 ms，`version` 还会额外探测一次 `git --version`。该绝对阈值在当前宿主上无法验证，需在进程创建开销正常的机器（`cmd.exe` 冷启动 < 20 ms）复测。
-- `NFR-P-002`：仅 1 – 2 次 git 子进程调用，端到端 P95 443.66 ms，达标。
-- `NFR-P-003`：50 个提交各触发一次 `git diff-tree`，按本机 git 进程创建开销（106 – 144 ms）即需 5 s 量级；耗时由子进程创建主导，检测逻辑不是瓶颈。批量取差异（`git diff-tree --stdin`）可减少子进程数量，登记为后续优化项 `GGD-0023`。
-- `NFR-P-004`：检测器管线吞吐 26.64 MB/s，高于 20 MB/s 目标。
+- `NFR-P-001`：本机仅创建 `cmd.exe` 的基线就约 170 ms，已高于 150 ms 阈值；`version` 还会额外探测一次 `git --version`。该绝对阈值在当前宿主上无法验证，需在进程创建开销正常的机器（`cmd.exe` 冷启动 < 20 ms）复测。复测 P95 200.44 ms 仍高于阈值，结果由宿主进程创建开销主导。
+- `NFR-P-002`：仅 1 – 2 次 git 子进程调用，端到端 P95 311.05 ms，达标。
+- `NFR-P-003`：GGD-0023 将逐提交 `git diff-tree` 改为一次批量 `git log --no-walk=unsorted --stdin` 取回全部提交差异，git 子进程数量不再随提交数增长；P95 由 4687.07 ms 降至 669.78 ms（约 −86%），达标。
+- `NFR-P-004`：检测器管线吞吐 26.08 MB/s，高于 20 MB/s 目标。
 
 ## 7. 文件编码约定
 

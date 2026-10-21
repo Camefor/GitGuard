@@ -94,7 +94,7 @@
 - **输入**：Git 从 stdin 传入的 `<local-ref> <local-sha> <remote-ref> <remote-sha>` 行。
 - **处理规则**：
   - 对每一行：若 `remote-sha` 全零（新分支），计算范围 `<local-sha>`；否则 `<remote-sha>..<local-sha>`。
-  - 使用 `git rev-list` 枚举提交，再逐个 `git diff-tree -p -U0 --root --no-commit-id <commit>` 扫描（`--root` 使初始提交按全量新增输出，避免新分支仅含根提交时漏扫；`--no-commit-id` 保证输出为纯 unified 差异）。
+  - 使用 `git rev-list` 枚举提交；再一次 `git log --no-walk=unsorted --stdin -p -U0 --root --format=%H` 批量取回全部提交差异（`--root` 使初始提交按全量新增输出，避免新分支仅含根提交时漏扫；`%H` 为每个提交输出 SHA 头，空提交对应空差异；输出无法完整归属到请求提交时 FailClosed，避免静默漏扫）。
   - 若 `local-sha` 全零（删除分支）→ 跳过该行，无提交可扫描。
   - 空 stdin → 无推送目标：直接 Clean（退出码 0）。
   - 提交在多个 ref 行重复出现时按首次出现顺序去重，只扫描一次。
@@ -186,7 +186,7 @@
 | 对外（CLI） | `gitguard` 命令集 | 开发者与 Hook 调用 | 冷启动 < 150ms（Native AOT 目标），单命令 FailClosed 必须 < 配置超时 |
 | 对外（配置） | `.gitguard.yml` / 用户级 config | 规则与策略 | 解析失败 → FailClosed |
 | 对外（审计导出） | `gitguard audit export --format json/csv` | 用户事后分析 | 必须脱敏，无原文；**v0.1 未实现**（`audit` 子命令未注册，v0.2 候选 `GGD-0022`） |
-| 对内（Git） | `git diff --cached`、`git rev-list`、`git diff-tree`、`git log` | 读取仓库差异 | 失败即 FailClosed |
+| 对内（Git） | `git diff --cached`、`git rev-list`、`git log --no-walk=unsorted --stdin` | 读取仓库差异 | 失败即 FailClosed |
 | 对内（可选） | `gitleaks` CLI | P2 秘密检测补强 | 不可用时降级，不阻断 |
 
 CLI 命令细节见 `06-API接口设计.md`。
@@ -197,10 +197,10 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 | 编号 | 指标 | 条件 | 目标值 | 测量方式 | v0.1 状态 |
 | --- | --- | --- | --- | --- | --- |
-| `NFR-P-001` | 冷启动时间 | Native AOT 单文件；Windows 11 NVMe | ≤ 150ms | 基准脚本 `benchmarks/startup.sh` 执行 50 次取 P95 | 未达标：实测 P95 265.86 ms（2026-10-21）；本机仅 `cmd.exe` 进程创建基线即约 170 ms，绝对阈值低于宿主基线，需在正常宿主复测（`GGD-0020`） |
-| `NFR-P-002` | 暂存区扫描 P95 | ≤ 500 行差异 | ≤ 500ms | 基准脚本 `benchmarks/run.sh staged` 执行 10 次 | 已达标：实测 P95 443.66 ms（`GGD-0020`） |
-| `NFR-P-003` | 推送扫描 P95 | ≤ 50 提交 / ≤ 5000 行差异 | ≤ 2s | 基准脚本 `benchmarks/run.sh push` 执行 10 次 | 未达标：实测 P95 4687.07 ms（2026-10-21）；逐提交 `git diff-tree` 子进程创建（本机 106–144 ms/次）主导耗时，批量取差异登记 `GGD-0023`（`GGD-0020`） |
-| `NFR-P-004` | 全量扫描吞吐 | ≤ 100 MB 代码 | ≥ 20 MB/s | 基准脚本进程内检测器管线（`benchmarks/run.sh throughput`） | 已达标：实测 P50 26.64 MB/s（100 MiB / 1326 文件，`GGD-0020`） |
+| `NFR-P-001` | 冷启动时间 | Native AOT 单文件；Windows 11 NVMe | ≤ 150ms | 基准脚本 `benchmarks/startup.sh` 执行 50 次取 P95 | 未达标：实测 P95 200.44 ms（2026-10-21）；本机仅 `cmd.exe` 进程创建基线即约 170 ms，绝对阈值低于宿主基线，需在正常宿主复测（`GGD-0020` / `GGD-0023` 复测） |
+| `NFR-P-002` | 暂存区扫描 P95 | ≤ 500 行差异 | ≤ 500ms | 基准脚本 `benchmarks/run.sh staged` 执行 10 次 | 已达标：实测 P95 311.05 ms（`GGD-0020`；`GGD-0023` 复测） |
+| `NFR-P-003` | 推送扫描 P95 | ≤ 50 提交 / ≤ 5000 行差异 | ≤ 2s | 基准脚本 `benchmarks/run.sh push` 执行 10 次 | 已达标：实测 P95 669.78 ms（2026-10-21）；一次批量 `git log --no-walk=unsorted --stdin` 取回全部提交差异（`GGD-0023`），较逐提交实现 4687.07 ms 下降约 86% |
+| `NFR-P-004` | 全量扫描吞吐 | ≤ 100 MB 代码 | ≥ 20 MB/s | 基准脚本进程内检测器管线（`benchmarks/run.sh throughput`） | 已达标：实测 P50 26.08 MB/s（100 MiB / 1326 文件，`GGD-0020`；`GGD-0023` 复测） |
 
 ### 5.2 可用性
 
@@ -304,3 +304,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.6 | 2026-10-21 | GGD-0019：§2.12 `exclude` 改为已消费语义（`paths` 匹配仓库相对路径、`files` 匹配任意深度文件名、命中不计入 `skipped_files`、空项 FailClosed）；§8 FR-070 追溯补 `TC-FR-070-05` 并标记已实现 |
 | 0.1.7 | 2026-10-21 | GGD-0014：§5.5 `NFR-U-002` 标记已实现（`--language` 优先于 `GITGUARD_LANG`，环境变量别名与 JSON / 日志不变约定） |
 | 0.1.8 | 2026-10-21 | GGD-0020：§5.1 性能 NFR 回填实测结果（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标并登记 `GGD-0023`）；§5.6 `NFR-M-002` 标记已实现（`--verbose` 输出 `Scan.RuleTiming`） |
+| 0.1.9 | 2026-10-21 | GGD-0023：§2.8 / §4 推送差异来源改为一次批量 `git log --no-walk=unsorted --stdin`；§5.1 P-003 回填复测 P95 669.78 ms 达标（较 4687.07 ms 下降约 86%），P-001 / P-002 / P-004 同步最新实测 |
