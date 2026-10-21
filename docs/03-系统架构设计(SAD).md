@@ -136,13 +136,11 @@ GitGuard/
 │  ├─ GitGuard.Infrastructure.Tests/
 │  ├─ GitGuard.Cli.Tests/         # 进程内驱动 CliApplication 的契约 / 命令链测试
 │  └─ GitGuard.E2E.Tests/         # 调起 git CLI 的集成测试
-├─ benchmarks/
-│  └─ GitGuard.Benchmarks/        # BenchmarkDotNet（可选）
+├─ benchmarks/                     # GGD-0020：性能基准工具与报告
+│  ├─ GitGuard.Benchmarks/        # 自研 harness（进程级 + 进程内，无第三方依赖）
+│  ├─ startup.sh / startup.ps1    # NFR-P-001 冷启动基准
+│  └─ run.sh / run.ps1            # 全量四场景 + JSON 归档
 ├─ docs/                           # 本仓库文档
-├─ scripts/
-│  ├─ build-aot.ps1
-│  ├─ build-aot.sh
-│  └─ hook-template.sh
 ├─ .editorconfig
 ├─ Directory.Build.props          # 统一 LangVersion / Nullable / TreatWarningsAsErrors / Analyzer / 层边界守卫
 ├─ Directory.Build.targets        # DR-01：移除隐式 System.Net.Http global using
@@ -290,7 +288,7 @@ flowchart LR
 
 - **日志**：`Microsoft.Extensions.Logging` + 自写 Sink，默认写到控制台（stderr）与 SQLite 的 `AuditLogs` 表。默认级别 `Information`，`--verbose` 升到 `Debug`。
 - **指标**（本地）：每次扫描结束时在日志中打一行结构化 Summary `scan.summary{duration_ms, rule_hits, blocked, warned, skipped}`。
-- **追踪**：本地单进程无需分布式追踪；长期考虑用 ActivitySource 便于 BenchmarkDotNet 集成。
+- **追踪**：本地单进程无需分布式追踪；长期考虑用 ActivitySource 便于接入性能基准。
 - 详细规范见 `09-日志设计.md`。
 
 ## 11. 安全架构
@@ -318,3 +316,4 @@ flowchart LR
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：锁定技术栈、分层、扩展点与 Native AOT 发行形态 |
 | 0.1.1 | 2026-10-16 | GGD-0009：§5.1 结构树与实现对齐——Application 补 `Configuration/`（配置加载）与 `Composition/`（`GitGuardSession` 组合根，承接「Cli 不得引用 Infrastructure」的装配职责）；Cli 补 `Commands/` / `Reporting/` / `Logging/` 子目录；tests 补 `GitGuard.Cli.Tests/` |
+| 0.1.2 | 2026-10-21 | GGD-0020：§5.1 结构树更新 benchmarks 实际内容（自研 harness + startup / run 脚本），移除未落地的 `scripts/` 占位（AOT 发布由 `.github/workflows/release.yml` 承担） |

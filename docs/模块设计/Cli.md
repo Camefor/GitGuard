@@ -114,7 +114,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | --- | --- | --- | --- |
 | `--format` | enum `text\|json` | text | 输出格式；取值经 `AcceptOnlyFromAmong` 在解析期校验 |
 | `--no-color` | bool | false | 禁用彩色 |
-| `--verbose` | bool | false | 日志级别到 Debug |
+| `--verbose` | bool | false | 日志级别到 Debug；扫描完成后输出 `Scan.RuleTiming` 规则级耗时摘要（`GGD-0020`） |
 | `--trace` | bool | false | 日志级别到 Trace（必须与 `--verbose` 同用，否则退出码 7） |
 | `--log-file` | path? | null | 启用文件日志（JSON-lines，`~` 展开为用户主目录） |
 | `--language` | enum `zh-CN\|en-US` | 环境或中文 | 覆盖输出语言（`GGD-0014`）；取值经 `AcceptOnlyFromAmong` 在解析期校验；未指定时读 `GITGUARD_LANG`，均无效时回退中文 |
@@ -125,7 +125,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 
 | 属性 | 目标 |
 | --- | --- |
-| 冷启动 | ≤ 150ms（Native AOT） |
+| 冷启动 | ≤ 150ms（Native AOT；实测口径与宿主基线见 `benchmarks/README.md`） |
 | `--help` 响应 | 立即 |
 | 终端渲染不换行乱码 | 自动检测 TTY 宽度，Finding 列表自动截断 |
 
@@ -138,6 +138,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 - [x] 用法错误不落盘：退出码 7 时不创建审计库 / 不写 Hook 文件。
 - [x] 绕过检测命令链（GGD-0013）：`--record-pending` 标记写入 / 清理 / 阻断清理、`GITGUARD_SKIP=1` 仅 Hook 模式生效、`hook post-commit` 的 `gitguard.bypass.v1` 字段与恒 0 退出码（`CliBypassTests`）。
 - [x] 输出语言（GGD-0014）：默认中文、`--language en-US`（子命令前后 / `=` 形式）、`GITGUARD_LANG=en`、命令行覆盖环境变量、非法取值回退、英文帮助与用法错误、JSON 契约不变（`CliLocalizationTests`）。
+- [x] 规则级耗时（GGD-0020）：`--verbose` 输出 `Scan.RuleTiming`（`rule_id` / `duration_us`）、默认级别不输出、英文文案（`CliRuleTimingTests`）。
 - [ ] `--help` 覆盖所有命令（随 Shell 补全一并补测）。
 
 ## 10. 演进与扩展位
@@ -154,3 +155,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | 0.1.1 | 2026-10-16 | GGD-0009：§2.1 环境变量按实现标注归属（`NO_COLOR` 已实现，`GITGUARD_SKIP` → `GGD-0013`、`GITGUARD_LANG` → `GGD-0014`）；§3 新增「解析失败 → 退出码 7」「输出分流」「脱敏」规则，JSON Schema 补全为六种；§4 `System.CommandLine` 降级说明改为本层归一退出码 7；§6.1 流程与组合根装配对齐（`CliHost` / `GitGuardSession` 懒装配）；§6.2 异常映射补 `HookException` / `SqliteException` / 非仓库 2 与解析期 7；§7 `--language` 标注 v0.2 顺延；§9 勾选已覆盖测试项 |
 | 0.1.2 | 2026-10-21 | GGD-0013：§2.1 `GITGUARD_SKIP` 标记已实现（仅 Hook 模式）；§3 JSON Schema 补 `bypass.v1`，新增隐藏命令 / 隐藏选项规则；新增 §6.2 post-commit 入口与 `--record-pending` 处理（原全局异常捕获顺延为 §6.3）；§9 勾选绕过检测命令链测试项 |
 | 0.1.3 | 2026-10-21 | GGD-0014：§2.1 `GITGUARD_LANG` 标记已实现；§7 `--language` 标注已注册与解析期校验；§9 勾选输出语言测试项；§10 标注文案表落点 |
+| 0.1.4 | 2026-10-21 | GGD-0020：§7 `--verbose` 说明补充规则耗时摘要；§8 冷启动标注实测入口；§9 勾选规则耗时测试项（`CliRuleTimingTests`） |

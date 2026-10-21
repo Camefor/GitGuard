@@ -197,10 +197,10 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 | 编号 | 指标 | 条件 | 目标值 | 测量方式 | v0.1 状态 |
 | --- | --- | --- | --- | --- | --- |
-| `NFR-P-001` | 冷启动时间 | Native AOT 单文件；Windows 11 NVMe | ≤ 150ms | 基准脚本 `benchmarks/startup.sh` 执行 50 次取 P95 | 未测量（`GGD-0020`） |
-| `NFR-P-002` | 暂存区扫描 P95 | ≤ 500 行差异 | ≤ 500ms | 基准脚本 10 组样本仓库 | 未测量（`GGD-0020`） |
-| `NFR-P-003` | 推送扫描 P95 | ≤ 50 提交 / ≤ 5000 行差异 | ≤ 2s | 同上 | 未测量（`GGD-0020`） |
-| `NFR-P-004` | 全量扫描吞吐 | ≤ 100 MB 代码 | ≥ 20 MB/s | 单机 benchmark | 未测量（`GGD-0020`） |
+| `NFR-P-001` | 冷启动时间 | Native AOT 单文件；Windows 11 NVMe | ≤ 150ms | 基准脚本 `benchmarks/startup.sh` 执行 50 次取 P95 | 未达标：实测 P95 265.86 ms（2026-10-21）；本机仅 `cmd.exe` 进程创建基线即约 170 ms，绝对阈值低于宿主基线，需在正常宿主复测（`GGD-0020`） |
+| `NFR-P-002` | 暂存区扫描 P95 | ≤ 500 行差异 | ≤ 500ms | 基准脚本 `benchmarks/run.sh staged` 执行 10 次 | 已达标：实测 P95 443.66 ms（`GGD-0020`） |
+| `NFR-P-003` | 推送扫描 P95 | ≤ 50 提交 / ≤ 5000 行差异 | ≤ 2s | 基准脚本 `benchmarks/run.sh push` 执行 10 次 | 未达标：实测 P95 4687.07 ms（2026-10-21）；逐提交 `git diff-tree` 子进程创建（本机 106–144 ms/次）主导耗时，批量取差异登记 `GGD-0023`（`GGD-0020`） |
+| `NFR-P-004` | 全量扫描吞吐 | ≤ 100 MB 代码 | ≥ 20 MB/s | 基准脚本进程内检测器管线（`benchmarks/run.sh throughput`） | 已达标：实测 P50 26.64 MB/s（100 MiB / 1326 文件，`GGD-0020`） |
 
 ### 5.2 可用性
 
@@ -236,7 +236,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 编号 | 要求 | 验证方式 | v0.1 状态 |
 | --- | --- | --- | --- |
 | `NFR-M-001` | 日志按 `level + category` 结构化输出 | 代码审查 | 已实现：`--log-file` / `logging.file` 输出 JSON-lines（含 `level` / `category` 等字段） |
-| `NFR-M-002` | `gitguard --verbose` 输出各规则命中耗时 | 单测 | 未实现规则级耗时；v0.1 语义为 `--verbose` → Debug 日志、`--trace` → Trace 逐行匹配细节（须与 `--verbose` 同用）；登记 `GGD-0020` |
+| `NFR-M-002` | `gitguard --verbose` 输出各规则命中耗时 | 单测 | 已实现（`GGD-0020`）：`--verbose`（Debug）在扫描完成后按 `rule_id` 输出 `Scan.RuleTiming`（求值次数 / 命中次数 / `duration_us`），只在正则实际求值时计时；普通扫描零计时开销；`--trace` 仍用于 Trace 逐行匹配细节 |
 
 ## 6. 领域规则（DR）
 
@@ -303,3 +303,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.5 | 2026-10-21 | GGD-0013：§2.10 按实现重写 FR-050（父提交 + 暂存树预测、`--record-pending` 隐藏选项、`GITGUARD_SKIP=1` 仅 Hook 模式、标记文件路径 / 原子写 / 失败语义、`NoVerify` / `GitGuardSkip` 判定、`Bypass` 运行与审计载荷、post-commit 退出码）；§5.3 NFR-S-004 标记已覆盖；§8 FR-050 追溯补齐测试类与 E2E S8；§9 Q-01 记录决议 |
 | 0.1.6 | 2026-10-21 | GGD-0019：§2.12 `exclude` 改为已消费语义（`paths` 匹配仓库相对路径、`files` 匹配任意深度文件名、命中不计入 `skipped_files`、空项 FailClosed）；§8 FR-070 追溯补 `TC-FR-070-05` 并标记已实现 |
 | 0.1.7 | 2026-10-21 | GGD-0014：§5.5 `NFR-U-002` 标记已实现（`--language` 优先于 `GITGUARD_LANG`，环境变量别名与 JSON / 日志不变约定） |
+| 0.1.8 | 2026-10-21 | GGD-0020：§5.1 性能 NFR 回填实测结果（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标并登记 `GGD-0023`）；§5.6 `NFR-M-002` 标记已实现（`--verbose` 输出 `Scan.RuleTiming`） |

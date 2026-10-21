@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
@@ -14,7 +15,7 @@ namespace GitGuard.Detection.Detectors;
 /// 声明式校验器 → 严重度调整 → <see cref="FindingFactory"/> 构造发现项。
 /// 子类通过受保护钩子定制类别特有语义，不重复实现管线。
 /// </summary>
-public abstract class RegexRuleDetector : IDetector
+public abstract class RegexRuleDetector : IRuleTimingAwareDetector
 {
     private readonly FindingFactory _findingFactory;
     private readonly Dictionary<string, Func<string, bool>> _validators;
@@ -60,20 +61,29 @@ public abstract class RegexRuleDetector : IDetector
     /// <returns>发现项流。</returns>
     /// <exception cref="ArgumentNullException"><paramref name="change"/> 为 <see langword="null"/>。</exception>
     /// <exception cref="DetectionException">正则匹配超时等检测失败时抛出（FailClosed）。</exception>
-    public async IAsyncEnumerable<Finding> DetectAsync(
+    public IAsyncEnumerable<Finding> DetectAsync(
         FileChange change,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        DetectCoreAsync(change, timingSink: null, cancellationToken);
+
+    /// <summary>
+    /// 扫描单个文件的变更行并上报规则级耗时（NFR-M-002）；检测语义与 <see cref="DetectAsync"/> 完全一致。
+    /// </summary>
+    /// <param name="change">文件变更。</param>
+    /// <param name="timingSink">耗时接收器。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>发现项流。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="change"/> 或 <paramref name="timingSink"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="DetectionException">正则匹配超时等检测失败时抛出（FailClosed）。</exception>
+    public IAsyncEnumerable<Finding> DetectWithTimingAsync(
+        FileChange change,
+        IRuleTimingSink timingSink,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(timingSink);
 
-        // 扫描管线为纯 CPU 同步逻辑（正则 + 校验器），无真实异步点；等待已完成任务仅为保持 async 迭代器形态
-        await Task.CompletedTask.ConfigureAwait(false);
-
-        foreach (Finding finding in Scan(change))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return finding;
-        }
+        return DetectCoreAsync(change, timingSink, cancellationToken);
     }
 
     /// <summary>文件级跳过钩子（如 Secret 跳过 <c>.lock</c> / <c>.min.js</c>）；默认不跳过。</summary>
@@ -238,13 +248,31 @@ public abstract class RegexRuleDetector : IDetector
         return true;
     }
 
+    private async IAsyncEnumerable<Finding> DetectCoreAsync(
+        FileChange change,
+        IRuleTimingSink? timingSink,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        // 扫描管线为纯 CPU 同步逻辑（正则 + 校验器），无真实异步点；等待已完成任务仅为保持 async 迭代器形态
+        await Task.CompletedTask.ConfigureAwait(false);
+
+        foreach (Finding finding in Scan(change, timingSink))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return finding;
+        }
+    }
+
     /// <summary>
     /// 扫描管线：逐行 × 逐规则依次经文件 glob 白名单、行级跳过、上下文关键字、正则匹配、
     /// 校验器与严重度调整，命中即产出发现项；同一行同一规则至多一条（首个命中生效）。
     /// </summary>
     /// <param name="change">文件变更。</param>
+    /// <param name="timingSink">耗时接收器；<see langword="null"/> 表示不采集规则耗时。</param>
     /// <returns>发现项序列。</returns>
-    private IEnumerable<Finding> Scan(FileChange change)
+    private IEnumerable<Finding> Scan(FileChange change, IRuleTimingSink? timingSink)
     {
         if (ShouldSkipFile(change))
         {
@@ -260,19 +288,20 @@ public abstract class RegexRuleDetector : IDetector
                     continue;
                 }
 
+                // 仅统计真正执行正则 / 校验器的求值；文件 glob 与上下文门禁的短路不计入规则耗时
+                long startedTimestamp = timingSink is null ? 0 : Stopwatch.GetTimestamp();
                 string? value = MatchValue(rule, line.Text);
-                if (value is null || !ValidateValue(_validators, rule, value))
-                {
-                    continue;
-                }
+                Severity? severity = value is not null && ValidateValue(_validators, rule, value)
+                    ? AdjustSeverity(rule, change)
+                    : null;
+                timingSink?.Record(rule.RuleId, Stopwatch.GetTimestamp() - startedTimestamp, severity is not null);
 
-                Severity? severity = AdjustSeverity(rule, change);
                 if (severity is null)
                 {
                     continue;
                 }
 
-                yield return _findingFactory.Create(rule, change, line.Number, value, severity.Value);
+                yield return _findingFactory.Create(rule, change, line.Number, value!, severity.Value);
             }
         }
     }

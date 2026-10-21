@@ -114,6 +114,62 @@ internal sealed class StubDetector : IDetector
     }
 }
 
+/// <summary>
+/// 测试用可上报耗时检测器（NFR-M-002）：每个文件固定上报两条规则求值（一条命中、一条未命中），
+/// 并分别记录走普通扫描 / 计时扫描的次数，用于验证采集开关与聚合结果。
+/// </summary>
+internal sealed class TimingAwareStubDetector : IRuleTimingAwareDetector
+{
+    internal const string HIT_RULE = "GGD/SECRET/AWS-AKID";
+    internal const string MISS_RULE = "GGD/SECRET/JWT";
+
+    private readonly IReadOnlyList<Finding> _findings;
+
+    internal TimingAwareStubDetector(IReadOnlyList<Finding>? findings = null) =>
+        _findings = findings ?? Array.Empty<Finding>();
+
+    public string Name => "timed";
+
+    internal int PlainCalls { get; private set; }
+
+    internal int TimedCalls { get; private set; }
+
+    public async IAsyncEnumerable<Finding> DetectAsync(
+        FileChange change,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        PlainCalls++;
+        await Task.CompletedTask.ConfigureAwait(false);
+
+        foreach (Finding finding in _findings)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return finding;
+        }
+    }
+
+    public async IAsyncEnumerable<Finding> DetectWithTimingAsync(
+        FileChange change,
+        IRuleTimingSink timingSink,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(timingSink);
+
+        TimedCalls++;
+        await Task.CompletedTask.ConfigureAwait(false);
+
+        // 故意逆序上报：聚合结果必须按规则 ID 排序
+        timingSink.Record(MISS_RULE, elapsedTimestampTicks: 200, hit: false);
+        timingSink.Record(HIT_RULE, elapsedTimestampTicks: 100, hit: true);
+
+        foreach (Finding finding in _findings)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return finding;
+        }
+    }
+}
+
 /// <summary>测试用阻塞检测器：等待至令牌取消，用于验证扫描级超时（12）与外部取消原样上抛。</summary>
 internal sealed class BlockingDetector : IDetector
 {

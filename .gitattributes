@@ -1,0 +1,2 @@
+# POSIX shell 脚本必须保持 LF，避免 Windows checkout 后被 core.autocrlf 转为 CRLF
+*.sh text eol=lf

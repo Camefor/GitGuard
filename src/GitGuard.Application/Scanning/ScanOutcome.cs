@@ -17,6 +17,7 @@ public sealed class ScanOutcome
     /// <param name="filesScanned">实际交付检测的文件数（不含跳过）。</param>
     /// <param name="skippedFiles">被跳过文件清单（二进制 / 超限）。</param>
     /// <param name="auditWriteFailed">审计写失败降级标记（Audit.md §4）。</param>
+    /// <param name="ruleTimings">规则级耗时摘要（NFR-M-002）；<see langword="null"/> 表示本次扫描未启用采集。</param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="filesScanned"/> 为负。</exception>
     public ScanOutcome(
@@ -24,7 +25,8 @@ public sealed class ScanOutcome
         IReadOnlyDictionary<Finding, PolicyDecision> decisions,
         int filesScanned,
         IReadOnlyList<SkippedFile> skippedFiles,
-        bool auditWriteFailed)
+        bool auditWriteFailed,
+        IReadOnlyList<RuleTiming>? ruleTimings = null)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(decisions);
@@ -36,6 +38,7 @@ public sealed class ScanOutcome
         FilesScanned = filesScanned;
         SkippedFiles = skippedFiles.ToImmutableArray();
         AuditWriteFailed = auditWriteFailed;
+        RuleTimings = ruleTimings is null ? ImmutableArray<RuleTiming>.Empty : ruleTimings.ToImmutableArray();
     }
 
     /// <summary>扫描运行聚合（<c>Id</c> 即报告中的 <c>run_id</c>）。</summary>
@@ -61,4 +64,7 @@ public sealed class ScanOutcome
 
     /// <summary>审计写失败降级标记（<see langword="true"/> 时报告应提示「审计写入失败」）。</summary>
     public bool AuditWriteFailed { get; }
+
+    /// <summary>规则级耗时摘要（NFR-M-002，按规则 ID 排序）；未启用采集时为空。</summary>
+    public ImmutableArray<RuleTiming> RuleTimings { get; }
 }

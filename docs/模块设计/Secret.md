@@ -84,7 +84,7 @@ flowchart LR
 
 | 属性 | 目标 | 测量方式 |
 | --- | --- | --- |
-| 单规则 P95 耗时 | ≤ 30ms（500 行差异） | BenchmarkDotNet |
+| 单规则 P95 耗时 | ≤ 30ms（500 行差异） | `gitguard scan --staged --verbose` 的 `Scan.RuleTiming`（`duration_us`，`GGD-0020` 提供采集；尚未作为门禁断言） |
 | 内置规则 Critical 命中召回率 | ≥ 90%（已知样本集） | Fixtures 回归 |
 | 误报率 | 单仓库首周 ≤ 5% | 真实项目灰度统计 |
 
@@ -112,3 +112,4 @@ flowchart LR
 | 0.1.0 | 2026-10-15 | 初始化：8 条 MVP 内置规则 + GitleaksAdapter 扩展位 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003 流式）；AWS-AKID 移除「行长 ≤ 256」表述（长行策略统一见 §6）；JWT 正则改为边界断言式（规则按行匹配、无 Multiline，`^`/`$` 不适用）；整文件跳过后缀定为 `.lock` / `.min.js` / `.min.css`；脱敏统一由 Core `Masker` 承担 |
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：上游差异解析落地（`UnifiedDiffParser` 将 `git diff --cached -U0` / `git diff-tree -p -U0` 输出按行号展开为逐文件变更）；§2.1 输入格式修正为 `FileChange { Path, Lines[ChangedLine] }` |
+| 0.1.3 | 2026-10-21 | GGD-0020：§8 单规则耗时测量方式改为 `--verbose` 的 `Scan.RuleTiming`（`duration_us`），替换未落地的 BenchmarkDotNet 引用 |

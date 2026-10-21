@@ -158,25 +158,41 @@ public sealed class GitGuardSession
     }
 
     /// <summary>装配暂存区扫描用例（扫描设置与策略映射全部来自有效配置）。</summary>
+    /// <param name="collectRuleTimings">是否采集规则级耗时（NFR-M-002，CLI <c>--verbose</c>）；<see langword="false"/> 时无计时开销。</param>
     /// <returns>已接线配置的暂存区扫描用例。</returns>
     /// <exception cref="ConfigurationException">配置无效（解析失败 / 违反硬下限 / 类别全禁）。</exception>
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
-    public ScanStagedUseCase CreateStagedScan()
+    public ScanStagedUseCase CreateStagedScan(bool collectRuleTimings = false)
     {
         GitGuardConfig config = Config;
-        return new ScanStagedUseCase(GitAccess, _detectors.Value.Detectors, AuditStore, _clock, config.Scan, BuildScanPolicy(config));
+        return new ScanStagedUseCase(
+            GitAccess,
+            _detectors.Value.Detectors,
+            AuditStore,
+            _clock,
+            config.Scan,
+            BuildScanPolicy(config),
+            collectRuleTimings);
     }
 
     /// <summary>装配推送扫描用例（扫描设置与策略映射全部来自有效配置）。</summary>
+    /// <param name="collectRuleTimings">是否采集规则级耗时（NFR-M-002，CLI <c>--verbose</c>）；<see langword="false"/> 时无计时开销。</param>
     /// <returns>已接线配置的推送扫描用例。</returns>
     /// <exception cref="ConfigurationException">配置无效（解析失败 / 违反硬下限 / 类别全禁）。</exception>
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
-    public ScanPushUseCase CreatePushScan()
+    public ScanPushUseCase CreatePushScan(bool collectRuleTimings = false)
     {
         GitGuardConfig config = Config;
-        return new ScanPushUseCase(GitAccess, _detectors.Value.Detectors, AuditStore, _clock, config.Scan, BuildScanPolicy(config));
+        return new ScanPushUseCase(
+            GitAccess,
+            _detectors.Value.Detectors,
+            AuditStore,
+            _clock,
+            config.Scan,
+            BuildScanPolicy(config),
+            collectRuleTimings);
     }
 
     /// <summary>装配待提交预测记录器（FR-050：pre-commit 扫描通过 / 按 GITGUARD_SKIP 跳过后记录）。</summary>

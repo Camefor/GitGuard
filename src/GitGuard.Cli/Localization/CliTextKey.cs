@@ -121,6 +121,7 @@ internal enum CliTextKey
     LogCommandStarted,
     LogScanSkipped,
     LogScanCompleted,
+    LogRuleTiming,
     LogHookInstalled,
     LogHookUninstalled,
     LogHookNotInstalled,

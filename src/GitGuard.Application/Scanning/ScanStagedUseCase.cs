@@ -20,6 +20,7 @@ public sealed class ScanStagedUseCase
     /// <param name="clock">时钟抽象。</param>
     /// <param name="settings">扫描设置；<see langword="null"/> 使用 <see cref="ScanSettings.Default"/>。</param>
     /// <param name="policy">扫描级策略（映射 + 白名单）；<see langword="null"/> 使用 <see cref="ScanPolicy.Default"/>。</param>
+    /// <param name="collectRuleTimings">是否采集规则级耗时（NFR-M-002）；<see langword="false"/> 时无计时开销。</param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException"><paramref name="detectors"/> 为空集合。</exception>
     public ScanStagedUseCase(
@@ -28,17 +29,19 @@ public sealed class ScanStagedUseCase
         IAuditStore auditStore,
         IClock clock,
         ScanSettings? settings = null,
-        ScanPolicy? policy = null)
+        ScanPolicy? policy = null,
+        bool collectRuleTimings = false)
     {
         ArgumentNullException.ThrowIfNull(gitAccess);
 
         _gitAccess = gitAccess;
-        _executor = new ScanExecutor(gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default, policy);
+        _executor = new ScanExecutor(
+            gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default, policy, collectRuleTimings);
     }
 
     /// <summary>执行暂存区扫描。</summary>
     /// <param name="cancellationToken">调用方取消令牌；外部取消原样上抛（CLI 映射退出码 12）。</param>
-    /// <returns>扫描结果（含 ScanRun 聚合、逐条策略判定、跳过文件清单与审计写失败标记）。</returns>
+    /// <returns>扫描结果（含 ScanRun 聚合、逐条策略判定、跳过文件清单、审计写失败标记与规则耗时摘要）。</returns>
     public Task<ScanOutcome> ExecuteAsync(CancellationToken cancellationToken = default) =>
         _executor.RunAsync(ScanType.PreCommit, _ => UnifiedDiffParser.Parse(_gitAccess.GetStagedDiff()), cancellationToken);
 }

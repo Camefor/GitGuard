@@ -76,6 +76,32 @@ internal static class ScanCommand
         }
     }
 
+    /// <summary>输出规则级耗时摘要（NFR-M-002；仅 Debug 级别启用）。</summary>
+    /// <param name="runtime">运行时上下文。</param>
+    /// <param name="outcome">扫描结果（携带规则耗时）。</param>
+    private static void WriteRuleTimings(CliRuntime runtime, ScanOutcome outcome)
+    {
+        foreach (RuleTiming timing in outcome.RuleTimings)
+        {
+            long durationUs = (long)Math.Round(timing.ElapsedMicroseconds, MidpointRounding.AwayFromZero);
+            runtime.Logger.Log(
+                CliLogLevel.Debug,
+                "Scan.RuleTiming",
+                runtime.Text.Format(
+                    CliTextKey.LogRuleTiming,
+                    timing.RuleId,
+                    timing.EvaluationCount,
+                    timing.HitCount,
+                    durationUs),
+                new LogFields
+                {
+                    RuleId = timing.RuleId,
+                    DurationUs = durationUs,
+                    TraceId = runtime.TraceId,
+                });
+        }
+    }
+
     private static async Task<int> ExecuteAsync(
         CliRuntime runtime,
         ParseResult parseResult,
@@ -119,15 +145,18 @@ internal static class ScanCommand
             return ExitCodes.SUCCESS;
         }
 
+        // NFR-M-002：--verbose（Debug）才采集规则耗时，普通扫描不付出计时开销
+        bool collectRuleTimings = runtime.Logger.IsEnabled(CliLogLevel.Debug);
+
         ScanOutcome outcome;
         if (staged)
         {
-            outcome = await runtime.Session.CreateStagedScan().ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            outcome = await runtime.Session.CreateStagedScan(collectRuleTimings).ExecuteAsync(cancellationToken).ConfigureAwait(false);
         }
         else
         {
             string pushStdin = await runtime.Host.Input.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            outcome = await runtime.Session.CreatePushScan().ExecuteAsync(pushStdin, cancellationToken).ConfigureAwait(false);
+            outcome = await runtime.Session.CreatePushScan(collectRuleTimings).ExecuteAsync(pushStdin, cancellationToken).ConfigureAwait(false);
         }
 
         // FR-050：扫描通过才记录预测；被阻断 / 失败时清理旧标记，避免残留标记掩盖后续真实绕过
@@ -154,6 +183,12 @@ internal static class ScanCommand
                 DurationMs = outcome.Run.DurationMs,
                 TraceId = runtime.TraceId,
             });
+
+        if (collectRuleTimings)
+        {
+            WriteRuleTimings(runtime, outcome);
+        }
+
         return outcome.ExitCode;
     }
 }

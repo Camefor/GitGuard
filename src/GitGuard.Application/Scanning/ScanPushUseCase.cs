@@ -20,6 +20,7 @@ public sealed class ScanPushUseCase
     /// <param name="clock">时钟抽象。</param>
     /// <param name="settings">扫描设置；<see langword="null"/> 使用 <see cref="ScanSettings.Default"/>。</param>
     /// <param name="policy">扫描级策略（映射 + 白名单）；<see langword="null"/> 使用 <see cref="ScanPolicy.Default"/>。</param>
+    /// <param name="collectRuleTimings">是否采集规则级耗时（NFR-M-002）；<see langword="false"/> 时无计时开销。</param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException"><paramref name="detectors"/> 为空集合。</exception>
     public ScanPushUseCase(
@@ -28,18 +29,20 @@ public sealed class ScanPushUseCase
         IAuditStore auditStore,
         IClock clock,
         ScanSettings? settings = null,
-        ScanPolicy? policy = null)
+        ScanPolicy? policy = null,
+        bool collectRuleTimings = false)
     {
         ArgumentNullException.ThrowIfNull(gitAccess);
 
         _gitAccess = gitAccess;
-        _executor = new ScanExecutor(gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default, policy);
+        _executor = new ScanExecutor(
+            gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default, policy, collectRuleTimings);
     }
 
     /// <summary>执行推送扫描。</summary>
     /// <param name="pushStdin">pre-push stdin 全文（<c>&lt;local-ref&gt; &lt;local-sha&gt; &lt;remote-ref&gt; &lt;remote-sha&gt;</c> 行）。</param>
     /// <param name="cancellationToken">调用方取消令牌；外部取消原样上抛（CLI 映射退出码 12）。</param>
-    /// <returns>扫描结果（PrePush 类型的 ScanRun；发现项携带所属提交 SHA）。</returns>
+    /// <returns>扫描结果（PrePush 类型的 ScanRun；发现项携带所属提交 SHA；含规则耗时摘要）。</returns>
     /// <exception cref="ArgumentNullException"><paramref name="pushStdin"/> 为 <see langword="null"/>。</exception>
     public Task<ScanOutcome> ExecuteAsync(string pushStdin, CancellationToken cancellationToken = default)
     {

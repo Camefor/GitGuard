@@ -27,6 +27,9 @@ internal sealed record LogFields
     /// <summary>耗时（毫秒）。</summary>
     internal long? DurationMs { get; init; }
 
+    /// <summary>耗时（微秒；规则耗时摘要使用，<c>09-日志设计</c> §3 <c>duration_us</c>）。</summary>
+    internal long? DurationUs { get; init; }
+
     /// <summary>错误码（<c>10-异常处理设计</c> §4 登记值）。</summary>
     internal string? ErrorCode { get; init; }
 
@@ -127,6 +130,11 @@ internal sealed class CliLogger
         if (fields.DurationMs is { } durationMs)
         {
             target.Add(new LogFieldValue("duration_ms", durationMs.ToString(CultureInfo.InvariantCulture), durationMs));
+        }
+
+        if (fields.DurationUs is { } durationUs)
+        {
+            target.Add(new LogFieldValue("duration_us", durationUs.ToString(CultureInfo.InvariantCulture), durationUs));
         }
 
         if (!string.IsNullOrEmpty(fields.ErrorCode))

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
 using GitGuard.Core.Model;
@@ -27,6 +28,7 @@ internal sealed class ScanExecutor
     private readonly IClock _clock;
     private readonly ScanSettings _settings;
     private readonly ScanPolicy _policy;
+    private readonly bool _collectRuleTimings;
 
     /// <summary>初始化扫描管线。</summary>
     /// <param name="gitAccess">Git 访问抽象。</param>
@@ -35,6 +37,9 @@ internal sealed class ScanExecutor
     /// <param name="clock">时钟抽象。</param>
     /// <param name="settings">扫描设置（已合并默认值）。</param>
     /// <param name="policy">扫描级策略（映射 + 白名单）；<see langword="null"/> 使用 <see cref="ScanPolicy.Default"/>。</param>
+    /// <param name="collectRuleTimings">
+    /// 是否采集规则级耗时（NFR-M-002）；<see langword="false"/> 时检测器不付出计时开销。
+    /// </param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException"><paramref name="detectors"/> 为空集合（无检测器的扫描会无意义地放行全部内容）。</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="settings"/> 的阈值非正。</exception>
@@ -44,7 +49,8 @@ internal sealed class ScanExecutor
         IAuditStore auditStore,
         IClock clock,
         ScanSettings settings,
-        ScanPolicy? policy = null)
+        ScanPolicy? policy = null,
+        bool collectRuleTimings = false)
     {
         ArgumentNullException.ThrowIfNull(gitAccess);
         ArgumentNullException.ThrowIfNull(detectors);
@@ -65,6 +71,7 @@ internal sealed class ScanExecutor
         _clock = clock;
         _settings = settings;
         _policy = policy ?? ScanPolicy.Default;
+        _collectRuleTimings = collectRuleTimings;
     }
 
     /// <summary>
@@ -88,6 +95,9 @@ internal sealed class ScanExecutor
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(_settings.Timeout);
 
+        // 仅 --verbose 路径创建采集器；未启用时检测器走无计时开销的 DetectAsync
+        RuleTimingCollector? timingCollector = _collectRuleTimings ? new RuleTimingCollector() : null;
+
         try
         {
             IReadOnlyList<ParsedDiffFile> parsedFiles = acquireDiffFiles(timeoutSource.Token);
@@ -100,28 +110,46 @@ internal sealed class ScanExecutor
             {
                 foreach (IDetector detector in _detectors)
                 {
-                    await foreach (Finding finding in detector.DetectAsync(change, timeoutSource.Token).ConfigureAwait(false))
+                    // 未实现 IRuleTimingAwareDetector 的检测器照常扫描，只是不参与耗时摘要
+                    IAsyncEnumerable<Finding> detected = timingCollector is not null && detector is IRuleTimingAwareDetector timingAware
+                        ? timingAware.DetectWithTimingAsync(change, timingCollector, timeoutSource.Token)
+                        : detector.DetectAsync(change, timeoutSource.Token);
+
+                    await foreach (Finding finding in detected.ConfigureAwait(false))
                     {
                         findings.Add(finding);
                     }
                 }
             }
 
-            return Complete(scanType, startedAt, stopwatch.ElapsedMilliseconds, changes.Count, findings, skippedFiles);
+            return Complete(
+                scanType,
+                startedAt,
+                stopwatch.ElapsedMilliseconds,
+                changes.Count,
+                findings,
+                skippedFiles,
+                SnapshotTimings(timingCollector));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return Fail(scanType, EXIT_CODE_TIMEOUT, startedAt, stopwatch.ElapsedMilliseconds);
+            return Fail(scanType, EXIT_CODE_TIMEOUT, startedAt, stopwatch.ElapsedMilliseconds, SnapshotTimings(timingCollector));
         }
         catch (GitException)
         {
-            return Fail(scanType, EXIT_CODE_GIT_FAILED, startedAt, stopwatch.ElapsedMilliseconds);
+            return Fail(scanType, EXIT_CODE_GIT_FAILED, startedAt, stopwatch.ElapsedMilliseconds, SnapshotTimings(timingCollector));
         }
         catch (DetectionException)
         {
-            return Fail(scanType, EXIT_CODE_DETECTOR_FAILED, startedAt, stopwatch.ElapsedMilliseconds);
+            return Fail(scanType, EXIT_CODE_DETECTOR_FAILED, startedAt, stopwatch.ElapsedMilliseconds, SnapshotTimings(timingCollector));
         }
     }
+
+    /// <summary>取规则耗时快照；未启用采集时返回空。</summary>
+    /// <param name="collector">耗时采集器；<see langword="null"/> 表示未启用。</param>
+    /// <returns>按规则 ID 排序的耗时摘要。</returns>
+    private static ImmutableArray<RuleTiming> SnapshotTimings(RuleTimingCollector? collector) =>
+        collector is null ? ImmutableArray<RuleTiming>.Empty : collector.Snapshot();
 
     /// <summary>
     /// 跳过判定：<c>exclude</c> 命中 → 直接排除（用户显式配置，不扫描也不记 skipped）；
@@ -164,7 +192,8 @@ internal sealed class ScanExecutor
         long durationMs,
         int filesScanned,
         List<Finding> findings,
-        IReadOnlyList<SkippedFile> skippedFiles)
+        IReadOnlyList<SkippedFile> skippedFiles,
+        ImmutableArray<RuleTiming> ruleTimings)
     {
         var decisions = PolicyEvaluator.Evaluate(findings, _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
 
@@ -177,11 +206,16 @@ internal sealed class ScanExecutor
         var run = ScanRun.Create(_gitAccess.GetRepositoryRoot(), scanType, startedAt, durationMs, result, exitCode, findings);
         bool auditWriteFailed = !TryPersistAudit(run, decisions);
 
-        return new ScanOutcome(run, decisions, filesScanned, skippedFiles, auditWriteFailed);
+        return new ScanOutcome(run, decisions, filesScanned, skippedFiles, auditWriteFailed, ruleTimings);
     }
 
     /// <summary>FailClosed 路径收尾：以 Failed + 指定退出码（10 / 11 / 12）落库并返回（不携带 Findings）。</summary>
-    private ScanOutcome Fail(ScanType scanType, int exitCode, DateTimeOffset startedAt, long durationMs)
+    private ScanOutcome Fail(
+        ScanType scanType,
+        int exitCode,
+        DateTimeOffset startedAt,
+        long durationMs,
+        ImmutableArray<RuleTiming> ruleTimings)
     {
         var decisions = PolicyEvaluator.Evaluate(
             Array.Empty<Finding>(), _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
@@ -189,7 +223,7 @@ internal sealed class ScanExecutor
         var run = ScanRun.Create(_gitAccess.GetRepositoryRoot(), scanType, startedAt, durationMs, ScanResult.Failed, exitCode);
         bool auditWriteFailed = !TryPersistAudit(run, decisions);
 
-        return new ScanOutcome(run, decisions, filesScanned: 0, Array.Empty<SkippedFile>(), auditWriteFailed);
+        return new ScanOutcome(run, decisions, filesScanned: 0, Array.Empty<SkippedFile>(), auditWriteFailed, ruleTimings);
     }
 
     /// <summary>单事务落库；失败按 AuditWriteFailed 降级（10-异常处理设计 §5 / Audit.md §4），不改变扫描判定。</summary>

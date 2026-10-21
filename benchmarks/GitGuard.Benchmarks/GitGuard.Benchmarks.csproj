@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    性能基准工具（GGD-0020 / NFR-P-001~004）：不是发行产物，不参与 AOT 发布。
+    吞吐基准通过 ProjectReference 直接驱动检测器管线；启动 / 扫描延迟以子进程方式测量发布版可执行文件。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>gitguard-benchmarks</AssemblyName>
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\GitGuard.Detection\GitGuard.Detection.csproj" />
+  </ItemGroup>
+
+</Project>
