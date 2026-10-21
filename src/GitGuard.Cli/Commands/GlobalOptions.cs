@@ -1,4 +1,5 @@
 ﻿using System.CommandLine;
+using GitGuard.Cli.Localization;
 
 namespace GitGuard.Cli.Commands;
 
@@ -16,11 +17,15 @@ internal sealed class GlobalOptionSet
     internal const string FORMAT_JSON = "json";
 
     /// <summary>创建并接线全部全局选项。</summary>
-    internal GlobalOptionSet()
+    /// <param name="text">帮助文案（按输出语言选择）。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> 为 <see langword="null"/>。</exception>
+    internal GlobalOptionSet(CliText text)
     {
+        ArgumentNullException.ThrowIfNull(text);
+
         Format = new Option<string>("--format")
         {
-            Description = "输出格式：text 人类可读（默认，报告走 stderr）或 json 机器可读（走 stdout）",
+            Description = text.Get(CliTextKey.FormatOptionDescription),
             Recursive = true,
             DefaultValueFactory = _ => FORMAT_TEXT,
         };
@@ -28,27 +33,34 @@ internal sealed class GlobalOptionSet
 
         NoColor = new Option<bool>("--no-color")
         {
-            Description = "禁用彩色输出（stderr 非终端或已设置 NO_COLOR 时自动禁用）",
+            Description = text.Get(CliTextKey.NoColorOptionDescription),
             Recursive = true,
         };
 
         Verbose = new Option<bool>("--verbose")
         {
-            Description = "日志级别降到 Debug（关键决策与 Git 调用）",
+            Description = text.Get(CliTextKey.VerboseOptionDescription),
             Recursive = true,
         };
 
         Trace = new Option<bool>("--trace")
         {
-            Description = "日志级别降到 Trace（逐行匹配细节；必须与 --verbose 同用）",
+            Description = text.Get(CliTextKey.TraceOptionDescription),
             Recursive = true,
         };
 
         LogFile = new Option<string>("--log-file")
         {
-            Description = "启用文件日志并写入指定路径（JSON-lines；~ 展开为用户主目录）",
+            Description = text.Get(CliTextKey.LogFileOptionDescription),
             Recursive = true,
         };
+
+        Language = new Option<string>(CliLanguageResolver.LANGUAGE_OPTION)
+        {
+            Description = text.Get(CliTextKey.LanguageOptionDescription),
+            Recursive = true,
+        };
+        Language.AcceptOnlyFromAmong(CliLanguageResolver.ZH_CN, CliLanguageResolver.EN_US);
     }
 
     /// <summary><c>--format text|json</c>。</summary>
@@ -66,6 +78,9 @@ internal sealed class GlobalOptionSet
     /// <summary><c>--log-file &lt;path&gt;</c>。</summary>
     internal Option<string> LogFile { get; }
 
+    /// <summary><c>--language zh-CN|en-US</c>。</summary>
+    internal Option<string> Language { get; }
+
     /// <summary>把全部全局选项挂到根命令（递归下发到子命令）。</summary>
     /// <param name="root">根命令。</param>
     /// <exception cref="ArgumentNullException"><paramref name="root"/> 为 <see langword="null"/>。</exception>
@@ -78,6 +93,7 @@ internal sealed class GlobalOptionSet
         root.Options.Add(Verbose);
         root.Options.Add(Trace);
         root.Options.Add(LogFile);
+        root.Options.Add(Language);
     }
 
     /// <summary>读取全局选项取值；受限取值转换失败时返回 <see langword="null"/>（调用方按用法错误 7 处理）。</summary>

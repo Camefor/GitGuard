@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using GitGuard.Application.Hooks;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 using GitGuard.Core.Model;
 
@@ -21,14 +22,14 @@ internal static class UninstallCommand
 
         var forceOption = new Option<bool>("--force")
         {
-            Description = "仅当备份仍存在时，允许接管被手工替换的非托管目标并还原备份",
+            Description = runtime.Text.Get(CliTextKey.UninstallForceDescription),
         };
         var hookOption = new Option<string>("--hook")
         {
-            Description = "仅卸载指定 Hook：pre-commit 或 pre-push（默认全部）",
+            Description = runtime.Text.Get(CliTextKey.UninstallHookDescription),
         };
 
-        var command = new Command("uninstall", "卸载 GitGuard Hook 分发脚本并还原被包裹的原 Hook");
+        var command = new Command("uninstall", runtime.Text.Get(CliTextKey.UninstallDescription));
         command.Options.Add(forceOption);
         command.Options.Add(hookOption);
 
@@ -44,7 +45,7 @@ internal static class UninstallCommand
         Option<string> hookOption)
     {
         bool force = parseResult.GetValue(forceOption);
-        IReadOnlyList<HookType>? hooks = HookNames.Resolve(parseResult.GetValue(hookOption), out string? hookError);
+        IReadOnlyList<HookType>? hooks = HookNames.Resolve(parseResult.GetValue(hookOption), runtime.Text, out string? hookError);
         if (hookError is not null)
         {
             return UsageError.Report(runtime, hookError);
@@ -58,7 +59,7 @@ internal static class UninstallCommand
         runtime.Logger.Log(
             notInstalled ? CliLogLevel.Warning : CliLogLevel.Information,
             "Hook.Uninstall",
-            notInstalled ? "未发现 GitGuard 安装痕迹（未改动任何文件）" : "Hook 卸载完成",
+            runtime.Text.Get(notInstalled ? CliTextKey.LogHookNotInstalled : CliTextKey.LogHookUninstalled),
             new LogFields { RepoPath = report.RepoPath, ExitCode = exitCode, TraceId = runtime.TraceId });
         return exitCode;
     }

@@ -229,7 +229,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 编号 | 要求 | 验证方式 | v0.1 状态 |
 | --- | --- | --- | --- |
 | `NFR-U-001` | CLI 支持 `--no-color` 与 `--format json` | 单测 | 已实现（`--no-color` / `NO_COLOR` / 非 TTY 自动关闭；JSON 走 stdout） |
-| `NFR-U-002` | 终端输出默认中文（MVP）；允许 `GITGUARD_LANG=en` 切换英文 | 单测 | 未实现：v0.1 仅中文；顺延 `GGD-0014`（`--language` + `GITGUARD_LANG`） |
+| `NFR-U-002` | 终端输出默认中文（MVP）；允许 `--language zh-CN` / `en-US` 或 `GITGUARD_LANG` 切换英文（命令行优先） | 单测 | 已实现（`GGD-0014`）：环境变量接受 `zh` / `zh-CN` / `zh-Hans` / `en` / `en-US` / `en-GB`（大小写不敏感）；JSON 契约与日志字段名不本地化 |
 
 ### 5.6 可维护性与可观测性
 
@@ -302,3 +302,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.3 状态输出改为实际 Hook 分类与退出码 6；§2.4 / §2.8 测试用例编号按实际落地收敛；§2.5 `IEnumerable` 更正为 `IAsyncEnumerable` 并标注 21 条规则与装配顺序；§2.7 报告样例改为 v0.1 实际输出（无建议文案、文本 → stderr / JSON → stdout）；§2.9 / §2.10 / §2.11 / §2.13 标注白名单 CLI、绕过审计、全量扫描、Gitleaks 的未实现状态；§2.12 补充 `exclude` / 扫描类型开关 / `fail_closed` 仅解析告警；§4 `audit export` 标注未实现；§5 全部 NFR 表新增 v0.1 状态列（性能未测量、兼容矩阵部分、i18n 未实现等）；§8 追溯矩阵补齐 FR-031 / FR-032 / FR-041 / FR-042 / FR-061 / FR-080 / FR-100 并新增实现状态列 |
 | 0.1.5 | 2026-10-21 | GGD-0013：§2.10 按实现重写 FR-050（父提交 + 暂存树预测、`--record-pending` 隐藏选项、`GITGUARD_SKIP=1` 仅 Hook 模式、标记文件路径 / 原子写 / 失败语义、`NoVerify` / `GitGuardSkip` 判定、`Bypass` 运行与审计载荷、post-commit 退出码）；§5.3 NFR-S-004 标记已覆盖；§8 FR-050 追溯补齐测试类与 E2E S8；§9 Q-01 记录决议 |
 | 0.1.6 | 2026-10-21 | GGD-0019：§2.12 `exclude` 改为已消费语义（`paths` 匹配仓库相对路径、`files` 匹配任意深度文件名、命中不计入 `skipped_files`、空项 FailClosed）；§8 FR-070 追溯补 `TC-FR-070-05` 并标记已实现 |
+| 0.1.7 | 2026-10-21 | GGD-0014：§5.5 `NFR-U-002` 标记已实现（`--language` 优先于 `GITGUARD_LANG`，环境变量别名与 JSON / 日志不变约定） |

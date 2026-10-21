@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using GitGuard.Cli.Localization;
 
 namespace GitGuard.Cli.Logging;
 
@@ -13,20 +14,25 @@ internal sealed class LogFileSink
     private readonly string _path;
     private readonly long _maxBytes;
     private readonly int _maxFiles;
+    private readonly CliText _text;
     private bool _disabled;
 
     /// <summary>初始化文件 Sink。</summary>
     /// <param name="path">日志文件绝对路径（<c>~</c> 已由调用方展开）。</param>
     /// <param name="maxBytes">单文件滚动阈值（字节）。</param>
     /// <param name="maxFiles">保留份数（含当前文件）；小于 1 时按 1 处理。</param>
+    /// <param name="text">降级提示文案表。</param>
     /// <exception cref="ArgumentException"><paramref name="path"/> 为空或全空白。</exception>
-    internal LogFileSink(string path, long maxBytes, int maxFiles)
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> 为 <see langword="null"/>。</exception>
+    internal LogFileSink(string path, long maxBytes, int maxFiles, CliText text)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(text);
 
         _path = path;
         _maxBytes = maxBytes > 0 ? maxBytes : 10L * 1024 * 1024;
         _maxFiles = Math.Max(maxFiles, 1);
+        _text = text;
     }
 
     /// <summary>降级原因；未失败时为 <see langword="null"/>。</summary>
@@ -63,9 +69,7 @@ internal sealed class LogFileSink
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             _disabled = true;
-            FailureMessage = string.Create(
-                CultureInfo.InvariantCulture,
-                $"日志文件写入失败：{ex.Message}（已停用文件日志，本次运行仅输出终端日志）");
+            FailureMessage = _text.Format(CliTextKey.LogFileWriteFailed, ex.Message);
             return false;
         }
     }

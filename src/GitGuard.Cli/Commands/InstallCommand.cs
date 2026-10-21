@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using GitGuard.Application.Hooks;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 using GitGuard.Core.Model;
 
@@ -22,14 +23,14 @@ internal static class InstallCommand
 
         var forceOption = new Option<bool>("--force")
         {
-            Description = "接管二进制文件 / 符号链接形态的既有 Hook（普通文本脚本自动备份包裹，无需该开关）",
+            Description = runtime.Text.Get(CliTextKey.InstallForceDescription),
         };
         var hookOption = new Option<string>("--hook")
         {
-            Description = "仅安装指定 Hook：pre-commit 或 pre-push（默认全部）",
+            Description = runtime.Text.Get(CliTextKey.InstallHookDescription),
         };
 
-        var command = new Command("install", "安装 GitGuard Hook 分发脚本（pre-commit / pre-push）");
+        var command = new Command("install", runtime.Text.Get(CliTextKey.InstallDescription));
         command.Options.Add(forceOption);
         command.Options.Add(hookOption);
 
@@ -45,7 +46,7 @@ internal static class InstallCommand
         Option<string> hookOption)
     {
         bool force = parseResult.GetValue(forceOption);
-        IReadOnlyList<HookType>? hooks = HookNames.Resolve(parseResult.GetValue(hookOption), out string? hookError);
+        IReadOnlyList<HookType>? hooks = HookNames.Resolve(parseResult.GetValue(hookOption), runtime.Text, out string? hookError);
         if (hookError is not null)
         {
             return UsageError.Report(runtime, hookError);
@@ -58,7 +59,7 @@ internal static class InstallCommand
         runtime.Logger.Log(
             CliLogLevel.Information,
             "Hook.Install",
-            "Hook 安装完成",
+            runtime.Text.Get(CliTextKey.LogHookInstalled),
             new LogFields { RepoPath = report.RepoPath, ExitCode = ExitCodes.SUCCESS, TraceId = runtime.TraceId });
         return ExitCodes.SUCCESS;
     }

@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace GitGuard.Cli.Reporting;
 
@@ -22,9 +21,6 @@ internal sealed class VersionInfo
         GitFailureMessage = gitFailureMessage;
         FrameworkDescription = RuntimeInformation.FrameworkDescription;
         RuntimeIdentifier = RuntimeInformation.RuntimeIdentifier;
-        RuntimeDescription = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{FrameworkDescription}（{RuntimeIdentifier}）");
     }
 
     /// <summary>GitGuard 版本（SemVer）。</summary>
@@ -44,7 +40,4 @@ internal sealed class VersionInfo
 
     /// <summary>本进程的运行时标识符（如 <c>win-x64</c>；构造时快照）。</summary>
     internal string RuntimeIdentifier { get; }
-
-    /// <summary>终端展示用的一行运行时信息。</summary>
-    internal string RuntimeDescription { get; }
 }

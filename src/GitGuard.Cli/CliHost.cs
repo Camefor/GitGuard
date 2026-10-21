@@ -36,6 +36,9 @@ public sealed class CliHost
     /// <summary><c>GITGUARD_SKIP</c> 环境变量取值（<c>1</c> 表示 Hook 模式下显式跳过扫描，FR-050）；未设置为 <see langword="null"/>。</summary>
     public string? SkipEnvironment { get; init; }
 
+    /// <summary><c>GITGUARD_LANG</c> 环境变量取值（输出语言；命令行 <c>--language</c> 优先）；未设置为 <see langword="null"/>。</summary>
+    public string? LanguageEnvironment { get; init; }
+
     /// <summary>stderr 是否连接到终端（彩色输出的必要条件之一）；测试注入内存流时应保持 <see langword="false"/>。</summary>
     public bool IsErrorTerminal { get; init; }
 
@@ -63,6 +66,7 @@ public sealed class CliHost
         GitExecutable = "git",
         ExecutablePath = ResolveExecutablePath(),
         SkipEnvironment = Environment.GetEnvironmentVariable("GITGUARD_SKIP"),
+        LanguageEnvironment = Environment.GetEnvironmentVariable("GITGUARD_LANG"),
         IsErrorTerminal = !Console.IsErrorRedirected,
         NoColorEnvironment = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")),
     };

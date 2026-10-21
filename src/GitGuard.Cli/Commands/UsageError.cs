@@ -1,4 +1,5 @@
-﻿using GitGuard.Cli.Logging;
+﻿using GitGuard.Cli.Localization;
+using GitGuard.Cli.Logging;
 
 namespace GitGuard.Cli.Commands;
 
@@ -23,7 +24,7 @@ internal static class UsageError
         runtime.Logger.Log(
             CliLogLevel.Warning,
             "Cli",
-            string.Join("；", details),
+            string.Join(runtime.Text.Get(CliTextKey.ErrorJoinSeparator), details),
             new LogFields { ErrorCode = ExitCodeMapper.CLI_USAGE_ERROR, ExitCode = ExitCodes.USAGE_ERROR, TraceId = runtime.TraceId });
         return ExitCodes.USAGE_ERROR;
     }

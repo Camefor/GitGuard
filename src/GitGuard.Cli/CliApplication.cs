@@ -3,6 +3,7 @@ using System.Globalization;
 using GitGuard.Application.Composition;
 using GitGuard.Application.Configuration;
 using GitGuard.Cli.Commands;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 using GitGuard.Cli.Reporting;
 using GitGuard.Core;
@@ -28,30 +29,63 @@ public static class CliApplication
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(host);
 
+        // 语言必须在构建命令树与解析之前确定：帮助文本与框架解析错误在解析 / 调用期生成
+        CliLanguage language = CliLanguageResolver.Resolve(args, host.LanguageEnvironment);
+        var text = CliText.For(language);
+        var previousUICulture = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = language.ToCulture();
+        try
+        {
+            return await RunCoreAsync(args, host, text, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // 并行测试与宿主进程复用：恢复调用前的区域设置，避免跨调用泄漏
+            CultureInfo.CurrentUICulture = previousUICulture;
+        }
+    }
+
+    /// <summary>
+    /// 生成短追踪 ID（<c>XXXX-XXXX</c>）：取 UUIDv7 的随机尾段而非时间戳前缀，
+    /// 保证同一秒内多次运行的 ID 不重复（用户反馈与日志对齐用）。
+    /// </summary>
+    /// <returns>追踪 ID 字符串。</returns>
+    internal static string CreateTraceId()
+    {
+        string value = Guid.CreateVersion7().ToString("N");
+        return string.Create(CultureInfo.InvariantCulture, $"{value[^8..^4]}-{value[^4..]}");
+    }
+
+    private static async Task<int> RunCoreAsync(
+        string[] args,
+        CliHost host,
+        CliText text,
+        CancellationToken cancellationToken)
+    {
         string traceId = CreateTraceId();
-        var runtime = new CliRuntime(host, traceId);
-        var globalOptions = new GlobalOptionSet();
+        var runtime = new CliRuntime(host, traceId, text);
+        var globalOptions = new GlobalOptionSet(text);
         RootCommand root = CommandTree.Create(runtime, globalOptions);
 
         ParseResult parseResult = root.Parse(args);
         if (parseResult.Errors.Count > 0)
         {
-            return ReportUsageErrors(host, globalOptions, parseResult, traceId);
+            return ReportUsageErrors(host, text, globalOptions, parseResult, traceId);
         }
 
         GlobalOptionValues? options = globalOptions.Read(parseResult);
         if (options is null)
         {
-            return ReportUsageError(host, false, traceId, "命令行参数取值无效。");
+            return ReportUsageError(host, false, text, traceId, text.Get(CliTextKey.InvalidOptionValues));
         }
 
         if (options.Trace && !options.Verbose)
         {
-            return ReportUsageError(host, options.Json, traceId, "--trace 必须与 --verbose 同用（Trace 是 Debug 的进一步细化）。");
+            return ReportUsageError(host, options.Json, text, traceId, text.Get(CliTextKey.TraceRequiresVerbose));
         }
 
         bool color = host.IsErrorTerminal && !host.NoColorEnvironment && !options.NoColor;
-        var writer = new ReportWriter(host.Output, host.Error, options.Json, color);
+        var writer = new ReportWriter(host.Output, host.Error, options.Json, color, text);
         CliLogger logger = CreateLogger(runtime, options, color);
         runtime.Configure(writer, logger);
 
@@ -59,7 +93,7 @@ public static class CliApplication
         logger.Log(
             CliLogLevel.Debug,
             "Cli",
-            string.Create(CultureInfo.InvariantCulture, $"命令开始：{commandName}"),
+            text.Format(CliTextKey.LogCommandStarted, commandName),
             new LogFields { TraceId = traceId });
 
         var configuration = new InvocationConfiguration
@@ -79,19 +113,13 @@ public static class CliApplication
         }
     }
 
-    /// <summary>
-    /// 生成短追踪 ID（<c>XXXX-XXXX</c>）：取 UUIDv7 的随机尾段而非时间戳前缀，
-    /// 保证同一秒内多次运行的 ID 不重复（用户反馈与日志对齐用）。
-    /// </summary>
-    /// <returns>追踪 ID 字符串。</returns>
-    internal static string CreateTraceId()
-    {
-        string value = Guid.CreateVersion7().ToString("N");
-        return string.Create(CultureInfo.InvariantCulture, $"{value[^8..^4]}-{value[^4..]}");
-    }
-
     /// <summary>解析失败：输出全部解析错误与 <c>--help</c> 提示（退出码 7，不执行任何命令）。</summary>
-    private static int ReportUsageErrors(CliHost host, GlobalOptionSet globalOptions, ParseResult parseResult, string traceId)
+    private static int ReportUsageErrors(
+        CliHost host,
+        CliText text,
+        GlobalOptionSet globalOptions,
+        ParseResult parseResult,
+        string traceId)
     {
         var details = new List<string>(parseResult.Errors.Count);
         foreach (var error in parseResult.Errors)
@@ -101,15 +129,15 @@ public static class CliApplication
 
         // 尽力按 --format 分流：JSON 调用方也应拿到机器可读错误；--format 本身非法时回退文本
         bool json = string.Equals(globalOptions.TryGetFormat(parseResult), GlobalOptionSet.FORMAT_JSON, StringComparison.Ordinal);
-        var writer = new ReportWriter(host.Output, host.Error, json, color: false);
+        var writer = new ReportWriter(host.Output, host.Error, json, color: false, text);
         writer.WriteUsageError(details, traceId);
         return ExitCodes.USAGE_ERROR;
     }
 
-    private static int ReportUsageError(CliHost host, bool json, string traceId, params string[] details)
+    private static int ReportUsageError(CliHost host, bool json, CliText text, string traceId, string detail)
     {
-        var writer = new ReportWriter(host.Output, host.Error, json, color: false);
-        writer.WriteUsageError(details, traceId);
+        var writer = new ReportWriter(host.Output, host.Error, json, color: false, text);
+        writer.WriteUsageError(new[] { detail }, traceId);
         return ExitCodes.USAGE_ERROR;
     }
 
@@ -134,7 +162,7 @@ public static class CliApplication
                 runtime.Logger.Log(
                     CliLogLevel.Warning,
                     "Cli",
-                    string.Create(CultureInfo.InvariantCulture, $"已写入脱敏崩溃日志：{crashLogPath}"),
+                    runtime.Text.Format(CliTextKey.LogCrashLogWritten, crashLogPath),
                     new LogFields { TraceId = runtime.TraceId });
             }
         }
@@ -183,14 +211,15 @@ public static class CliApplication
             return new LogFileSink(
                 GitGuardSession.ExpandUserPath(commandLinePath),
                 LogFileSettings.Default.MaxBytes,
-                LogFileSettings.Default.MaxFiles);
+                LogFileSettings.Default.MaxFiles,
+                runtime.Text);
         }
 
         try
         {
             LogFileSettings settings = runtime.Session.Config.LogFile;
             return settings.Enabled
-                ? new LogFileSink(GitGuardSession.ExpandUserPath(settings.Path), settings.MaxBytes, settings.MaxFiles)
+                ? new LogFileSink(GitGuardSession.ExpandUserPath(settings.Path), settings.MaxBytes, settings.MaxFiles, runtime.Text)
                 : null;
         }
         catch (ConfigurationException)

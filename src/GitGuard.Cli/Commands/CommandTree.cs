@@ -1,4 +1,5 @@
 ﻿using System.CommandLine;
+using GitGuard.Cli.Localization;
 
 namespace GitGuard.Cli.Commands;
 
@@ -21,7 +22,7 @@ internal static class CommandTree
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(globalOptions);
 
-        var root = new RootCommand("GitGuard：本地 Git 密钥 / 隐私泄露检测（扫描暂存区与推送范围，安装仓库 Hook）");
+        var root = new RootCommand(runtime.Text.Get(CliTextKey.RootDescription));
         root.Subcommands.Add(HookCommand.Create(runtime));
         root.Subcommands.Add(ScanCommand.Create(runtime));
         root.Subcommands.Add(InstallCommand.Create(runtime));

@@ -5,6 +5,7 @@ using System.Text.Json;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Hooks;
 using GitGuard.Application.Scanning;
+using GitGuard.Cli.Localization;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
 
@@ -29,22 +30,26 @@ internal sealed class ReportWriter
     private readonly TextWriter _error;
     private readonly bool _json;
     private readonly bool _color;
+    private readonly CliText _text;
 
     /// <summary>初始化渲染器。</summary>
     /// <param name="output">标准输出（JSON 目标）。</param>
     /// <param name="error">标准错误（文本报告与错误提示目标）。</param>
     /// <param name="json">是否使用 <c>--format json</c>。</param>
     /// <param name="color">是否允许彩色输出。</param>
-    /// <exception cref="ArgumentNullException">任一流参数为 <see langword="null"/>。</exception>
-    internal ReportWriter(TextWriter output, TextWriter error, bool json, bool color)
+    /// <param name="text">文本报告文案表（JSON 输出不受影响）。</param>
+    /// <exception cref="ArgumentNullException">任一流参数或 <paramref name="text"/> 为 <see langword="null"/>。</exception>
+    internal ReportWriter(TextWriter output, TextWriter error, bool json, bool color, CliText text)
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(text);
 
         _output = output;
         _error = error;
         _json = json;
         _color = color;
+        _text = text;
     }
 
     /// <summary>渲染扫描结果（退出码语义由调用方按 <see cref="ScanOutcome.ExitCode"/> 返回）。</summary>
@@ -114,15 +119,15 @@ internal sealed class ReportWriter
         }
 
         WriteColored("⚠ ", ConsoleColor.Yellow);
-        _error.WriteLine("GitGuard 检测到绕过扫描的提交（已写入审计）");
+        _error.WriteLine(_text.Get(CliTextKey.BypassDetected));
         string reasonText = result.Reason == BypassReason.GitGuardSkip
-            ? "GITGUARD_SKIP=1（显式跳过扫描）"
-            : "--no-verify（未经过 pre-commit 扫描）";
-        WriteIndented("提交", result.CommitSha);
-        WriteIndented("原因", reasonText);
+            ? _text.Get(CliTextKey.BypassReasonSkip)
+            : _text.Get(CliTextKey.BypassReasonNoVerify);
+        WriteIndented(_text.Get(CliTextKey.LabelCommit), result.CommitSha);
+        WriteIndented(_text.Get(CliTextKey.LabelReason), reasonText);
         if (result.RunId is { } id)
         {
-            WriteIndented("运行", id.ToString());
+            WriteIndented(_text.Get(CliTextKey.LabelRun), id.ToString());
         }
     }
 
@@ -140,17 +145,19 @@ internal sealed class ReportWriter
         else
         {
             WriteColored("✔ ", ConsoleColor.Green);
-            _error.WriteLine("GitGuard Hook 安装完成");
-            WriteIndented("仓库", report.RepoPath);
-            WriteIndented("GitGuard", report.Version);
+            _error.WriteLine(_text.Get(CliTextKey.InstallHeader));
+            WriteIndented(_text.Get(CliTextKey.LabelRepo), report.RepoPath);
+            WriteIndented(_text.Get(CliTextKey.LabelGitGuard), report.Version);
             foreach (HookInstallResult result in report.Results)
             {
-                string line = string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"{result.HookType.ToHookName()}：{DispositionText(result.Disposition)} → {result.HookPath}");
+                string line = _text.Format(
+                    CliTextKey.HookLine,
+                    result.HookType.ToHookName(),
+                    DispositionText(result.Disposition, _text),
+                    result.HookPath);
                 if (result.BackupPath is { } backup)
                 {
-                    line += string.Create(CultureInfo.InvariantCulture, $"（原 Hook 已备份：{backup}）");
+                    line += _text.Format(CliTextKey.InstallBackupSuffix, backup);
                 }
 
                 WriteIndented(null, line);
@@ -175,23 +182,25 @@ internal sealed class ReportWriter
         if (notInstalled)
         {
             WriteColored("⚠ ", ConsoleColor.Yellow);
-            _error.WriteLine("未发现 GitGuard 安装痕迹（无需卸载）");
+            _error.WriteLine(_text.Get(CliTextKey.UninstallNotInstalledHeader));
         }
         else
         {
             WriteColored("✔ ", ConsoleColor.Green);
-            _error.WriteLine("GitGuard Hook 卸载完成");
+            _error.WriteLine(_text.Get(CliTextKey.UninstallHeader));
         }
 
-        WriteIndented("仓库", report.RepoPath);
+        WriteIndented(_text.Get(CliTextKey.LabelRepo), report.RepoPath);
         foreach (HookUninstallResult result in report.Results)
         {
-            string line = string.Create(
-                CultureInfo.InvariantCulture,
-                $"{result.HookType.ToHookName()}：{DispositionText(result.Disposition)} → {result.HookPath}");
+            string line = _text.Format(
+                CliTextKey.HookLine,
+                result.HookType.ToHookName(),
+                DispositionText(result.Disposition, _text),
+                result.HookPath);
             if (result.BackupPath is { } backup)
             {
-                line += string.Create(CultureInfo.InvariantCulture, $"（已还原原 Hook：{backup}）");
+                line += _text.Format(CliTextKey.UninstallRestoreSuffix, backup);
             }
 
             WriteIndented(null, line);
@@ -211,36 +220,39 @@ internal sealed class ReportWriter
             return;
         }
 
-        _error.WriteLine("GitGuard 状态");
-        WriteIndented("仓库", report.RepoPath);
-        WriteIndented("GitGuard 版本", report.GitGuardVersion);
-        WriteIndented("Git", report.GitVersion);
-        string hooksPath = report.ConfiguredHooksPath ?? string.Create(
-            CultureInfo.InvariantCulture,
-            $"未配置（使用 {report.HooksDirectory}）");
-        WriteIndented("core.hooksPath", hooksPath);
-        WriteIndented("hooks 目录", report.HooksDirectory);
+        _error.WriteLine(_text.Get(CliTextKey.StatusHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelRepo), report.RepoPath);
+        WriteIndented(_text.Get(CliTextKey.LabelGitGuardVersion), report.GitGuardVersion);
+        WriteIndented(_text.Get(CliTextKey.LabelGit), report.GitVersion);
+        string hooksPath = report.ConfiguredHooksPath ?? _text.Format(
+            CliTextKey.HooksPathNotConfigured,
+            report.HooksDirectory);
+        WriteIndented(_text.Get(CliTextKey.LabelHooksPath), hooksPath);
+        WriteIndented(_text.Get(CliTextKey.LabelHooksDirectory), report.HooksDirectory);
         foreach (HookStatus hook in report.Hooks)
         {
             string version = hook.ManagedVersion is null
                 ? string.Empty
-                : string.Create(CultureInfo.InvariantCulture, $"（v{hook.ManagedVersion}）");
+                : _text.Format(CliTextKey.ManagedVersionSuffix, hook.ManagedVersion);
             WriteIndented(
                 hook.HookType.ToHookName(),
-                string.Create(CultureInfo.InvariantCulture, $"{HookStateText(hook.Kind)}{version} → {hook.HookPath}"));
+                string.Create(CultureInfo.InvariantCulture, $"{HookStateText(hook.Kind, _text)}{version} → {hook.HookPath}"));
         }
 
-        WriteIndented("配置文件", report.ConfigFiles.Length == 0 ? "（内置默认）" : string.Join("、", report.ConfigFiles));
+        string configFilesText = report.ConfigFiles.Length == 0
+            ? _text.Get(CliTextKey.ConfigFilesBuiltin)
+            : string.Join(_text.Get(CliTextKey.ConfigFilesSeparator), report.ConfigFiles);
+        WriteIndented(_text.Get(CliTextKey.LabelConfigFiles), configFilesText);
         foreach (string warning in report.Warnings)
         {
-            WriteIndented("警告", warning);
+            WriteIndented(_text.Get(CliTextKey.LabelWarning), warning);
         }
 
         if (report.NeedsAttention)
         {
             WriteIndented(
-                "注意",
-                "存在未被 GitGuard 托管的 Hook；运行 gitguard install 接管（二进制 / 符号链接目标需 --force）");
+                _text.Get(CliTextKey.LabelAttention),
+                _text.Get(CliTextKey.StatusAttention));
         }
     }
 
@@ -258,12 +270,14 @@ internal sealed class ReportWriter
         }
 
         _error.WriteLine(string.Create(CultureInfo.InvariantCulture, $"gitguard {version.GitGuardVersion}"));
-        WriteIndented("规则库版本", version.RulesVersion.ToString(CultureInfo.InvariantCulture));
-        string gitLine = version.GitVersionLine ?? string.Create(
-            CultureInfo.InvariantCulture,
-            $"不可用（{MessageSanitizer.Sanitize(version.GitFailureMessage)}）");
-        WriteIndented("本机 git", gitLine);
-        WriteIndented("运行时", version.RuntimeDescription);
+        WriteIndented(_text.Get(CliTextKey.LabelRulesVersion), version.RulesVersion.ToString(CultureInfo.InvariantCulture));
+        string gitLine = version.GitVersionLine ?? _text.Format(
+            CliTextKey.GitUnavailable,
+            MessageSanitizer.Sanitize(version.GitFailureMessage));
+        WriteIndented(_text.Get(CliTextKey.LabelGitVersion), gitLine);
+        WriteIndented(
+            _text.Get(CliTextKey.LabelRuntime),
+            _text.Format(CliTextKey.RuntimeDescription, version.FrameworkDescription, version.RuntimeIdentifier));
     }
 
     /// <summary>渲染错误报告（文本 → stderr；JSON → stdout）。</summary>
@@ -284,10 +298,10 @@ internal sealed class ReportWriter
         }
 
         WriteColored("✖ ", ConsoleColor.Red);
-        _error.WriteLine(string.Create(CultureInfo.InvariantCulture, $"GitGuard 失败（exit_code={exitCode}）"));
-        WriteIndented("错误码", errorCode);
-        WriteIndented("原因", message);
-        WriteIndented("trace_id", traceId);
+        _error.WriteLine(_text.Format(CliTextKey.ErrorHeader, exitCode));
+        WriteIndented(_text.Get(CliTextKey.LabelErrorCode), errorCode);
+        WriteIndented(_text.Get(CliTextKey.LabelReason), message);
+        WriteIndented(_text.Get(CliTextKey.LabelTraceId), traceId);
     }
 
     /// <summary>渲染用法错误（退出码 7：未知命令 / 选项冲突 / 受限取值非法 / 参数组合非法）。</summary>
@@ -301,7 +315,9 @@ internal sealed class ReportWriter
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
 
         // 解析错误可能自带换行与缩进（框架的多行取值列表）：折成单行再输出
-        string message = string.Join("；", errors.Select(static error => MessageSanitizer.Sanitize(error).ReplaceLineEndings(" ")));
+        string message = string.Join(
+            _text.Get(CliTextKey.ErrorJoinSeparator),
+            errors.Select(static error => MessageSanitizer.Sanitize(error).ReplaceLineEndings(" ")));
         if (_json)
         {
             WriteErrorJson(ExitCodes.USAGE_ERROR, ExitCodeMapper.CLI_USAGE_ERROR, message, traceId);
@@ -309,10 +325,10 @@ internal sealed class ReportWriter
         }
 
         WriteColored("✖ ", ConsoleColor.Red);
-        _error.WriteLine("用法错误");
-        WriteIndented("原因", message);
-        WriteIndented("提示", "运行 gitguard --help 查看用法。");
-        WriteIndented("trace_id", traceId);
+        _error.WriteLine(_text.Get(CliTextKey.UsageErrorTitle));
+        WriteIndented(_text.Get(CliTextKey.LabelReason), message);
+        WriteIndented(_text.Get(CliTextKey.LabelHint), _text.Get(CliTextKey.UsageErrorHint));
+        WriteIndented(_text.Get(CliTextKey.LabelTraceId), traceId);
     }
 
     /// <summary>渲染提示行（文本模式；JSON 模式静默，避免污染 stdout 的机器可读输出）。</summary>
@@ -327,29 +343,29 @@ internal sealed class ReportWriter
         }
     }
 
-    private static string DispositionText(HookInstallDisposition disposition) => disposition switch
+    private static string DispositionText(HookInstallDisposition disposition, CliText text) => disposition switch
     {
-        HookInstallDisposition.Installed => "已安装",
-        HookInstallDisposition.Refreshed => "已刷新（版本更新）",
-        HookInstallDisposition.WrappedLegacy => "已接管（原 Hook 已备份）",
+        HookInstallDisposition.Installed => text.Get(CliTextKey.DispositionInstalled),
+        HookInstallDisposition.Refreshed => text.Get(CliTextKey.DispositionRefreshed),
+        HookInstallDisposition.WrappedLegacy => text.Get(CliTextKey.DispositionWrappedLegacy),
         _ => throw new ArgumentOutOfRangeException(nameof(disposition), disposition, "未知的安装处置"),
     };
 
-    private static string DispositionText(HookUninstallDisposition disposition) => disposition switch
+    private static string DispositionText(HookUninstallDisposition disposition, CliText text) => disposition switch
     {
-        HookUninstallDisposition.Removed => "已删除",
-        HookUninstallDisposition.RestoredLegacy => "已还原原 Hook",
-        HookUninstallDisposition.NotInstalled => "未安装（未改动）",
+        HookUninstallDisposition.Removed => text.Get(CliTextKey.DispositionRemoved),
+        HookUninstallDisposition.RestoredLegacy => text.Get(CliTextKey.DispositionRestoredLegacy),
+        HookUninstallDisposition.NotInstalled => text.Get(CliTextKey.DispositionNotInstalled),
         _ => throw new ArgumentOutOfRangeException(nameof(disposition), disposition, "未知的卸载处置"),
     };
 
-    private static string HookStateText(HookStatusKind kind) => kind switch
+    private static string HookStateText(HookStatusKind kind, CliText text) => kind switch
     {
-        HookStatusKind.Missing => "Missing（未安装）",
-        HookStatusKind.Managed => "Managed（GitGuard 托管）",
-        HookStatusKind.Legacy => "Legacy（非托管脚本）",
-        HookStatusKind.Binary => "Binary（二进制文件）",
-        HookStatusKind.SymbolicLink => "SymbolicLink（符号链接）",
+        HookStatusKind.Missing => text.Get(CliTextKey.HookStateMissing),
+        HookStatusKind.Managed => text.Get(CliTextKey.HookStateManaged),
+        HookStatusKind.Legacy => text.Get(CliTextKey.HookStateLegacy),
+        HookStatusKind.Binary => text.Get(CliTextKey.HookStateBinary),
+        HookStatusKind.SymbolicLink => text.Get(CliTextKey.HookStateSymbolicLink),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知的 Hook 状态"),
     };
 
@@ -381,13 +397,13 @@ internal sealed class ReportWriter
         _ => throw new ArgumentOutOfRangeException(nameof(result), result, "未知的扫描结果"),
     };
 
-    private static string FailureHint(int exitCode) => exitCode switch
+    private static string FailureHint(int exitCode, CliText text) => exitCode switch
     {
-        ExitCodes.GIT_COMMAND_FAILED => "Git 命令执行失败；可用 --verbose 查看日志排查 Git 环境。",
-        ExitCodes.DETECTOR_FAILED => "检测器异常；请查看日志，必要时在 .gitguard.yml 暂时禁用疑似规则。",
-        ExitCodes.SCAN_TIMEOUT => "扫描超时；可调整 .gitguard.yml 的 scan.timeout_ms。",
-        ExitCodes.CONFIG_INVALID => "配置无效；请检查 YAML 语法与 version 字段。",
-        _ => "扫描未能完成（FailClosed）；请查看日志。",
+        ExitCodes.GIT_COMMAND_FAILED => text.Get(CliTextKey.HintGitCommandFailed),
+        ExitCodes.DETECTOR_FAILED => text.Get(CliTextKey.HintDetectorFailed),
+        ExitCodes.SCAN_TIMEOUT => text.Get(CliTextKey.HintScanTimeout),
+        ExitCodes.CONFIG_INVALID => text.Get(CliTextKey.HintConfigInvalid),
+        _ => text.Get(CliTextKey.HintScanIncomplete),
     };
 
     private static void WriteFindingJson(
@@ -446,48 +462,53 @@ internal sealed class ReportWriter
         if (outcome.Result == ScanResult.Failed)
         {
             WriteColored("✖ ", ConsoleColor.Red);
-            _error.WriteLine(string.Create(CultureInfo.InvariantCulture, $"GitGuard 扫描失败（exit_code={outcome.ExitCode}）"));
+            _error.WriteLine(_text.Format(CliTextKey.ScanFailedHeader, outcome.ExitCode));
         }
         else if (outcome.Result == ScanResult.Blocked)
         {
             WriteColored("✖ ", ConsoleColor.Red);
-            _error.WriteLine(string.Create(CultureInfo.InvariantCulture, $"GitGuard 扫描被阻断（exit_code={outcome.ExitCode}）"));
+            _error.WriteLine(_text.Format(CliTextKey.ScanBlockedHeader, outcome.ExitCode));
         }
         else if (outcome.Result == ScanResult.Warned)
         {
             WriteColored("⚠ ", ConsoleColor.Yellow);
-            _error.WriteLine("GitGuard 扫描完成（存在警告）");
+            _error.WriteLine(_text.Get(CliTextKey.ScanWarnedHeader));
         }
         else
         {
             WriteColored("✔ ", ConsoleColor.Green);
-            _error.WriteLine("GitGuard 扫描完成");
+            _error.WriteLine(_text.Get(CliTextKey.ScanCleanHeader));
         }
 
-        string summary = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{result}（扫描 {outcome.FilesScanned} 个文件，发现 {outcome.Findings.Length} 项：阻断 {blocked} / 警告 {warned} / 白名单忽略 {ignored}）");
+        string summary = _text.Format(
+            CliTextKey.ScanSummary,
+            result,
+            outcome.FilesScanned,
+            outcome.Findings.Length,
+            blocked,
+            warned,
+            ignored);
         string durationText = outcome.Run.DurationMs is { } duration
             ? string.Create(CultureInfo.InvariantCulture, $"{duration} ms")
-            : "未知";
+            : _text.Get(CliTextKey.UnknownDuration);
 
-        WriteIndented("仓库", outcome.Run.RepoPath);
-        WriteIndented("类型", ScanTypeText(outcome.Run.ScanType));
-        WriteIndented("结果", summary);
-        WriteIndented("耗时", durationText);
+        WriteIndented(_text.Get(CliTextKey.LabelRepo), outcome.Run.RepoPath);
+        WriteIndented(_text.Get(CliTextKey.LabelType), ScanTypeText(outcome.Run.ScanType));
+        WriteIndented(_text.Get(CliTextKey.LabelResult), summary);
+        WriteIndented(_text.Get(CliTextKey.LabelDuration), durationText);
 
         if (outcome.Result == ScanResult.Failed)
         {
-            WriteIndented("提示", FailureHint(outcome.ExitCode));
+            WriteIndented(_text.Get(CliTextKey.LabelHint), FailureHint(outcome.ExitCode, _text));
         }
 
         if (!outcome.Findings.IsEmpty)
         {
-            WriteIndented("发现项", string.Empty);
+            WriteIndented(_text.Get(CliTextKey.LabelFindings), string.Empty);
             foreach (Finding finding in outcome.Findings)
             {
                 string action = outcome.Decisions.TryGetValue(finding, out PolicyDecision? decision)
-                    ? decision.IgnoredByAllowlist ? "Allow(白名单)" : decision.Action.ToString()
+                    ? decision.IgnoredByAllowlist ? _text.Get(CliTextKey.FindingAllowlisted) : decision.Action.ToString()
                     : "Allow";
                 string location = string.Create(
                     CultureInfo.InvariantCulture,
@@ -521,20 +542,18 @@ internal sealed class ReportWriter
             }
 
             WriteIndented(
-                "跳过",
-                string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"{outcome.SkippedFiles.Length} 个文件（二进制 {binary} / 超限 {tooLarge}）"));
+                _text.Get(CliTextKey.LabelSkipped),
+                _text.Format(CliTextKey.SkipSummary, outcome.SkippedFiles.Length, binary, tooLarge));
         }
 
         if (outcome.AuditWriteFailed)
         {
-            WriteIndented("警告", "审计写入失败（本次扫描结果仍然有效，降级为 AuditWriteFailed）");
+            WriteIndented(_text.Get(CliTextKey.LabelWarning), _text.Get(CliTextKey.AuditWriteFailed));
         }
 
         foreach (string warning in warnings)
         {
-            WriteIndented("警告", warning);
+            WriteIndented(_text.Get(CliTextKey.LabelWarning), warning);
         }
     }
 
@@ -800,7 +819,7 @@ internal sealed class ReportWriter
     {
         string text = label is null
             ? string.Create(CultureInfo.InvariantCulture, $"  {value}")
-            : string.Create(CultureInfo.InvariantCulture, $"  {label}：{value}");
+            : string.Concat("  ", label, _text.Get(CliTextKey.ValueSeparator), value);
         _error.WriteLine(text);
     }
 

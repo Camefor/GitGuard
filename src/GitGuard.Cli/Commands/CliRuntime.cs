@@ -1,4 +1,5 @@
 ﻿using GitGuard.Application.Composition;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 using GitGuard.Cli.Reporting;
 
@@ -17,15 +18,18 @@ internal sealed class CliRuntime
     /// <summary>初始化运行时上下文（不触碰配置、仓库与磁盘）。</summary>
     /// <param name="host">宿主缝合点。</param>
     /// <param name="traceId">本次调用的短追踪 ID。</param>
-    /// <exception cref="ArgumentNullException"><paramref name="host"/> 为 <see langword="null"/>。</exception>
+    /// <param name="text">本次调用的文案表。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="host"/> 或 <paramref name="text"/> 为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException"><paramref name="traceId"/> 为空或全空白。</exception>
-    internal CliRuntime(CliHost host, string traceId)
+    internal CliRuntime(CliHost host, string traceId, CliText text)
     {
         ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(text);
         ArgumentException.ThrowIfNullOrWhiteSpace(traceId);
 
         Host = host;
         TraceId = traceId;
+        Text = text;
         Session = new GitGuardSession(new GitGuardSessionOptions
         {
             WorkingDirectory = host.WorkingDirectory,
@@ -41,6 +45,9 @@ internal sealed class CliRuntime
 
     /// <summary>本次调用的短追踪 ID（错误报告与日志的 <c>trace_id</c>）。</summary>
     internal string TraceId { get; }
+
+    /// <summary>本次调用的文案表（语言由 <c>--language</c> / <c>GITGUARD_LANG</c> 决定）。</summary>
+    internal CliText Text { get; }
 
     /// <summary>组合根会话（各子系统惰性初始化；未使用的命令不付出其代价）。</summary>
     internal GitGuardSession Session { get; }

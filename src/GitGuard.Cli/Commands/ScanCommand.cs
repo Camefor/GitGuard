@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.CommandLine;
 using GitGuard.Application.Scanning;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 using GitGuard.Core;
 
@@ -24,19 +25,19 @@ internal static class ScanCommand
 
         var stagedOption = new Option<bool>("--staged")
         {
-            Description = "扫描暂存区（pre-commit 语义；Hook 与手动调用共用）",
+            Description = runtime.Text.Get(CliTextKey.ScanStagedDescription),
         };
         var pushOption = new Option<bool>("--push")
         {
-            Description = "扫描推送范围；从 stdin 读取 Git 推送信息行",
+            Description = runtime.Text.Get(CliTextKey.ScanPushDescription),
         };
         var recordPendingOption = new Option<bool>("--record-pending")
         {
-            Description = "（内部）Hook 模式：扫描通过后记录待提交预测，供 post-commit 绕过检测使用",
+            Description = runtime.Text.Get(CliTextKey.ScanRecordPendingDescription),
             Hidden = true,
         };
 
-        var command = new Command("scan", "扫描 Git 变更内容（合并后的 .gitguard.yml 策略与白名单生效）");
+        var command = new Command("scan", runtime.Text.Get(CliTextKey.ScanDescription));
         command.Options.Add(stagedOption);
         command.Options.Add(pushOption);
         command.Options.Add(recordPendingOption);
@@ -69,9 +70,9 @@ internal static class ScanCommand
         }
         catch (Exception ex) when (ex is GitException or IOException or UnauthorizedAccessException)
         {
-            return skipped is null
-                ? $"待提交标记清理失败（{ex.GetType().Name}）：后续提交可能被误判为绕过事件。"
-                : $"待提交标记写入失败（{ex.GetType().Name}）：post-commit 可能将本次提交登记为绕过事件。";
+            return runtime.Text.Format(
+                skipped is null ? CliTextKey.PendingClearFailed : CliTextKey.PendingWriteFailed,
+                ex.GetType().Name);
         }
     }
 
@@ -88,12 +89,12 @@ internal static class ScanCommand
         bool recordPending = parseResult.GetValue(recordPendingOption);
         if (staged == push)
         {
-            return UsageError.Report(runtime, "scan 必须且只能指定 --staged 或 --push 之一。");
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanScopeRequired));
         }
 
         if (recordPending && !staged)
         {
-            return UsageError.Report(runtime, "--record-pending 只能与 --staged 一起使用。");
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.RecordPendingRequiresStaged));
         }
 
         // FR-050：仅在 Hook 模式（--record-pending）识别 GITGUARD_SKIP=1，手动扫描不受环境变量影响
@@ -105,11 +106,11 @@ internal static class ScanCommand
                 runtime.Writer.WriteNotice(skipWarning);
             }
 
-            runtime.Writer.WriteNotice("GitGuard: GITGUARD_SKIP=1，已跳过暂存区扫描；本次提交将登记为绕过事件（DR-06）。");
+            runtime.Writer.WriteNotice(runtime.Text.Get(CliTextKey.NoticeSkip));
             runtime.Logger.Log(
                 CliLogLevel.Information,
                 "Scan.Skipped",
-                "已按 GITGUARD_SKIP=1 跳过扫描",
+                runtime.Text.Get(CliTextKey.LogScanSkipped),
                 new LogFields
                 {
                     ExitCode = ExitCodes.SUCCESS,
@@ -144,7 +145,7 @@ internal static class ScanCommand
         runtime.Logger.Log(
             CliLogLevel.Information,
             staged ? "Scan.Staged" : "Scan.Push",
-            "扫描完成",
+            runtime.Text.Get(CliTextKey.LogScanCompleted),
             new LogFields
             {
                 RunId = outcome.Run.Id.ToString(),

@@ -1,0 +1,296 @@
+﻿using System.Globalization;
+
+namespace GitGuard.Cli.Localization;
+
+/// <summary>
+/// CLI 中英文案表（SRS <c>NFR-U-002</c> / <c>模块设计/Cli.md</c> §7）。使用枚举键而非 .resx，
+/// 避免为自有文案引入反射式资源查找（AOT 友好）；框架内置帮助与解析错误由 <see cref="CultureInfo.CurrentUICulture"/> 切换。
+/// </summary>
+internal sealed class CliText
+{
+    private static readonly CliText CHINESE = new CliText(CliLanguage.Chinese);
+    private static readonly CliText ENGLISH = new CliText(CliLanguage.English);
+
+    private readonly CliLanguage _language;
+
+    private CliText(CliLanguage language) => _language = language;
+
+    /// <summary>取指定语言的文案表（每种语言共享同一实例）。</summary>
+    /// <param name="language">输出语言。</param>
+    /// <returns>文案表。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="language"/> 不是已登记取值。</exception>
+    internal static CliText For(CliLanguage language) => language switch
+    {
+        CliLanguage.Chinese => CHINESE,
+        CliLanguage.English => ENGLISH,
+        _ => throw new ArgumentOutOfRangeException(nameof(language), language, "未知的输出语言"),
+    };
+
+    /// <summary>取文案原文（含 <see cref="string.Format(string, object?)"/> 占位符）。</summary>
+    /// <param name="key">文案键。</param>
+    /// <returns>当前语言的文案。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="key"/> 不是已登记取值。</exception>
+    internal string Get(CliTextKey key) => _language switch
+    {
+        CliLanguage.Chinese => ChineseValue(key),
+        CliLanguage.English => EnglishValue(key),
+        _ => throw new ArgumentOutOfRangeException(nameof(key), key, "未知的输出语言"),
+    };
+
+    /// <summary>按当前语言格式化文案（数字与占位符使用固定区域，避免跟随系统区域漂移）。</summary>
+    /// <param name="key">文案键。</param>
+    /// <param name="arguments">占位符实参。</param>
+    /// <returns>格式化后的文案。</returns>
+    internal string Format(CliTextKey key, params object?[] arguments) =>
+        string.Format(CultureInfo.InvariantCulture, Get(key), arguments);
+
+    private static string ChineseValue(CliTextKey key) => key switch
+    {
+        CliTextKey.RootDescription => "GitGuard：本地 Git 密钥 / 隐私泄露检测（扫描暂存区与推送范围，安装仓库 Hook）",
+        CliTextKey.ScanDescription => "扫描 Git 变更内容（合并后的 .gitguard.yml 策略与白名单生效）",
+        CliTextKey.InstallDescription => "安装 GitGuard Hook 分发脚本（pre-commit / pre-push）",
+        CliTextKey.UninstallDescription => "卸载 GitGuard Hook 分发脚本并还原被包裹的原 Hook",
+        CliTextKey.StatusDescription => "查询当前仓库的 Hook 状态、Git 与配置信息",
+        CliTextKey.VersionDescription => "显示 GitGuard / 规则库 / 本机 git / 运行时版本信息",
+        CliTextKey.HookDescription => "Git Hook 内部入口（由 GitGuard 安装的分发脚本调用）",
+        CliTextKey.HookPostCommitDescription => "检测刚发生的提交是否绕过扫描（FR-050）",
+        CliTextKey.FormatOptionDescription => "输出格式：text 人类可读（默认，报告走 stderr）或 json 机器可读（走 stdout）",
+        CliTextKey.NoColorOptionDescription => "禁用彩色输出（stderr 非终端或已设置 NO_COLOR 时自动禁用）",
+        CliTextKey.VerboseOptionDescription => "日志级别降到 Debug（关键决策与 Git 调用）",
+        CliTextKey.TraceOptionDescription => "日志级别降到 Trace（逐行匹配细节；必须与 --verbose 同用）",
+        CliTextKey.LogFileOptionDescription => "启用文件日志并写入指定路径（JSON-lines；~ 展开为用户主目录）",
+        CliTextKey.LanguageOptionDescription => "输出语言：zh-CN（默认）或 en-US；等价环境变量 GITGUARD_LANG",
+        CliTextKey.ScanStagedDescription => "扫描暂存区（pre-commit 语义；Hook 与手动调用共用）",
+        CliTextKey.ScanPushDescription => "扫描推送范围；从 stdin 读取 Git 推送信息行",
+        CliTextKey.ScanRecordPendingDescription => "（内部）Hook 模式：扫描通过后记录待提交预测，供 post-commit 绕过检测使用",
+        CliTextKey.InstallForceDescription => "接管二进制文件 / 符号链接形态的既有 Hook（普通文本脚本自动备份包裹，无需该开关）",
+        CliTextKey.InstallHookDescription => "仅安装指定 Hook：pre-commit 或 pre-push（默认全部）",
+        CliTextKey.UninstallForceDescription => "仅当备份仍存在时，允许接管被手工替换的非托管目标并还原备份",
+        CliTextKey.UninstallHookDescription => "仅卸载指定 Hook：pre-commit 或 pre-push（默认全部）",
+
+        CliTextKey.LabelRepo => "仓库",
+        CliTextKey.LabelType => "类型",
+        CliTextKey.LabelResult => "结果",
+        CliTextKey.LabelDuration => "耗时",
+        CliTextKey.LabelFindings => "发现项",
+        CliTextKey.LabelSkipped => "跳过",
+        CliTextKey.LabelWarning => "警告",
+        CliTextKey.LabelHint => "提示",
+        CliTextKey.LabelAttention => "注意",
+        CliTextKey.LabelConfigFiles => "配置文件",
+        CliTextKey.LabelCommit => "提交",
+        CliTextKey.LabelReason => "原因",
+        CliTextKey.LabelRun => "运行",
+        CliTextKey.LabelErrorCode => "错误码",
+        CliTextKey.LabelTraceId => "trace_id",
+        CliTextKey.LabelGitGuardVersion => "GitGuard 版本",
+        CliTextKey.LabelRulesVersion => "规则库版本",
+        CliTextKey.LabelGitVersion => "本机 git",
+        CliTextKey.LabelRuntime => "运行时",
+        CliTextKey.LabelHooksDirectory => "hooks 目录",
+        CliTextKey.LabelGit => "Git",
+        CliTextKey.LabelHooksPath => "core.hooksPath",
+        CliTextKey.LabelGitGuard => "GitGuard",
+        CliTextKey.ValueSeparator => "：",
+
+        CliTextKey.UsageErrorTitle => "用法错误",
+        CliTextKey.UsageErrorHint => "运行 gitguard --help 查看用法。",
+        CliTextKey.InvalidOptionValues => "命令行参数取值无效。",
+        CliTextKey.TraceRequiresVerbose => "--trace 必须与 --verbose 同用（Trace 是 Debug 的进一步细化）。",
+        CliTextKey.ScanScopeRequired => "scan 必须且只能指定 --staged 或 --push 之一。",
+        CliTextKey.RecordPendingRequiresStaged => "--record-pending 只能与 --staged 一起使用。",
+        CliTextKey.UnknownHook => "未知的 --hook 取值：{0}（可用：pre-commit、pre-push、post-commit）。",
+        CliTextKey.ErrorJoinSeparator => "；",
+
+        CliTextKey.ScanFailedHeader => "GitGuard 扫描失败（exit_code={0}）",
+        CliTextKey.ScanBlockedHeader => "GitGuard 扫描被阻断（exit_code={0}）",
+        CliTextKey.ScanWarnedHeader => "GitGuard 扫描完成（存在警告）",
+        CliTextKey.ScanCleanHeader => "GitGuard 扫描完成",
+        CliTextKey.ScanSummary => "{0}（扫描 {1} 个文件，发现 {2} 项：阻断 {3} / 警告 {4} / 白名单忽略 {5}）",
+        CliTextKey.UnknownDuration => "未知",
+        CliTextKey.SkipSummary => "{0} 个文件（二进制 {1} / 超限 {2}）",
+        CliTextKey.AuditWriteFailed => "审计写入失败（本次扫描结果仍然有效，降级为 AuditWriteFailed）",
+        CliTextKey.FindingAllowlisted => "Allow(白名单)",
+        CliTextKey.HintGitCommandFailed => "Git 命令执行失败；可用 --verbose 查看日志排查 Git 环境。",
+        CliTextKey.HintDetectorFailed => "检测器异常；请查看日志，必要时在 .gitguard.yml 暂时禁用疑似规则。",
+        CliTextKey.HintScanTimeout => "扫描超时；可调整 .gitguard.yml 的 scan.timeout_ms。",
+        CliTextKey.HintConfigInvalid => "配置无效；请检查 YAML 语法与 version 字段。",
+        CliTextKey.HintScanIncomplete => "扫描未能完成（FailClosed）；请查看日志。",
+
+        CliTextKey.BypassDetected => "GitGuard 检测到绕过扫描的提交（已写入审计）",
+        CliTextKey.BypassReasonSkip => "GITGUARD_SKIP=1（显式跳过扫描）",
+        CliTextKey.BypassReasonNoVerify => "--no-verify（未经过 pre-commit 扫描）",
+
+        CliTextKey.InstallHeader => "GitGuard Hook 安装完成",
+        CliTextKey.InstallBackupSuffix => "（原 Hook 已备份：{0}）",
+        CliTextKey.UninstallHeader => "GitGuard Hook 卸载完成",
+        CliTextKey.UninstallNotInstalledHeader => "未发现 GitGuard 安装痕迹（无需卸载）",
+        CliTextKey.UninstallRestoreSuffix => "（已还原原 Hook：{0}）",
+        CliTextKey.HookLine => "{0}：{1} → {2}",
+        CliTextKey.DispositionInstalled => "已安装",
+        CliTextKey.DispositionRefreshed => "已刷新（版本更新）",
+        CliTextKey.DispositionWrappedLegacy => "已接管（原 Hook 已备份）",
+        CliTextKey.DispositionRemoved => "已删除",
+        CliTextKey.DispositionRestoredLegacy => "已还原原 Hook",
+        CliTextKey.DispositionNotInstalled => "未安装（未改动）",
+
+        CliTextKey.StatusHeader => "GitGuard 状态",
+        CliTextKey.HooksPathNotConfigured => "未配置（使用 {0}）",
+        CliTextKey.ManagedVersionSuffix => "（v{0}）",
+        CliTextKey.ConfigFilesBuiltin => "（内置默认）",
+        CliTextKey.ConfigFilesSeparator => "、",
+        CliTextKey.StatusAttention => "存在未被 GitGuard 托管的 Hook；运行 gitguard install 接管（二进制 / 符号链接目标需 --force）",
+        CliTextKey.HookStateMissing => "Missing（未安装）",
+        CliTextKey.HookStateManaged => "Managed（GitGuard 托管）",
+        CliTextKey.HookStateLegacy => "Legacy（非托管脚本）",
+        CliTextKey.HookStateBinary => "Binary（二进制文件）",
+        CliTextKey.HookStateSymbolicLink => "SymbolicLink（符号链接）",
+
+        CliTextKey.GitUnavailable => "不可用（{0}）",
+        CliTextKey.RuntimeDescription => "{0}（{1}）",
+        CliTextKey.ErrorHeader => "GitGuard 失败（exit_code={0}）",
+
+        CliTextKey.LogCommandStarted => "命令开始：{0}",
+        CliTextKey.LogScanSkipped => "已按 GITGUARD_SKIP=1 跳过扫描",
+        CliTextKey.LogScanCompleted => "扫描完成",
+        CliTextKey.LogHookInstalled => "Hook 安装完成",
+        CliTextKey.LogHookUninstalled => "Hook 卸载完成",
+        CliTextKey.LogHookNotInstalled => "未发现 GitGuard 安装痕迹（未改动任何文件）",
+        CliTextKey.LogStatusChecked => "状态查询完成",
+        CliTextKey.LogVersionReported => "版本信息已输出",
+        CliTextKey.LogBypassDetected => "检测到绕过扫描的提交",
+        CliTextKey.LogBypassChecked => "提交已通过绕过检测",
+        CliTextKey.LogCrashLogWritten => "已写入脱敏崩溃日志：{0}",
+        CliTextKey.LogFileWriteFailed => "日志文件写入失败：{0}（已停用文件日志，本次运行仅输出终端日志）",
+
+        CliTextKey.NoticeSkip => "GitGuard: GITGUARD_SKIP=1，已跳过暂存区扫描；本次提交将登记为绕过事件（DR-06）。",
+        CliTextKey.PendingClearFailed => "待提交标记清理失败（{0}）：后续提交可能被误判为绕过事件。",
+        CliTextKey.PendingWriteFailed => "待提交标记写入失败（{0}）：post-commit 可能将本次提交登记为绕过事件。",
+        _ => throw new ArgumentOutOfRangeException(nameof(key), key, "未登记的文案键"),
+    };
+
+    private static string EnglishValue(CliTextKey key) => key switch
+    {
+        CliTextKey.RootDescription => "GitGuard: local Git secret / privacy leak detection (scans staged changes and push ranges, installs repository hooks)",
+        CliTextKey.ScanDescription => "Scan Git changes (merged .gitguard.yml policies and allowlist apply)",
+        CliTextKey.InstallDescription => "Install GitGuard hook dispatcher scripts (pre-commit / pre-push)",
+        CliTextKey.UninstallDescription => "Uninstall GitGuard hook dispatcher scripts and restore wrapped hooks",
+        CliTextKey.StatusDescription => "Show hook status, Git and configuration information for the current repository",
+        CliTextKey.VersionDescription => "Show GitGuard, rules, local git and runtime version information",
+        CliTextKey.HookDescription => "Internal Git hook entry point (called by GitGuard-installed dispatcher scripts)",
+        CliTextKey.HookPostCommitDescription => "Detect whether the latest commit bypassed scanning (FR-050)",
+        CliTextKey.FormatOptionDescription => "Output format: text for humans (default, reports go to stderr) or json for machines (goes to stdout)",
+        CliTextKey.NoColorOptionDescription => "Disable colored output (disabled automatically when stderr is not a terminal or NO_COLOR is set)",
+        CliTextKey.VerboseOptionDescription => "Lower the log level to Debug (key decisions and Git invocations)",
+        CliTextKey.TraceOptionDescription => "Lower the log level to Trace (line-by-line matching details; requires --verbose)",
+        CliTextKey.LogFileOptionDescription => "Enable file logging and write to the given path (JSON lines; ~ expands to the user home directory)",
+        CliTextKey.LanguageOptionDescription => "Output language: zh-CN (default) or en-US; equivalent environment variable GITGUARD_LANG",
+        CliTextKey.ScanStagedDescription => "Scan the staging area (pre-commit semantics; shared by hooks and manual invocations)",
+        CliTextKey.ScanPushDescription => "Scan the push range; reads Git push information lines from stdin",
+        CliTextKey.ScanRecordPendingDescription => "(internal) Hook mode: record the pending-commit prediction after a passing scan for post-commit bypass detection",
+        CliTextKey.InstallForceDescription => "Take over existing hooks that are binary files or symbolic links (plain text scripts are backed up and wrapped automatically; no flag needed)",
+        CliTextKey.InstallHookDescription => "Install only the specified hook: pre-commit or pre-push (default: all)",
+        CliTextKey.UninstallForceDescription => "Allow taking over manually replaced unmanaged targets and restoring the backup, only when the backup still exists",
+        CliTextKey.UninstallHookDescription => "Uninstall only the specified hook: pre-commit or pre-push (default: all)",
+
+        CliTextKey.LabelRepo => "Repository",
+        CliTextKey.LabelType => "Type",
+        CliTextKey.LabelResult => "Result",
+        CliTextKey.LabelDuration => "Duration",
+        CliTextKey.LabelFindings => "Findings",
+        CliTextKey.LabelSkipped => "Skipped",
+        CliTextKey.LabelWarning => "Warning",
+        CliTextKey.LabelHint => "Hint",
+        CliTextKey.LabelAttention => "Attention",
+        CliTextKey.LabelConfigFiles => "Config files",
+        CliTextKey.LabelCommit => "Commit",
+        CliTextKey.LabelReason => "Reason",
+        CliTextKey.LabelRun => "Run",
+        CliTextKey.LabelErrorCode => "Error code",
+        CliTextKey.LabelTraceId => "trace_id",
+        CliTextKey.LabelGitGuardVersion => "GitGuard version",
+        CliTextKey.LabelRulesVersion => "Rules version",
+        CliTextKey.LabelGitVersion => "Local git",
+        CliTextKey.LabelRuntime => "Runtime",
+        CliTextKey.LabelHooksDirectory => "hooks directory",
+        CliTextKey.LabelGit => "Git",
+        CliTextKey.LabelHooksPath => "core.hooksPath",
+        CliTextKey.LabelGitGuard => "GitGuard",
+        CliTextKey.ValueSeparator => ": ",
+
+        CliTextKey.UsageErrorTitle => "Usage error",
+        CliTextKey.UsageErrorHint => "Run gitguard --help for usage.",
+        CliTextKey.InvalidOptionValues => "Invalid command-line option value.",
+        CliTextKey.TraceRequiresVerbose => "--trace must be used with --verbose (Trace further refines Debug).",
+        CliTextKey.ScanScopeRequired => "scan requires exactly one of --staged or --push.",
+        CliTextKey.RecordPendingRequiresStaged => "--record-pending can only be used with --staged.",
+        CliTextKey.UnknownHook => "Unknown --hook value: {0} (available: pre-commit, pre-push, post-commit).",
+        CliTextKey.ErrorJoinSeparator => "; ",
+
+        CliTextKey.ScanFailedHeader => "GitGuard scan failed (exit_code={0})",
+        CliTextKey.ScanBlockedHeader => "GitGuard scan blocked (exit_code={0})",
+        CliTextKey.ScanWarnedHeader => "GitGuard scan completed with warnings",
+        CliTextKey.ScanCleanHeader => "GitGuard scan completed",
+        CliTextKey.ScanSummary => "{0} (scanned {1} files, {2} findings: blocked {3} / warned {4} / allowlisted {5})",
+        CliTextKey.UnknownDuration => "unknown",
+        CliTextKey.SkipSummary => "{0} files (binary {1} / too large {2})",
+        CliTextKey.AuditWriteFailed => "Audit write failed (this scan result remains valid; degraded to AuditWriteFailed)",
+        CliTextKey.FindingAllowlisted => "Allow(allowlist)",
+        CliTextKey.HintGitCommandFailed => "Git command failed; use --verbose to inspect logs and troubleshoot the Git environment.",
+        CliTextKey.HintDetectorFailed => "Detector error; check the logs and temporarily disable the suspect rule in .gitguard.yml if needed.",
+        CliTextKey.HintScanTimeout => "Scan timed out; adjust scan.timeout_ms in .gitguard.yml.",
+        CliTextKey.HintConfigInvalid => "Invalid configuration; check the YAML syntax and the version field.",
+        CliTextKey.HintScanIncomplete => "Scan could not complete (fail-closed); check the logs.",
+
+        CliTextKey.BypassDetected => "GitGuard detected a commit that bypassed scanning (recorded in audit)",
+        CliTextKey.BypassReasonSkip => "GITGUARD_SKIP=1 (scan explicitly skipped)",
+        CliTextKey.BypassReasonNoVerify => "--no-verify (pre-commit scan not run)",
+
+        CliTextKey.InstallHeader => "GitGuard hook installation completed",
+        CliTextKey.InstallBackupSuffix => " (original hook backed up: {0})",
+        CliTextKey.UninstallHeader => "GitGuard hook uninstall completed",
+        CliTextKey.UninstallNotInstalledHeader => "No GitGuard installation found (nothing to uninstall)",
+        CliTextKey.UninstallRestoreSuffix => " (original hook restored: {0})",
+        CliTextKey.HookLine => "{0}: {1} → {2}",
+        CliTextKey.DispositionInstalled => "installed",
+        CliTextKey.DispositionRefreshed => "refreshed (version update)",
+        CliTextKey.DispositionWrappedLegacy => "taken over (original hook backed up)",
+        CliTextKey.DispositionRemoved => "removed",
+        CliTextKey.DispositionRestoredLegacy => "original hook restored",
+        CliTextKey.DispositionNotInstalled => "not installed (unchanged)",
+
+        CliTextKey.StatusHeader => "GitGuard status",
+        CliTextKey.HooksPathNotConfigured => "not configured (using {0})",
+        CliTextKey.ManagedVersionSuffix => " (v{0})",
+        CliTextKey.ConfigFilesBuiltin => "(built-in defaults)",
+        CliTextKey.ConfigFilesSeparator => ", ",
+        CliTextKey.StatusAttention => "Some hooks are not managed by GitGuard; run gitguard install to take over (binary / symbolic-link targets require --force)",
+        CliTextKey.HookStateMissing => "Missing (not installed)",
+        CliTextKey.HookStateManaged => "Managed (by GitGuard)",
+        CliTextKey.HookStateLegacy => "Legacy (unmanaged script)",
+        CliTextKey.HookStateBinary => "Binary (binary file)",
+        CliTextKey.HookStateSymbolicLink => "SymbolicLink (symbolic link)",
+
+        CliTextKey.GitUnavailable => "unavailable ({0})",
+        CliTextKey.RuntimeDescription => "{0} ({1})",
+        CliTextKey.ErrorHeader => "GitGuard failed (exit_code={0})",
+
+        CliTextKey.LogCommandStarted => "Command started: {0}",
+        CliTextKey.LogScanSkipped => "Scan skipped because GITGUARD_SKIP=1",
+        CliTextKey.LogScanCompleted => "Scan completed",
+        CliTextKey.LogHookInstalled => "Hook installation completed",
+        CliTextKey.LogHookUninstalled => "Hook uninstall completed",
+        CliTextKey.LogHookNotInstalled => "No GitGuard installation found (no files changed)",
+        CliTextKey.LogStatusChecked => "Status query completed",
+        CliTextKey.LogVersionReported => "Version information emitted",
+        CliTextKey.LogBypassDetected => "Bypass commit detected",
+        CliTextKey.LogBypassChecked => "Commit passed bypass detection",
+        CliTextKey.LogCrashLogWritten => "Sanitized crash log written: {0}",
+        CliTextKey.LogFileWriteFailed => "Failed to write log file: {0} (file logging disabled; only terminal logs for this run)",
+
+        CliTextKey.NoticeSkip => "GitGuard: GITGUARD_SKIP=1, staging-area scan skipped; this commit will be recorded as a bypass event (DR-06).",
+        CliTextKey.PendingClearFailed => "Failed to clear the pending-commit marker ({0}): subsequent commits may be misidentified as bypass events.",
+        CliTextKey.PendingWriteFailed => "Failed to write the pending-commit marker ({0}): post-commit may record this commit as a bypass event.",
+        _ => throw new ArgumentOutOfRangeException(nameof(key), key, "未登记的文案键"),
+    };
+}

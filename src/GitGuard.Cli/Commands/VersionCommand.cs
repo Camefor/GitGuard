@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using GitGuard.Application.Composition;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 using GitGuard.Cli.Reporting;
 
@@ -19,7 +20,7 @@ internal static class VersionCommand
     {
         ArgumentNullException.ThrowIfNull(runtime);
 
-        var command = new Command("version", "显示 GitGuard / 规则库 / 本机 git / 运行时版本信息");
+        var command = new Command("version", runtime.Text.Get(CliTextKey.VersionDescription));
 
         Func<ParseResult, int> action = _ => Execute(runtime);
         command.SetAction(action);
@@ -38,7 +39,7 @@ internal static class VersionCommand
         runtime.Logger.Log(
             CliLogLevel.Debug,
             "Cli.Version",
-            "版本信息已输出",
+            runtime.Text.Get(CliTextKey.LogVersionReported),
             new LogFields { ExitCode = ExitCodes.SUCCESS, TraceId = runtime.TraceId });
         return ExitCodes.SUCCESS;
     }

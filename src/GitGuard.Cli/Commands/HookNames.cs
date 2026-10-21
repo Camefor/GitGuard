@@ -1,4 +1,5 @@
-﻿using GitGuard.Core.Model;
+﻿using GitGuard.Cli.Localization;
+using GitGuard.Core.Model;
 
 namespace GitGuard.Cli.Commands;
 
@@ -10,10 +11,14 @@ internal static class HookNames
 {
     /// <summary>解析 <c>--hook</c> 取值。</summary>
     /// <param name="name">选项取值；<see langword="null"/> 表示未指定（交由用例取默认集合）。</param>
+    /// <param name="text">错误文案表。</param>
     /// <param name="error">失败原因；成功时为 <see langword="null"/>。</param>
     /// <returns>待安装 / 卸载的 Hook 列表；未指定时为 <see langword="null"/>。</returns>
-    internal static IReadOnlyList<HookType>? Resolve(string? name, out string? error)
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> 为 <see langword="null"/>。</exception>
+    internal static IReadOnlyList<HookType>? Resolve(string? name, CliText text, out string? error)
     {
+        ArgumentNullException.ThrowIfNull(text);
+
         error = null;
         if (name is null)
         {
@@ -36,7 +41,7 @@ internal static class HookNames
             return new[] { HookType.PostCommit };
         }
 
-        error = $"未知的 --hook 取值：{name}（可用：pre-commit、pre-push、post-commit）。";
+        error = text.Format(CliTextKey.UnknownHook, name);
         return null;
     }
 }

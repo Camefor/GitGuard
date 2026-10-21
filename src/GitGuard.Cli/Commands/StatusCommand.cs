@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using GitGuard.Application.Hooks;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 
 namespace GitGuard.Cli.Commands;
@@ -18,7 +19,7 @@ internal static class StatusCommand
     {
         ArgumentNullException.ThrowIfNull(runtime);
 
-        var command = new Command("status", "查询当前仓库的 Hook 状态、Git 与配置信息");
+        var command = new Command("status", runtime.Text.Get(CliTextKey.StatusDescription));
 
         Func<ParseResult, int> action = _ => Execute(runtime);
         command.SetAction(action);
@@ -34,7 +35,7 @@ internal static class StatusCommand
         runtime.Logger.Log(
             CliLogLevel.Debug,
             "Hook.Status",
-            "状态查询完成",
+            runtime.Text.Get(CliTextKey.LogStatusChecked),
             new LogFields { RepoPath = report.RepoPath, ExitCode = exitCode, TraceId = runtime.TraceId });
         return exitCode;
     }

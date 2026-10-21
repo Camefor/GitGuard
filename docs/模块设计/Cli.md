@@ -15,7 +15,7 @@
 | 来源 | 内容 |
 | --- | --- |
 | 命令行参数 | `gitguard <command> [options]` |
-| 环境变量 | `GITGUARD_SKIP`（已实现：仅 `scan --staged --record-pending` Hook 模式识别，`GGD-0013`）、`GITGUARD_LANG`（i18n，归 `GGD-0014`）、`NO_COLOR`（已实现） |
+| 环境变量 | `GITGUARD_SKIP`（已实现：仅 `scan --staged --record-pending` Hook 模式识别，`GGD-0013`）、`GITGUARD_LANG`（已实现：`GGD-0014`，`--language` 优先）、`NO_COLOR`（已实现） |
 | stdin（仅 `scan --push`） | Git push 信息行 |
 | 配置文件 | 由 Policy 模块加载 |
 
@@ -117,7 +117,9 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | `--verbose` | bool | false | 日志级别到 Debug |
 | `--trace` | bool | false | 日志级别到 Trace（必须与 `--verbose` 同用，否则退出码 7） |
 | `--log-file` | path? | null | 启用文件日志（JSON-lines，`~` 展开为用户主目录） |
-| `--language` | string? | 环境或中文 | 覆盖输出语言（**v0.2**，归 `GGD-0014`；本版本未注册，传入将得到退出码 7） |
+| `--language` | enum `zh-CN\|en-US` | 环境或中文 | 覆盖输出语言（`GGD-0014`）；取值经 `AcceptOnlyFromAmong` 在解析期校验；未指定时读 `GITGUARD_LANG`，均无效时回退中文 |
+
+语言边界（`GGD-0014`）：命令描述、帮助、文本报告、用法错误与 CLI 日志文案随语言切换；JSON 字段名与取值、日志字段名保持英文；Application / Core 层异常消息与崩溃日志文本不在本期本地化范围（英文模式下部分失败原因仍为中文）。文案表为 `Localization/CliText.cs`（枚举键、AOT 友好）；框架帮助与解析错误经 `CurrentUICulture` 使用 `System.CommandLine` 内置资源。
 
 ## 8. 质量属性
 
@@ -135,13 +137,14 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 - [x] 全局 catch 不会吞 ExitCode。
 - [x] 用法错误不落盘：退出码 7 时不创建审计库 / 不写 Hook 文件。
 - [x] 绕过检测命令链（GGD-0013）：`--record-pending` 标记写入 / 清理 / 阻断清理、`GITGUARD_SKIP=1` 仅 Hook 模式生效、`hook post-commit` 的 `gitguard.bypass.v1` 字段与恒 0 退出码（`CliBypassTests`）。
+- [x] 输出语言（GGD-0014）：默认中文、`--language en-US`（子命令前后 / `=` 形式）、`GITGUARD_LANG=en`、命令行覆盖环境变量、非法取值回退、英文帮助与用法错误、JSON 契约不变（`CliLocalizationTests`）。
 - [ ] `--help` 覆盖所有命令（随 Shell 补全一并补测）。
 
 ## 10. 演进与扩展位
 
 - 新增命令：新建 `Commands/*Command.cs` 并在 `CommandTree` 登记；禁止在 `Program.cs` 内写具体业务。
 - Shell 自动补全：P2 启用 `System.CommandLine` 的 shell completion（`bash`、`pwsh`、`zsh`）。
-- 国际化：目前只做中英（`GGD-0014`）；更多语言靠社区贡献。
+- 国际化：目前只做中英（`GGD-0014` 已实现，文案表见 `Localization/CliText.cs`）；更多语言靠社区贡献。
 
 ## 11. 变更记录
 
@@ -150,3 +153,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | 0.1.0 | 2026-10-15 | 初始化：命令解析入口 + 全局异常映射 + 彩色策略 |
 | 0.1.1 | 2026-10-16 | GGD-0009：§2.1 环境变量按实现标注归属（`NO_COLOR` 已实现，`GITGUARD_SKIP` → `GGD-0013`、`GITGUARD_LANG` → `GGD-0014`）；§3 新增「解析失败 → 退出码 7」「输出分流」「脱敏」规则，JSON Schema 补全为六种；§4 `System.CommandLine` 降级说明改为本层归一退出码 7；§6.1 流程与组合根装配对齐（`CliHost` / `GitGuardSession` 懒装配）；§6.2 异常映射补 `HookException` / `SqliteException` / 非仓库 2 与解析期 7；§7 `--language` 标注 v0.2 顺延；§9 勾选已覆盖测试项 |
 | 0.1.2 | 2026-10-21 | GGD-0013：§2.1 `GITGUARD_SKIP` 标记已实现（仅 Hook 模式）；§3 JSON Schema 补 `bypass.v1`，新增隐藏命令 / 隐藏选项规则；新增 §6.2 post-commit 入口与 `--record-pending` 处理（原全局异常捕获顺延为 §6.3）；§9 勾选绕过检测命令链测试项 |
+| 0.1.3 | 2026-10-21 | GGD-0014：§2.1 `GITGUARD_LANG` 标记已实现；§7 `--language` 标注已注册与解析期校验；§9 勾选输出语言测试项；§10 标注文案表落点 |

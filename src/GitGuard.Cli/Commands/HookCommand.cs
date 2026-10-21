@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using GitGuard.Application.Bypass;
+using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
 
 namespace GitGuard.Cli.Commands;
@@ -20,7 +21,7 @@ internal static class HookCommand
     {
         ArgumentNullException.ThrowIfNull(runtime);
 
-        var command = new Command("hook", "Git Hook 内部入口（由 GitGuard 安装的分发脚本调用）")
+        var command = new Command("hook", runtime.Text.Get(CliTextKey.HookDescription))
         {
             Hidden = true,
         };
@@ -30,7 +31,7 @@ internal static class HookCommand
 
     private static Command CreatePostCommit(CliRuntime runtime)
     {
-        var command = new Command("post-commit", "检测刚发生的提交是否绕过扫描（FR-050）")
+        var command = new Command("post-commit", runtime.Text.Get(CliTextKey.HookPostCommitDescription))
         {
             Hidden = true,
         };
@@ -47,7 +48,7 @@ internal static class HookCommand
         runtime.Logger.Log(
             CliLogLevel.Information,
             result.Detected ? "Bypass.Detected" : "Bypass.Checked",
-            result.Detected ? "检测到绕过扫描的提交" : "提交已通过绕过检测",
+            runtime.Text.Get(result.Detected ? CliTextKey.LogBypassDetected : CliTextKey.LogBypassChecked),
             new LogFields
             {
                 RunId = result.RunId?.ToString(),

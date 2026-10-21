@@ -166,8 +166,13 @@ internal sealed class CliHarness : IDisposable
     /// <param name="args">命令行参数（不含可执行文件名）。</param>
     /// <param name="standardInput">标准输入内容（<c>scan --push</c> 推送信息行）。</param>
     /// <param name="skipEnvironment"><c>GITGUARD_SKIP</c> 取值（<see langword="null"/> 表示未设置）。</param>
+    /// <param name="languageEnvironment"><c>GITGUARD_LANG</c> 取值（<see langword="null"/> 表示未设置）。</param>
     /// <returns>进程退出码。</returns>
-    internal Task<int> RunAsync(string[] args, string standardInput, string? skipEnvironment = null)
+    internal Task<int> RunAsync(
+        string[] args,
+        string standardInput,
+        string? skipEnvironment = null,
+        string? languageEnvironment = null)
     {
         var host = new CliHost
         {
@@ -180,6 +185,7 @@ internal sealed class CliHarness : IDisposable
             GitGuardVersion = TEST_VERSION,
             ExecutablePath = TEST_EXECUTABLE,
             SkipEnvironment = skipEnvironment,
+            LanguageEnvironment = languageEnvironment,
             IsErrorTerminal = false,
             NoColorEnvironment = true,
         };
