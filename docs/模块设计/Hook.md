@@ -189,6 +189,7 @@ if [ ! -x "$GITGUARD_BIN" ]; then
 fi
 
 HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ORIGINAL_HOOK="$HOOK_DIR/{{HOOK_NAME}}"
 LEGACY_HOOK="$HOOK_DIR/{{HOOK_NAME}}.local.bak"
 
 GUARD_EXIT=0
@@ -196,7 +197,17 @@ GUARD_EXIT=0
 
 LEGACY_EXIT=0
 if [ -x "$LEGACY_HOOK" ]; then
-    "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+    LEGACY_SHEBANG=
+    IFS= read -r LEGACY_SHEBANG < "$LEGACY_HOOK" || :
+    case "$LEGACY_SHEBANG" in
+        "#!"*"/sh" | "#!"*" sh")
+            # 以原 Hook 路径作为 $0：Husky 等分发器据 $0 推导真正执行的 Hook 文件
+            sh -c 'legacy=$1; shift; . "$legacy"' "$ORIGINAL_HOOK" "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+            ;;
+        *)
+            "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+            ;;
+    esac
 fi
 
 if [ "$GUARD_EXIT" -ne 0 ]; then
@@ -220,6 +231,7 @@ GUARD_EXIT=0
 | 前两行固定 | `#!/bin/sh` + `# gitguard-managed vX.Y.Z`：托管识别的逐行精确匹配依据 |
 | 备份路径相对 hook 所在目录解析 | 用 `$0` 推导 `HOOK_DIR`，同时覆盖默认 `.git/hooks` 与 `core.hooksPath` 自定义目录 |
 | 无 `set -e` / 无 `exec` | 保证 GitGuard 阻断时原 Hook 仍执行、退出码可合并 |
+| POSIX sh 备份保留 `$0` | Husky 的 `.husky/_/h` 按 `$0` 推导 `.husky/<hook>`；若直接以 `.local.bak` 路径执行会解析到不存在的文件并静默退出 0。对 shebang 为 POSIX sh 的备份，用 `sh -c '. "$1"'` 并传入原 Hook 路径作为 `$0`；其他形态（二进制 / 非 sh）维持直接执行 |
 | 脚本内消息使用英文 | POSIX 区域环境下中文可能乱码；面向开发者的双语提示由 CLI 负责 |
 | 路径固化 | Windows 下反斜杠在渲染期转为正斜杠（MSYS sh 不识别 `\`） |
 | 可执行文件缺失 | 退出码 10 且**不调用**原 Hook——分发链断链时宁可阻断也不静默降级 |
@@ -251,6 +263,7 @@ GUARD_EXIT=0
 - [x] `TC-DR-05-01`：Husky 共存不破坏——真实 `git commit` 执行分发脚本，验证 GitGuard 先行、原 Hook 随后、退出码矩阵（0,0→0 / 3,0→3 / 0,7→7 / 3,7→3）。
 - [x] `TC-DR-06-01`：post-commit 绕过检测（`GGD-0013`：`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8）。
 - [x] `TC-FR-050-01`：`--no-verify` / `GITGUARD_SKIP=1` 审计留痕与正常提交零 Bypass 行（同上）。
+- [x] `TC-COMPAT-01~04`：Husky v9 / lefthook v2 / pre-commit 4.x 真实安装矩阵——安装包裹与备份、真实提交链式执行、阻断时框架仍执行、卸载逐字节还原（`HookFrameworkCompatibilityTests`，CI `hook-compat` 作业）。
 - [ ] 跨平台脚本可执行（Windows Git bash / Linux sh / macOS zsh）——Windows MSYS sh 与 POSIX shell 语义已在 CI 覆盖，macOS 待补。
 
 ## 11. 演进与扩展位
@@ -266,3 +279,4 @@ GUARD_EXIT=0
 | 0.1.1 | 2026-10-16 | 与 GGD-0007 实现同步：§2.1 pre-push 空 stdin 语义由「降级扫描所有未推送提交」改判为「无推送目标 → Clean / 退出码 0」（Git 仅在存在待推送引用时触发 pre-push） |
 | 0.1.2 | 2026-10-16 | 与 GGD-0008 实现同步：§2.2 输出限定 POSIX sh（撤销 PowerShell 变体）；§3 核心规则补全托管识别 / 复制备份 / 退出码规则 / 冲突拒绝边界 / 并发锁 / 卸载判定；§5 记录 EmbeddedResource `WithCulture=false` 陷阱、post-commit 推迟 GGD-0013、upsert 语义；§6 流程补锁与三阶段安装；§6.2/6.3 退出码规则取代 `max(...)`；§7 替换为实际交付模板；§10 勾选已完成测试项 |
 | 0.1.3 | 2026-10-21 | 与 GGD-0013 实现同步：§2.1/§2.2 补 post-commit 输入与 Bypass 审计输出；§3 补绕过判定与原因优先级；§5 新增 `post-commit.sh.template` 与待提交标记文件语义；§6.2 更新为 `scan --staged --record-pending`，新增 §6.4 PostCommit 流程；§7 模板片段更新并补 post-commit 调用；§8 标注 `hooks.*` 配置未接线；§10 勾选 TC-DR-06-01 / TC-FR-050-01 |
+| 0.1.4 | 2026-10-21 | 与 GGD-0021 实现同步：§7 模板新增 POSIX sh 备份的 `$0` 保留执行（Husky `.husky/_/h` 按 `$0` 推导目标 Hook），要点表补对应说明；§10 勾选 TC-COMPAT-01~04（Husky / lefthook / pre-commit 真实安装矩阵） |

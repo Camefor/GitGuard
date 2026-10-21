@@ -140,7 +140,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - [x] `--no-verify` 与 `GITGUARD_SKIP=1` 本地绕过被记录为独立审计事件（DR-06；E2E S8、TC-DR-06-01）。
 - [ ] 白名单登记必填 reason，可按规则 / 路径 / 指纹豁免（配置文件 `allowlist.entries` 已可用；CLI / SQLite 登记随 v0.2）。
 - [x] SQLite 中无任何 Token / 密码 / 完整敏感行原文（DR-02；TC-DR-02-01）。
-- [ ] lefthook / pre-commit 真实框架兼容矩阵（NFR-A-001；`GGD-0021`）。
+- [x] Husky / lefthook / pre-commit 真实框架兼容矩阵（NFR-A-001；`GGD-0021`；TC-COMPAT-01~04，CI `hook-compat`）。
 - [x] NFR-P-001~004 性能基准已落地（`GGD-0020`，工具与结果见 `benchmarks/README.md`）：P-002 / P-004 达标；P-001 / P-003 在本机受进程创建基线影响未达标，待正常宿主复测 / `GGD-0023`。
 
 ## 7. 产品路线与版本计划
@@ -168,3 +168,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.3 | 2026-10-21 | GGD-0019：§4 FR-070 标记已实现（`exclude.paths` 按仓库相对路径、`exclude.files` 按任意深度文件名过滤，扫描期生效） |
 | 0.1.4 | 2026-10-21 | GGD-0014：§5 可访问性更新 CLI 中英切换为已实现（`--language` / `GITGUARD_LANG`，命令行优先） |
 | 0.1.5 | 2026-10-21 | GGD-0020：§6 勾选 NFR-P-001~004 基准验收，并标注实测达标情况（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标） |
+| 0.1.6 | 2026-10-21 | GGD-0021：§6 勾选 Husky / lefthook / pre-commit 真实框架兼容矩阵验收（TC-COMPAT-01~04，CI `hook-compat`） |

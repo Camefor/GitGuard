@@ -113,7 +113,7 @@ flowchart LR
 | # | 风险 | 影响 | 概率 | 应对 | Owner | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Native AOT 下 YAML / SQLite 依赖反射兼容性问题 | 高 | 中 | 启动期用 trim-safe 包；CI 冒烟验证 | 项目负责人 | 缓解中（trim-safe 已落地；`release.yml` 原生平台冒烟已接线） |
-| R-02 | Husky / lefthook / pre-commit 的 Hook 格式差异导致兼容失败 | 高 | 中 | 真实 Fixture + CI 矩阵 | 项目负责人 | 部分缓解（Husky 形态文本 Hook 已由 E2E S6 / TC-DR-05-01 覆盖；lefthook / pre-commit 待 `GGD-0021`） |
+| R-02 | Husky / lefthook / pre-commit 的 Hook 格式差异导致兼容失败 | 高 | 中 | 真实 Fixture + CI 矩阵 | 项目负责人 | 已缓解（`GGD-0021`：三框架真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat` 作业；期间发现并修复 Husky `$0` 推导导致备份不执行的问题） |
 | R-03 | 中国手机号检测误报率过高 | 中 | 高 | 结合上下文关键字（如 `phone`, `mobile`, `tel`） | 项目负责人 | Open |
 | R-04 | 用户习惯 `--no-verify` 导致 Hook 价值被架空 | 中 | 高 | 文档宣讲 + 服务端扫描是互补 | 项目负责人 | Open |
 | R-05 | 单人维护进度延迟 | 中 | 中 | 文档优先，范围克制；MVP 不追求覆盖所有规则 | 项目负责人 | Open |
@@ -128,3 +128,4 @@ flowchart LR
 | 0.1.3 | 2026-10-21 | GGD-0020：§2.1 性能退出条件回填实测状态（P-002 达标；P-001 / P-003 受宿主进程创建开销影响未达标，登记 `GGD-0023`） |
 | 0.1.4 | 2026-10-21 | GGD-0023：§2.1 性能退出条件回填——P-003 经批量取差异优化后 P95 669.78 ms 达标；P-001 仍需正常宿主复测 |
 | 0.1.5 | 2026-10-21 | GGD-0022：§2.1 交付物补 `audit list` / `audit export`（审计查询与脱敏导出提前落地） |
+| 0.1.6 | 2026-10-21 | GGD-0021：§6 R-02 标记已缓解（Husky / lefthook / pre-commit 真实安装矩阵 + CI `hook-compat`） |

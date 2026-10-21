@@ -11,6 +11,7 @@ if [ ! -x "$GITGUARD_BIN" ]; then
 fi
 
 HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ORIGINAL_HOOK="$HOOK_DIR/{{HOOK_NAME}}"
 LEGACY_HOOK="$HOOK_DIR/{{HOOK_NAME}}.local.bak"
 
 GUARD_EXIT=0
@@ -18,7 +19,17 @@ GUARD_EXIT=0
 
 LEGACY_EXIT=0
 if [ -x "$LEGACY_HOOK" ]; then
-    "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+    LEGACY_SHEBANG=
+    IFS= read -r LEGACY_SHEBANG < "$LEGACY_HOOK" || :
+    case "$LEGACY_SHEBANG" in
+        "#!"*"/sh" | "#!"*" sh")
+            # 以原 Hook 路径作为 $0：Husky 等分发器据 $0 推导真正执行的 Hook 文件
+            sh -c 'legacy=$1; shift; . "$legacy"' "$ORIGINAL_HOOK" "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+            ;;
+        *)
+            "$LEGACY_HOOK" "$@" || LEGACY_EXIT=$?
+            ;;
+    esac
 fi
 
 if [ "$GUARD_EXIT" -ne 0 ]; then

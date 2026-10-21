@@ -206,7 +206,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 | 编号 | 指标 | 目标值 | 测量方式 | v0.1 状态 |
 | --- | --- | --- | --- | --- |
-| `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` | 部分验证：E2E S6 / TC-DR-05-01 覆盖 Husky 形态文本 Hook；lefthook / pre-commit 真实矩阵未覆盖（`GGD-0021`） |
+| `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` | 已覆盖：`TC-COMPAT-01~04` 在真实安装的 Husky v9 / lefthook v2 / pre-commit 仓库中验证安装包裹、真实 `git commit` 链式执行、阻断语义与卸载逐字节还原；CI `hook-compat` 作业（Ubuntu / Windows）执行（`GGD-0021`） |
 | `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 | 已覆盖：`.github/workflows/ci.yml` 三平台矩阵（`GGD-0011`） |
 
 ### 5.3 安全
@@ -306,3 +306,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.8 | 2026-10-21 | GGD-0020：§5.1 性能 NFR 回填实测结果（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标并登记 `GGD-0023`）；§5.6 `NFR-M-002` 标记已实现（`--verbose` 输出 `Scan.RuleTiming`） |
 | 0.1.9 | 2026-10-21 | GGD-0023：§2.8 / §4 推送差异来源改为一次批量 `git log --no-walk=unsorted --stdin`；§5.1 P-003 回填复测 P95 669.78 ms 达标（较 4687.07 ms 下降约 86%），P-001 / P-002 / P-004 同步最新实测 |
 | 0.1.10 | 2026-10-21 | GGD-0022：§4 审计查询 / 导出接口标记已实现（`audit list` 分页 / 筛选，`audit export` 仅脱敏字段；`audit view` 仍为 v0.2） |
+| 0.1.11 | 2026-10-21 | GGD-0021：§5.2 NFR-A-001 标记已覆盖（Husky / lefthook / pre-commit 真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat`） |

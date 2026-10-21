@@ -34,8 +34,12 @@ internal sealed class AcceptanceHarness : IDisposable
     private readonly string _localAppDataDirectory;
     private readonly string _xdgDataDirectory;
 
-    /// <summary>初始化隔离工作区：目录树、平台数据目录推导、Git 仓库基线配置（含 hooks 目录钉住）。</summary>
-    internal AcceptanceHarness()
+    /// <summary>初始化隔离工作区：目录树、平台数据目录推导、Git 仓库基线配置。</summary>
+    /// <param name="pinHooksPath">
+    /// <see langword="true"/> 把 <c>core.hooksPath</c> 钉住为仓库内绝对路径（隔离本机全局配置）；
+    /// <see langword="false"/> 不写本地配置（真实框架兼容性用例需要框架自己决定 hooks 目录）。
+    /// </param>
+    internal AcceptanceHarness(bool pinHooksPath = true)
     {
         // 先于任何落盘检查：跳过时（Assert.Skip 抛异常）不留下半成品目录
         EnsureHermeticUserConfig();
@@ -61,8 +65,13 @@ internal sealed class AcceptanceHarness : IDisposable
         RunGitOrThrow("config", "commit.gpgsign", "false");
         RunGitOrThrow("config", "core.autocrlf", "false");
 
-        // 钉住 hooks 目录（绝对路径）：中和本机全局 core.hooksPath 对安装目标与触发链的干扰
-        RunGitOrThrow("config", "core.hooksPath", ToPosixPath(Path.Combine(RepositoryPath, ".git", "hooks")));
+        // 钉住 hooks 目录（绝对路径）：中和本机全局 core.hooksPath 对安装目标与触发链的干扰。
+        // 兼容性用例不写本地值：空值会让 git rev-parse --git-path hooks 报错，pre-commit/lefthook
+        // 都无法安装，故交给框架自行决定 hooks 目录。
+        if (pinHooksPath)
+        {
+            RunGitOrThrow("config", "core.hooksPath", ToPosixPath(Path.Combine(RepositoryPath, ".git", "hooks")));
+        }
     }
 
     /// <summary>测试输出目录中的真实 GitGuard 可执行文件（Hook 分发脚本的固化目标）。</summary>
@@ -248,6 +257,32 @@ internal sealed class AcceptanceHarness : IDisposable
     /// <returns>进程结果快照。</returns>
     internal ProcessResult RunCli(params string[] arguments) => RunProcess(GitGuardExecutablePath, arguments, string.Empty);
 
+    /// <summary>运行任意工具（工作目录 = 仓库根；继承隔离环境），用于真实框架安装（npm / pre-commit）。</summary>
+    /// <param name="executable">可执行文件名或绝对路径。</param>
+    /// <param name="arguments">命令行参数。</param>
+    /// <returns>进程结果快照。</returns>
+    internal ProcessResult RunTool(string executable, params string[] arguments) =>
+        RunProcess(executable, arguments, string.Empty);
+
+    /// <summary>
+    /// 运行 Node 生态命令（<c>npm</c> / <c>npx</c>）：Windows 下经 <c>cmd.exe /c</c> 解析 <c>.cmd</c> 垫片，
+    /// Unix 直接执行。
+    /// </summary>
+    /// <param name="tool">工具名（<c>npm</c> / <c>npx</c>）。</param>
+    /// <param name="arguments">命令行参数。</param>
+    /// <returns>进程结果快照。</returns>
+    internal ProcessResult RunNodeTool(string tool, params string[] arguments)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return RunProcess(tool, arguments, string.Empty);
+        }
+
+        var command = new List<string>(arguments.Length + 3) { "/d", "/c", tool };
+        command.AddRange(arguments);
+        return RunProcess("cmd.exe", command, string.Empty);
+    }
+
     /// <summary>
     /// 进程内驱动 CLI（<see cref="CliApplication.RunAsync"/> + 注入 <see cref="CliHost"/>）：
     /// 仅用于 S7 注入缺失 / 替身扫描器可执行文件路径（子进程模式的可执行文件路径恒为真实进程路径，无法注入）。
@@ -409,6 +444,10 @@ internal sealed class AcceptanceHarness : IDisposable
         startInfo.Environment["HOME"] = _homeDirectory;
         startInfo.Environment["USERPROFILE"] = _homeDirectory;
         startInfo.Environment["NO_COLOR"] = "1";
+
+        // 真实框架安装隔离：npm 缓存与更新检查不落到真实用户目录
+        startInfo.Environment["npm_config_cache"] = Path.Combine(Root, "npm-cache");
+        startInfo.Environment["npm_config_update_notifier"] = "false";
         if (OperatingSystem.IsWindows())
         {
             startInfo.Environment["LOCALAPPDATA"] = _localAppDataDirectory;

@@ -287,13 +287,13 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：981 用例（979 通过 + 2 个平台相关跳过，0 失败）
+- 全量测试：1023 用例（1018 通过 + 5 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
 
 ## 已知限制
 
-- Hook 兼容性：已验证传统文本 Hook 与 Husky 形态的链式执行；lefthook / pre-commit 的真实兼容矩阵仍在补齐。
+- Hook 兼容性：Husky v9 / lefthook v2 / pre-commit 4.x 的安装包裹、真实提交链式执行、阻断语义与卸载还原已在真实安装仓库中验证（`TC-COMPAT-01~04`）；CI `hook-compat` 作业覆盖 Ubuntu / Windows，macOS 的真实框架安装矩阵待补。
 - Windows 下审计库目前依赖用户目录默认 ACL，显式收紧计划中。
 - Git 2.9 / 2.40 兼容矩阵尚未在 CI 覆盖，当前以最新稳定版 Git 验证。
 - `scan --staged` 只扫描暂存区，不读取未暂存内容；全量历史扫描尚未实现。
