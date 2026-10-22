@@ -258,6 +258,7 @@ gitguard allowlist remove --id <条目 GUID>
 - `add` 的 `--rule` / `--path` / `--fingerprint` 至少提供一个，可组合；`--reason` 必填且至少 5 字符。
 - 条目写入本地 SQLite 并记录 `AllowlistChanged` 审计事件；后续 `scan --staged` / `scan --push` 会同时应用配置文件的 `allowlist.entries` 与 SQLite 条目。
 - 校验失败退出码 20，条目不存在退出码 21；可加全局 `--format json` 获取机器可读结果。
+- 误报判定、白名单粒度选择、复核周期与误报率统计方法见 [docs/19-误报治理指南.md](docs/19-误报治理指南.md)。
 
 ### 8. 自定义规则与规则查询
 
@@ -362,7 +363,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1284 用例（1275 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1353 用例（1344 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
@@ -382,5 +383,6 @@ dotnet test GitGuard.sln
 - 需求规格：[docs/02-需求规格说明书(SRS).md](<docs/02-需求规格说明书(SRS).md>)
 - CLI 命令契约：[docs/06-API接口设计.md](docs/06-API接口设计.md)
 - 发行与分发：[docs/14-部署文档.md](docs/14-部署文档.md)
+- 误报治理：[docs/19-误报治理指南.md](docs/19-误报治理指南.md)
 - 文档索引与导航：[docs/README.md](docs/README.md)
 - Agent 工作指南与任务台账：[docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md)

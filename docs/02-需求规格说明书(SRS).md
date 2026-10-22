@@ -53,7 +53,7 @@
   - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱、护照、座机、美国 SSN、姓名与地址组合。
   - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\`、UNC 共享路径、`/opt` `/srv` `/data` 部署目录等。
   - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` / `password=` 查询参数、Slack / Discord Webhook、AWS 预签名 URL、RFC 1918 私网段与环回段。
-- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 扩充），可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
+- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 扩充），严重度分布为 Critical 7 / High 17 / Medium 9 / Low 7；可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
 - **关联领域规则**：`DR-01, DR-02`
 - **关联测试用例**：`TC-FR-021-S-*`（Secret）/ `TC-FR-021-P-*`（Privacy）/ `TC-FR-021-L-*`（LocalPath）/ `TC-FR-021-U-*`（Url）；每条规则由 `BuiltinRuleFixtureTests` 覆盖 ≥3 正例 / ≥3 反例 / 边界正反例
 
@@ -108,6 +108,7 @@
 - **输出**：写入 `Allowlist` 表。
 - **处理规则**：匹配时按「rule + path + fingerprint」三者取交集；缺省项视为通配。
 - **v0.1 实现状态**：已实现（`GGD-0030`）。匹配引擎（`AllowlistMatcher`）与策略放行可用；白名单来源为 `.gitguard.yml` 的 `allowlist.entries` 与 SQLite `allowlist` 表（`gitguard allowlist add/remove/list` 管理，`add` / `remove` 同事务写 `AllowlistChanged` 审计事件）；扫描策略合并两个来源（`FR-041`），审计库读取失败按 FailClosed 映射退出码 14。
+- **治理流程**：误报判定、白名单粒度选择、原因模板、复核周期与禁止事项见 [`19-误报治理指南.md`](./19-误报治理指南.md)（`GGD-0037`）。
 - **关联测试用例**：配置解析见 `GitGuardConfigLoaderTests`；匹配 / 放行见 `AllowlistMatcherTests` / `PolicyEvaluatorTests`；CLI / SQLite 见 `CliAllowlistCommandTests` / `SqliteAuditStoreAllowlistTests` / `AllowlistUseCaseTests` / `AllowlistEntryTests`；退出码映射见 `ExitCodeMapperTests`。
 
 ### 2.10 `FR-050` 绕过事件审计
@@ -142,7 +143,7 @@
 
 - **描述**：把首次全量扫描确认的历史噪声指纹写入基线文件；后续全量扫描自动消费基线，对已登记指纹不再阻断，只保留为可追溯记录。
 - **输入**：`gitguard scan --all --baseline <path>`（生成基线）。`--baseline` 仅能与 `--all` 组合，路径为空或以 `-` 开头返回用法错误（退出码 7）。
-- **文件格式**：JSON，`schema = "gitguard.baseline.v1"`；默认路径为仓库根目录 `.gitguard-baseline.json`；`entries` 每项含 `fingerprint`（64 位小写十六进制）、`rule_id`、`file_path`、`severity`。指纹按字典序排序、重复指纹去重，保证生成结果确定。
+- **文件格式**：JSON，`schema = "gitguard.baseline.v1"`；默认路径为仓库根目录 `.gitguard-baseline.json`；`entries` 每项含 `fingerprint`（64 位小写十六进制）、`rule_id`、`file_path`；读取时只强制校验 `fingerprint`，其余字段作为追溯元数据。指纹按字典序排序、重复指纹去重，保证生成结果确定。
 - **处理规则**：
   - **生成**：`--baseline` 指定路径时，扫描完成后写入当前全部命中的指纹；本次命中的 Finding 仍按原策略阻断，不在生成当次抑制。
   - **消费**：未指定 `--baseline` 的全量扫描（`scan --all` / 带历史参数）在默认文件存在时自动加载；自定义路径仅用于生成，后续运行只自动消费默认文件。
@@ -363,3 +364,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.18 | 2026-10-22 | GGD-0034：新增 §2.12.2 FR-080 自定义正则规则（`rules.custom` 字段 / 校验 / 合并与启用语义、200ms 超时、超长行不跳过、`gitguard rules list/view` 与退出码 7 / 40）；§8 追溯矩阵标记已实现；§9 Q-02 记录命名捕获组决议 |
 | 0.1.19 | 2026-10-22 | GGD-0035：§2.12 更新 `use_gitleaks` / `gitleaks_path` 配置语义（空白路径 → 13，缺失可执行文件 → 告警降级）；§2.13 FR-090 按实现重写（启动探测、逐文件暂存、命令与退出码、GLK 映射、禁用规则过滤、跨引擎去重、FailClosed 与临时目录清理）；§4 可选依赖说明与 §8 追溯矩阵同步标记已实现 |
 | 0.1.20 | 2026-10-22 | GGD-0036：§4 审计接口补充 `gitguard audit view <run-id>`（单次运行摘要与 Finding 明细，脱敏输出，退出码 7 / 30）并标记已实现 |
+| 0.1.21 | 2026-10-22 | GGD-0037：§2.5 补充 40 条规则严重度分布；§2.9 增加误报治理流程链接；§2.11.1 校正基线 `entries` 实际字段（`fingerprint` / `rule_id` / `file_path`，读取仅强制校验指纹） |

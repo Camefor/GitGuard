@@ -64,6 +64,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **失败分支**：缺少 `--reason` → 拒绝写入，白名单变更必须留言。
 - **对应功能需求**：`FR-040, FR-041, FR-042`
 - **v0.1 落地状态**：已实现（`GGD-0030`）。匹配引擎（规则 / 路径 / 指纹三粒度）与扫描汇总可用；白名单来源为 `.gitguard.yml` 的 `allowlist.entries` 与 SQLite `allowlist` 表，`gitguard allowlist add/remove/list` 管理并写 `AllowlistChanged` 审计事件；扫描时合并两个来源。
+- **误报治理**：判定口径、粒度选择、复核周期与误报率统计见 [`19-误报治理指南.md`](./19-误报治理指南.md)（`GGD-0037`）。
 
 ### 3.5 场景「开发者显式绕过（`--no-verify` 或 `GITGUARD_SKIP`）」
 
@@ -175,3 +176,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.10 | 2026-10-22 | GGD-0033：§4 FR-021 实现状态更新为 40 条内置规则（Secret 16 / Privacy 9 / LocalPath 7 / Url 8） |
 | 0.1.11 | 2026-10-22 | GGD-0034：§4 FR-080 标记已实现（`rules.custom` 自定义规则、USR 前缀与加载期校验、上下文 / 文件 glob 过滤、`gitguard rules list/view`） |
 | 0.1.12 | 2026-10-22 | GGD-0035：§4 FR-090 标记已实现（GitleaksAdapter 可选接入、启动探测缺失降级、`GLK/` 命名空间、跨引擎去重与 FailClosed） |
+| 0.1.13 | 2026-10-22 | GGD-0037：§3.4 增加误报治理指南链接（判定口径、白名单粒度、复核周期与误报率统计） |
