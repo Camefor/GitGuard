@@ -12,10 +12,10 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class UninstallHookUseCaseTests
 {
-    private const string SampleVersion = "9.9.9-test";
-    private const string LegacyHookContent = "#!/bin/sh\necho husky-like\n";
+    private const string SAMPLE_VERSION = "9.9.9-test";
+    private const string LEGACY_HOOK_CONTENT = "#!/bin/sh\necho husky-like\n";
 
-    private static readonly DateTimeOffset SampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     // FR-011：全新安装（无备份）卸载即删除脚本
     [Fact]
@@ -39,7 +39,7 @@ public sealed class UninstallHookUseCaseTests
         restoredLegacyHook.Should().BeFalse();
         installation.HookType.Should().Be(HookType.PreCommit);
         installation.RepoPath.Should().Be(repo.Root);
-        installation.InstalledAt.Should().Be(SampleUtcNow);
+        installation.InstalledAt.Should().Be(_sampleUtcNow);
         installation.OriginalHookBackupPath.Should().BeNull();
     }
 
@@ -57,7 +57,7 @@ public sealed class UninstallHookUseCaseTests
         HookUninstallResult result = report.Results.Should().ContainSingle().Subject;
         result.Disposition.Should().Be(HookUninstallDisposition.RestoredLegacy);
         result.BackupPath.Should().Be(hookPath + HookTypeExtensions.BACKUP_FILE_SUFFIX);
-        File.ReadAllText(hookPath).Should().Be(LegacyHookContent);
+        File.ReadAllText(hookPath).Should().Be(LEGACY_HOOK_CONTENT);
         File.Exists(hookPath + HookTypeExtensions.BACKUP_FILE_SUFFIX).Should().BeFalse();
 
         var (installation, restoredLegacyHook) = uninstallStore.SavedHookUninstallations.Should().ContainSingle().Subject;
@@ -77,7 +77,7 @@ public sealed class UninstallHookUseCaseTests
 
         report.Results.Should().ContainSingle()
             .Which.Disposition.Should().Be(HookUninstallDisposition.NotInstalled);
-        File.ReadAllText(hookPath).Should().Be(LegacyHookContent);
+        File.ReadAllText(hookPath).Should().Be(LEGACY_HOOK_CONTENT);
         store.SavedHookUninstallations.Should().BeEmpty();
     }
 
@@ -95,7 +95,7 @@ public sealed class UninstallHookUseCaseTests
 
         report.Results.Should().ContainSingle()
             .Which.Disposition.Should().Be(HookUninstallDisposition.NotInstalled);
-        File.ReadAllText(hookPath).Should().Be(LegacyHookContent);
+        File.ReadAllText(hookPath).Should().Be(LEGACY_HOOK_CONTENT);
         File.ReadAllText(backupPath).Should().Be("# replaced backup\n");
         store.SavedHookUninstallations.Should().BeEmpty();
     }
@@ -128,13 +128,13 @@ public sealed class UninstallHookUseCaseTests
         var store = new RecordingAuditStore();
         string hookPath = PreCommitPath(repo);
         string backupPath = hookPath + HookTypeExtensions.BACKUP_FILE_SUFFIX;
-        File.WriteAllText(backupPath, LegacyHookContent);
+        File.WriteAllText(backupPath, LEGACY_HOOK_CONTENT);
 
         HookUninstallReport report = CreateUseCase(repo, store).Execute(hooks: new[] { HookType.PreCommit });
 
         report.Results.Should().ContainSingle()
             .Which.Disposition.Should().Be(HookUninstallDisposition.RestoredLegacy);
-        File.ReadAllText(hookPath).Should().Be(LegacyHookContent);
+        File.ReadAllText(hookPath).Should().Be(LEGACY_HOOK_CONTENT);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public sealed class UninstallHookUseCaseTests
         using var repo = new TempGitRepository();
         InstallManagedHooks(repo, new RecordingAuditStore());
         string hookPath = PreCommitPath(repo);
-        var useCase = new UninstallHookUseCase(new FakeGitAccess(repo.Root), new FailingAuditStore(), new FixedClock(SampleUtcNow));
+        var useCase = new UninstallHookUseCase(new FakeGitAccess(repo.Root), new FailingAuditStore(), new FixedClock(_sampleUtcNow));
 
         Action act = () => useCase.Execute(hooks: new[] { HookType.PreCommit });
 
@@ -230,14 +230,14 @@ public sealed class UninstallHookUseCaseTests
     }
 
     private static UninstallHookUseCase CreateUseCase(TempGitRepository repo, RecordingAuditStore store) =>
-        new UninstallHookUseCase(new FakeGitAccess(repo.Root), store, new FixedClock(SampleUtcNow), SampleVersion);
+        new UninstallHookUseCase(new FakeGitAccess(repo.Root), store, new FixedClock(_sampleUtcNow), SAMPLE_VERSION);
 
     private static void InstallManagedHooks(TempGitRepository repo, RecordingAuditStore store)
     {
         string executablePath = Path.Combine(repo.Root, "tools", "gitguard");
         Directory.CreateDirectory(Path.Combine(repo.Root, "tools"));
         File.WriteAllText(executablePath, "#!/bin/sh\nexit 0\n");
-        new InstallHookUseCase(new FakeGitAccess(repo.Root), store, new FixedClock(SampleUtcNow), SampleVersion)
+        new InstallHookUseCase(new FakeGitAccess(repo.Root), store, new FixedClock(_sampleUtcNow), SAMPLE_VERSION)
             .Execute(executablePath);
     }
 
@@ -247,7 +247,7 @@ public sealed class UninstallHookUseCaseTests
     private static string WriteLegacyHook(TempGitRepository repo)
     {
         string hookPath = PreCommitPath(repo);
-        File.WriteAllText(hookPath, LegacyHookContent);
+        File.WriteAllText(hookPath, LEGACY_HOOK_CONTENT);
         return hookPath;
     }
 }

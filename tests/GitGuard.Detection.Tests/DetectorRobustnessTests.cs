@@ -15,7 +15,7 @@ namespace GitGuard.Detection.Tests;
 public sealed class DetectorRobustnessTests
 {
     /// <summary>对抗性输入集：重复字符、嵌套括号、超长连续段与正则热点形态。</summary>
-    private static readonly string[] EVIL_INPUTS = new[]
+    private static readonly string[] _evilInputs = new[]
     {
         new string('a', 64) + "!",
         new string('(', 512) + new string('a', 512) + new string(')', 512),
@@ -40,7 +40,7 @@ public sealed class DetectorRobustnessTests
 
         foreach (DetectionRule rule in rules)
         {
-            foreach (string input in EVIL_INPUTS)
+            foreach (string input in _evilInputs)
             {
                 Action act = () => _ = rule.Pattern.Regex.IsMatch(input);
                 act.Should().NotThrow($"{rule.RuleId} 在对抗输入下不应发生灾难性回溯（200ms 超时）");

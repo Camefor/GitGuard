@@ -14,7 +14,7 @@ namespace GitGuard.Detection.Tests;
 public sealed class BuiltinRuleLoaderTests
 {
     /// <summary>内置规则全量「ID → 严重度」期望表，顺序即 YAML 书写顺序（FR-021 稳定顺序）。</summary>
-    private static readonly (string RuleId, Severity Severity)[] ExpectedRules =
+    private static readonly (string RuleId, Severity Severity)[] _expectedRules =
     [
         ("GGD/SECRET/AWS-AKID", Severity.Critical),
         ("GGD/SECRET/AWS-SECRET", Severity.Critical),
@@ -44,7 +44,7 @@ public sealed class BuiltinRuleLoaderTests
     {
         var rules = BuiltinRuleLoader.LoadEmbedded();
 
-        rules.Select(rule => rule.RuleId).Should().Equal(ExpectedRules.Select(expected => expected.RuleId));
+        rules.Select(rule => rule.RuleId).Should().Equal(_expectedRules.Select(expected => expected.RuleId));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class BuiltinRuleLoaderTests
         var rules = BuiltinRuleLoader.LoadEmbedded();
 
         var actual = rules.Select(rule => (rule.RuleId, rule.Severity)).ToArray();
-        actual.Should().Equal(ExpectedRules);
+        actual.Should().Equal(_expectedRules);
     }
 
     [Fact]

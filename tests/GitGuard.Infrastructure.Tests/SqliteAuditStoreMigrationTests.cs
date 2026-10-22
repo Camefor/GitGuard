@@ -8,7 +8,7 @@ namespace GitGuard.Infrastructure.Tests;
 /// <summary>SchemaMigrator / V001 迁移集成测试（真实临时数据库文件；05-数据库设计 §4-§6、Audit.md §4）。</summary>
 public sealed class SqliteAuditStoreMigrationTests
 {
-    private static readonly string[] ExpectedTables = new[]
+    private static readonly string[] _expectedTables = new[]
     {
         "allowlist",
         "audit_logs",
@@ -18,7 +18,7 @@ public sealed class SqliteAuditStoreMigrationTests
         "schema_version",
     };
 
-    private static readonly string[] ExpectedIndexes = new[]
+    private static readonly string[] _expectedIndexes = new[]
     {
         "ix_allowlist_fingerprint",
         "ix_allowlist_rule_path",
@@ -38,9 +38,9 @@ public sealed class SqliteAuditStoreMigrationTests
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadStringColumn(connection, "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;")
-            .Should().Contain(ExpectedTables);
+            .Should().Contain(_expectedTables);
         SqliteTestHelpers.ReadStringColumn(connection, "SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name;")
-            .Should().Contain(ExpectedIndexes);
+            .Should().Contain(_expectedIndexes);
     }
 
     [Fact]

@@ -14,13 +14,13 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class BypassDetectionServiceTests
 {
-    private const string ParentSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    private const string SecondParentSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    private const string TreeSha = "cccccccccccccccccccccccccccccccccccccccc";
-    private const string HeadSha = "dddddddddddddddddddddddddddddddddddddddd";
+    private const string PARENT_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private const string SECOND_PARENT_SHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private const string TREE_SHA = "cccccccccccccccccccccccccccccccccccccccc";
+    private const string HEAD_SHA = "dddddddddddddddddddddddddddddddddddddddd";
 
-    private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
-    private static readonly DateTimeOffset SampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly string _repoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
+    private static readonly DateTimeOffset _sampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public void Detect_MatchingPendingScan_ClearsMarkerWithoutAudit()
@@ -28,7 +28,7 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleUtcNow),
         };
 
         BypassDetectionResult result = CreateService(auditStore, pendingStore).Detect();
@@ -36,7 +36,7 @@ public sealed class BypassDetectionServiceTests
         result.Detected.Should().BeFalse();
         result.Reason.Should().BeNull();
         result.RunId.Should().BeNull();
-        result.CommitSha.Should().Be(HeadSha);
+        result.CommitSha.Should().Be(HEAD_SHA);
         auditStore.SavedBypassEvents.Should().BeEmpty("正常提交不得产生绕过记录");
         pendingStore.ClearCalls.Should().Be(1, "预测标记必须在比对后被消费");
         pendingStore.Stored.Should().BeNull();
@@ -48,23 +48,23 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: true, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: true, _sampleUtcNow),
         };
 
         BypassDetectionResult result = CreateService(auditStore, pendingStore).Detect();
 
         result.Detected.Should().BeTrue();
         result.Reason.Should().Be(BypassReason.GitGuardSkip);
-        result.CommitSha.Should().Be(HeadSha);
+        result.CommitSha.Should().Be(HEAD_SHA);
         result.RunId.Should().NotBeNull();
 
         var (run, reason, commitSha) = auditStore.SavedBypassEvents.Should().ContainSingle().Subject;
         reason.Should().Be(BypassReason.GitGuardSkip);
-        commitSha.Should().Be(HeadSha);
+        commitSha.Should().Be(HEAD_SHA);
         run.Id.Should().Be(result.RunId!.Value);
-        run.RepoPath.Should().Be(RepoRoot);
+        run.RepoPath.Should().Be(_repoRoot);
         run.ScanType.Should().Be(ScanType.Bypass);
-        run.StartedAt.Should().Be(SampleUtcNow);
+        run.StartedAt.Should().Be(_sampleUtcNow);
         run.DurationMs.Should().BeNull("绕过事件不对应真实扫描耗时");
         run.Result.Should().Be(ScanResult.Clean);
         run.ExitCode.Should().Be(0);
@@ -92,10 +92,10 @@ public sealed class BypassDetectionServiceTests
         var pendingStore = new RecordingPendingScanStore
         {
             Stored = new PendingScan(
-                ParentSha,
+                PARENT_SHA,
                 "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 skipped: false,
-                SampleUtcNow),
+                _sampleUtcNow),
         };
 
         BypassDetectionResult result = CreateService(auditStore, pendingStore).Detect();
@@ -110,7 +110,7 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(SecondParentSha, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(SECOND_PARENT_SHA, TREE_SHA, skipped: false, _sampleUtcNow),
         };
 
         BypassDetectionResult result = CreateService(auditStore, pendingStore).Detect();
@@ -125,7 +125,7 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(parentSha: null, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(parentSha: null, TREE_SHA, skipped: false, _sampleUtcNow),
         };
 
         BypassDetectionResult result = CreateService(auditStore, pendingStore, parents: Array.Empty<string>()).Detect();
@@ -140,7 +140,7 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleUtcNow),
         };
 
         BypassDetectionResult result = CreateService(auditStore, pendingStore, parents: Array.Empty<string>()).Detect();
@@ -155,10 +155,10 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleUtcNow),
         };
 
-        BypassDetectionResult result = CreateService(auditStore, pendingStore, parents: new[] { ParentSha, SecondParentSha }).Detect();
+        BypassDetectionResult result = CreateService(auditStore, pendingStore, parents: new[] { PARENT_SHA, SECOND_PARENT_SHA }).Detect();
 
         result.Detected.Should().BeFalse();
     }
@@ -169,10 +169,10 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(SecondParentSha, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(SECOND_PARENT_SHA, TREE_SHA, skipped: false, _sampleUtcNow),
         };
 
-        BypassDetectionResult result = CreateService(auditStore, pendingStore, parents: new[] { ParentSha, SecondParentSha }).Detect();
+        BypassDetectionResult result = CreateService(auditStore, pendingStore, parents: new[] { PARENT_SHA, SECOND_PARENT_SHA }).Detect();
 
         result.Reason.Should().Be(BypassReason.NoVerify);
     }
@@ -199,7 +199,7 @@ public sealed class BypassDetectionServiceTests
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: true, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: true, _sampleUtcNow),
             ClearException = new IOException("标记清理失败（测试注入）。"),
         };
 
@@ -214,7 +214,7 @@ public sealed class BypassDetectionServiceTests
     {
         var pendingStore = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: true, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: true, _sampleUtcNow),
         };
         var service = CreateService(new FailingAuditStore(), pendingStore);
 
@@ -229,9 +229,9 @@ public sealed class BypassDetectionServiceTests
     {
         var auditStore = new RecordingAuditStore();
         var failingGit = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             headCommitSha: () => throw new GitException(GitException.GIT_COMMAND_FAILED, "HEAD 读取失败（测试注入）。"));
-        var service = new BypassDetectionService(failingGit, auditStore, new RecordingPendingScanStore(), new FixedClock(SampleUtcNow));
+        var service = new BypassDetectionService(failingGit, auditStore, new RecordingPendingScanStore(), new FixedClock(_sampleUtcNow));
 
         Action act = () => service.Detect();
 
@@ -242,10 +242,10 @@ public sealed class BypassDetectionServiceTests
     [Fact]
     public void Ctor_NullArguments_ThrowArgumentNullException()
     {
-        var git = new FakeGitAccess(RepoRoot);
+        var git = new FakeGitAccess(_repoRoot);
         var auditStore = new RecordingAuditStore();
         var pendingStore = new RecordingPendingScanStore();
-        var clock = new FixedClock(SampleUtcNow);
+        var clock = new FixedClock(_sampleUtcNow);
 
         Action nullGit = () => _ = new BypassDetectionService(null!, auditStore, pendingStore, clock);
         Action nullAudit = () => _ = new BypassDetectionService(git, null!, pendingStore, clock);
@@ -264,9 +264,9 @@ public sealed class BypassDetectionServiceTests
         IEnumerable<string>? parents = null)
     {
         var git = new FakeGitAccess(
-            RepoRoot,
-            headCommitSha: () => HeadSha,
-            commitMetadata: sha => new CommitMetadata(sha, TreeSha, parents ?? new[] { ParentSha }));
-        return new BypassDetectionService(git, auditStore, pendingStore, new FixedClock(SampleUtcNow));
+            _repoRoot,
+            headCommitSha: () => HEAD_SHA,
+            commitMetadata: sha => new CommitMetadata(sha, TREE_SHA, parents ?? new[] { PARENT_SHA }));
+        return new BypassDetectionService(git, auditStore, pendingStore, new FixedClock(_sampleUtcNow));
     }
 }

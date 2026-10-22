@@ -104,7 +104,7 @@ public sealed class FingerprinterTests
     [Fact]
     public void Compute_CanaryToken_FingerprintExposesNoPlaintext()
     {
-        var fingerprint = CreateFingerprinter(CreateSalt(0x06)).Compute(TestData.CanaryToken);
+        var fingerprint = CreateFingerprinter(CreateSalt(0x06)).Compute(TestData.CANARY_TOKEN);
 
         fingerprint.Hex.Should().MatchRegex("^[0-9a-f]{64}$");
         fingerprint.Hex.Should().NotContain("AKIA");

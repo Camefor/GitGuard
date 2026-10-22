@@ -11,7 +11,7 @@ namespace GitGuard.Infrastructure.Tests;
 /// <summary>SqliteAuditStore 读写集成测试（真实临时数据库文件；05-数据库设计 §4-§5、Audit.md §4）。</summary>
 public sealed class SqliteAuditStoreTests
 {
-    private static readonly DateTimeOffset SampleStartedAt = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleStartedAt = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public void SaveScanRun_CleanRun_RoundtripsThroughFindScanRun()
@@ -19,7 +19,7 @@ public sealed class SqliteAuditStoreTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath, "9.9.9-test");
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, SampleStartedAt, 25, ScanResult.Clean, 0);
+        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, 25, ScanResult.Clean, 0);
 
         store.SaveScanRun(run, new Dictionary<Finding, PolicyDecision>());
         ScanRun? loaded = store.FindScanRun(run.Id);
@@ -28,7 +28,7 @@ public sealed class SqliteAuditStoreTests
         loaded!.Id.Should().Be(run.Id);
         loaded.RepoPath.Should().Be(run.RepoPath);
         loaded.ScanType.Should().Be(ScanType.PreCommit);
-        loaded.StartedAt.Should().Be(SampleStartedAt);
+        loaded.StartedAt.Should().Be(_sampleStartedAt);
         loaded.DurationMs.Should().Be(25);
         loaded.Result.Should().Be(ScanResult.Clean);
         loaded.ExitCode.Should().Be(0);
@@ -59,7 +59,7 @@ public sealed class SqliteAuditStoreTests
         var run = ScanRun.Create(
             directory.Root,
             ScanType.PrePush,
-            SampleStartedAt,
+            _sampleStartedAt,
             null,
             ScanResult.Blocked,
             1,
@@ -93,7 +93,7 @@ public sealed class SqliteAuditStoreTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath, gitGuardVersion: "9.9.9-test");
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, SampleStartedAt, null, ScanResult.Clean, 0);
+        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, null, ScanResult.Clean, 0);
 
         store.SaveScanRun(run, new Dictionary<Finding, PolicyDecision>());
 
@@ -103,7 +103,7 @@ public sealed class SqliteAuditStoreTests
         SqliteTestHelpers.ReadScalarString(connection, "SELECT result FROM scan_runs;").Should().Be("Clean");
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT exit_code FROM scan_runs;").Should().Be(0);
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT started_at FROM scan_runs;")
-            .Should().Be(SampleStartedAt.ToUnixTimeMilliseconds());
+            .Should().Be(_sampleStartedAt.ToUnixTimeMilliseconds());
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT COUNT(*) FROM scan_runs WHERE duration_ms IS NULL;").Should().Be(1);
     }
 
@@ -114,7 +114,7 @@ public sealed class SqliteAuditStoreTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
         var finding = CreateFinding();
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, SampleStartedAt, 12, ScanResult.Warned, 0, new[] { finding });
+        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, 12, ScanResult.Warned, 0, new[] { finding });
 
         Action act = () => store.SaveScanRun(run, new Dictionary<Finding, PolicyDecision>());
 
@@ -128,7 +128,7 @@ public sealed class SqliteAuditStoreTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
         var finding = CreateFinding();
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, SampleStartedAt, 12, ScanResult.Blocked, 1, new[] { finding });
+        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, 12, ScanResult.Blocked, 1, new[] { finding });
         var decisions = new Dictionary<Finding, PolicyDecision>
         {
             [finding] = new PolicyDecision(PolicyAction.Block, false, Severity.Critical),
@@ -159,7 +159,7 @@ public sealed class SqliteAuditStoreTests
         var blocked = CreateFinding(ruleId: "GGD/SECRET/AWS-AKID");
         var ignored = CreateFinding(ruleId: "GGD/SECRET/GITHUB-PAT");
         var warned = CreateFinding(ruleId: "GGD/SECRET/SLACK-TOKEN");
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, SampleStartedAt, 12, ScanResult.Blocked, 1, new[] { blocked, ignored, warned });
+        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, 12, ScanResult.Blocked, 1, new[] { blocked, ignored, warned });
         var decisions = new Dictionary<Finding, PolicyDecision>
         {
             [blocked] = new PolicyDecision(PolicyAction.Block, false, Severity.Critical),
@@ -181,15 +181,15 @@ public sealed class SqliteAuditStoreTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
         var fingerprinter = new Fingerprinter(new byte[32]);
-        var masked = Masker.Mask(TestData.CanaryToken);
+        var masked = Masker.Mask(TestData.CANARY_TOKEN);
         var finding = Finding.Create(
             "GGD/SECRET/AWS-AKID",
             "src/appsettings.json",
             18,
             Severity.Critical,
-            fingerprinter.Compute(TestData.CanaryToken),
+            fingerprinter.Compute(TestData.CANARY_TOKEN),
             masked);
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, SampleStartedAt, 12, ScanResult.Blocked, 1, new[] { finding });
+        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, 12, ScanResult.Blocked, 1, new[] { finding });
         var decisions = new Dictionary<Finding, PolicyDecision>
         {
             [finding] = new PolicyDecision(PolicyAction.Block, false, Severity.Critical),
@@ -199,7 +199,7 @@ public sealed class SqliteAuditStoreTests
 
         // TC-DR-02-01（09-日志设计 §9.3）：金丝雀原文不得出现在审计库任何落盘字节中
         string databaseText = SqliteTestHelpers.ReadDatabaseFilesText(dbPath);
-        databaseText.Should().NotContain(TestData.CanaryToken);
+        databaseText.Should().NotContain(TestData.CANARY_TOKEN);
         databaseText.Should().NotContain("AKIA_SENTINEL");
 
         ScanRun? loaded = store.FindScanRun(run.Id);
@@ -211,7 +211,7 @@ public sealed class SqliteAuditStoreTests
     {
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
-        var run = ScanRun.Create(directory.Root, ScanType.Manual, SampleStartedAt, 3, ScanResult.Clean, 0);
+        var run = ScanRun.Create(directory.Root, ScanType.Manual, _sampleStartedAt, 3, ScanResult.Clean, 0);
         new SqliteAuditStore(dbPath).SaveScanRun(run, new Dictionary<Finding, PolicyDecision>());
 
         ScanRun? loaded = new SqliteAuditStore(dbPath).FindScanRun(run.Id);
@@ -252,9 +252,9 @@ public sealed class SqliteAuditStoreTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
         var emptyDecisions = new Dictionary<Finding, PolicyDecision>();
-        var oldest = ScanRun.Create(directory.Root, ScanType.Manual, SampleStartedAt.AddMinutes(-2), 1, ScanResult.Clean, 0);
-        var middle = ScanRun.Create(directory.Root, ScanType.Manual, SampleStartedAt.AddMinutes(-1), 1, ScanResult.Clean, 0);
-        var newest = ScanRun.Create(directory.Root, ScanType.Manual, SampleStartedAt, 1, ScanResult.Clean, 0);
+        var oldest = ScanRun.Create(directory.Root, ScanType.Manual, _sampleStartedAt.AddMinutes(-2), 1, ScanResult.Clean, 0);
+        var middle = ScanRun.Create(directory.Root, ScanType.Manual, _sampleStartedAt.AddMinutes(-1), 1, ScanResult.Clean, 0);
+        var newest = ScanRun.Create(directory.Root, ScanType.Manual, _sampleStartedAt, 1, ScanResult.Clean, 0);
 
         // 乱序写入：排序必须来自查询（started_at DESC），而非插入顺序
         store.SaveScanRun(middle, emptyDecisions);
@@ -274,8 +274,8 @@ public sealed class SqliteAuditStoreTests
         string dbPath = Path.Combine(directoryA.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
         var emptyDecisions = new Dictionary<Finding, PolicyDecision>();
-        var runA = ScanRun.Create(directoryA.Root, ScanType.Manual, SampleStartedAt, 1, ScanResult.Clean, 0);
-        var runB = ScanRun.Create(directoryB.Root, ScanType.Manual, SampleStartedAt, 1, ScanResult.Clean, 0);
+        var runA = ScanRun.Create(directoryA.Root, ScanType.Manual, _sampleStartedAt, 1, ScanResult.Clean, 0);
+        var runB = ScanRun.Create(directoryB.Root, ScanType.Manual, _sampleStartedAt, 1, ScanResult.Clean, 0);
         store.SaveScanRun(runA, emptyDecisions);
         store.SaveScanRun(runB, emptyDecisions);
 

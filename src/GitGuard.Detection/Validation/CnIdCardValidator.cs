@@ -10,7 +10,7 @@ public static class CnIdCardValidator
     private const string CHECK_CODES = "10X98765432";
 
     /// <summary>前 17 位加权因子（GB 11643-1999 表 1）。</summary>
-    private static readonly int[] WEIGHTS = new[] { 7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2 };
+    private static readonly int[] _weights = new[] { 7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2 };
 
     /// <summary>校验 18 位身份证号。</summary>
     /// <param name="idCard">待校验文本；必须为 18 位（17 位数字 + 数字或 <c>X</c>/<c>x</c> 校验码）。</param>
@@ -33,7 +33,7 @@ public static class CnIdCardValidator
                 return false;
             }
 
-            sum += (c - '0') * WEIGHTS[i];
+            sum += (c - '0') * _weights[i];
         }
 
         if (char.ToUpperInvariant(idCard[17]) != CHECK_CODES[sum % 11])

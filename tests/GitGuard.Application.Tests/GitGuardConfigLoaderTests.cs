@@ -14,7 +14,7 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class GitGuardConfigLoaderTests
 {
-    private static readonly DateTimeOffset FixedNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _fixedNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     // TC-FR-070-02：不存在配置文件 → 内置默认，加载链为空
     [Fact]
@@ -140,7 +140,7 @@ public sealed class GitGuardConfigLoaderTests
         AllowlistEntry entry = config.Allowlist.Should().ContainSingle().Subject;
         entry.PathPattern.Should().Be("config/*.env");
         entry.Reason.Should().Be("示例配置中的占位密钥");
-        entry.CreatedAt.Should().Be(FixedNow);
+        entry.CreatedAt.Should().Be(_fixedNow);
         entry.CreatedBy.Should().Be("tester");
     }
 
@@ -418,7 +418,7 @@ public sealed class GitGuardConfigLoaderTests
         new GitGuardConfigLoader(
             projectDirectory,
             userConfigPath,
-            new FixedClock(FixedNow),
+            new FixedClock(_fixedNow),
             createdBy: "tester",
             defaultLogFilePath: defaultLogFilePath);
 

@@ -11,10 +11,10 @@ namespace GitGuard.Infrastructure.Tests;
 /// </summary>
 public sealed class FilePendingScanStoreTests
 {
-    private const string ParentSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    private const string TreeSha = "cccccccccccccccccccccccccccccccccccccccc";
+    private const string PARENT_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private const string TREE_SHA = "cccccccccccccccccccccccccccccccccccccccc";
 
-    private static readonly DateTimeOffset SampleRecordedAt = new DateTimeOffset(2026, 10, 16, 8, 30, 0, 123, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleRecordedAt = new DateTimeOffset(2026, 10, 16, 8, 30, 0, 123, TimeSpan.Zero);
 
     [Fact]
     public void WriteThenRead_RoundTripsAllFields()
@@ -22,14 +22,14 @@ public sealed class FilePendingScanStoreTests
         using var directory = new TempDirectory();
         FilePendingScanStore store = CreateStore(directory);
 
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: true, SampleRecordedAt));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: true, _sampleRecordedAt));
         PendingScan? loaded = store.Read();
 
         loaded.Should().NotBeNull();
-        loaded!.ParentSha.Should().Be(ParentSha);
-        loaded.TreeSha.Should().Be(TreeSha);
+        loaded!.ParentSha.Should().Be(PARENT_SHA);
+        loaded.TreeSha.Should().Be(TREE_SHA);
         loaded.Skipped.Should().BeTrue();
-        loaded.RecordedAt.Should().Be(SampleRecordedAt);
+        loaded.RecordedAt.Should().Be(_sampleRecordedAt);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class FilePendingScanStoreTests
         using var directory = new TempDirectory();
         FilePendingScanStore store = CreateStore(directory);
 
-        store.Write(new PendingScan(parentSha: null, TreeSha, skipped: false, SampleRecordedAt));
+        store.Write(new PendingScan(parentSha: null, TREE_SHA, skipped: false, _sampleRecordedAt));
 
         PendingScan loaded = store.Read() ?? throw new InvalidOperationException("标记应可读回。");
         loaded.ParentSha.Should().BeNull();
@@ -78,7 +78,7 @@ public sealed class FilePendingScanStoreTests
         string stateDirectory = Path.Combine(directory.Root, "nested", "gitguard");
         var store = new FilePendingScanStore(stateDirectory);
 
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: false, SampleRecordedAt));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleRecordedAt));
 
         Directory.Exists(stateDirectory).Should().BeTrue();
         Directory.GetFiles(stateDirectory).Should().Equal(store.FilePath);
@@ -89,13 +89,13 @@ public sealed class FilePendingScanStoreTests
     {
         using var directory = new TempDirectory();
         FilePendingScanStore store = CreateStore(directory);
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: false, SampleRecordedAt));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleRecordedAt));
 
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: true, SampleRecordedAt.AddMinutes(1)));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: true, _sampleRecordedAt.AddMinutes(1)));
 
         PendingScan loaded = store.Read() ?? throw new InvalidOperationException("标记应可读回。");
         loaded.Skipped.Should().BeTrue();
-        loaded.RecordedAt.Should().Be(SampleRecordedAt.AddMinutes(1));
+        loaded.RecordedAt.Should().Be(_sampleRecordedAt.AddMinutes(1));
     }
 
     [Fact]
@@ -103,16 +103,16 @@ public sealed class FilePendingScanStoreTests
     {
         using var directory = new TempDirectory();
         FilePendingScanStore store = CreateStore(directory);
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: false, SampleRecordedAt));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleRecordedAt));
 
         byte[] bytes = File.ReadAllBytes(store.FilePath);
         bytes[0].Should().Be((byte)'{', "JSON 文件必须以 '{' 开头（UTF-8 无 BOM）");
         using var document = JsonDocument.Parse(bytes);
         JsonElement root = document.RootElement;
-        root.GetProperty("parent_sha").GetString().Should().Be(ParentSha);
-        root.GetProperty("tree_sha").GetString().Should().Be(TreeSha);
+        root.GetProperty("parent_sha").GetString().Should().Be(PARENT_SHA);
+        root.GetProperty("tree_sha").GetString().Should().Be(TREE_SHA);
         root.GetProperty("skipped").GetBoolean().Should().BeFalse();
-        root.GetProperty("recorded_at").GetInt64().Should().Be(SampleRecordedAt.ToUnixTimeMilliseconds());
+        root.GetProperty("recorded_at").GetInt64().Should().Be(_sampleRecordedAt.ToUnixTimeMilliseconds());
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class FilePendingScanStoreTests
         using var directory = new TempDirectory();
         FilePendingScanStore store = CreateStore(directory);
 
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: false, SampleRecordedAt));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleRecordedAt));
 
         UnixFileMode mode = File.GetUnixFileMode(store.FilePath);
         mode.Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
@@ -138,7 +138,7 @@ public sealed class FilePendingScanStoreTests
     {
         using var directory = new TempDirectory();
         FilePendingScanStore store = CreateStore(directory);
-        store.Write(new PendingScan(ParentSha, TreeSha, skipped: false, SampleRecordedAt));
+        store.Write(new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleRecordedAt));
 
         store.Clear();
 

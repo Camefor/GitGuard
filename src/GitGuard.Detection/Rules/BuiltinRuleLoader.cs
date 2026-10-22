@@ -25,7 +25,7 @@ public static class BuiltinRuleLoader
     /// <summary>内置规则 ID 前缀：加载器只接受 <c>GGD/</c> 前缀，防止来源标注与 ID 前缀错配。</summary>
     private const string BUILTIN_PREFIX = "GGD/";
 
-    private static readonly IDeserializer Deserializer =
+    private static readonly IDeserializer _deserializer =
         new StaticDeserializerBuilder(new BuiltinRulesYamlContext())
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .Build();
@@ -55,7 +55,7 @@ public static class BuiltinRuleLoader
         BuiltinRulesDocument document;
         try
         {
-            document = Deserializer.Deserialize<BuiltinRulesDocument>(yaml);
+            document = _deserializer.Deserialize<BuiltinRulesDocument>(yaml);
         }
         catch (YamlException ex)
         {

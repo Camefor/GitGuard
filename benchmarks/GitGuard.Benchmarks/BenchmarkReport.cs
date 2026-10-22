@@ -82,7 +82,7 @@ internal sealed record BenchmarkReportDocument
 /// <summary>基准报告：控制台逐项输出 PASS / FAIL 与统计量，可另写 JSON 供归档比较。</summary>
 internal sealed class BenchmarkReport
 {
-    private static readonly JsonSerializerOptions JSON_OPTIONS = new JsonSerializerOptions { WriteIndented = true };
+    private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
     private readonly BenchmarkEnvironment _environment;
     private readonly IReadOnlyList<BenchmarkResult> _results;
@@ -134,7 +134,7 @@ internal sealed class BenchmarkReport
         }
 
         var document = new BenchmarkReportDocument(_environment, _results);
-        File.WriteAllText(fullPath, JsonSerializer.Serialize(document, JSON_OPTIONS));
+        File.WriteAllText(fullPath, JsonSerializer.Serialize(document, _jsonOptions));
         Console.Out.WriteLine();
         Console.Out.WriteLine($"JSON result written: {fullPath}");
     }

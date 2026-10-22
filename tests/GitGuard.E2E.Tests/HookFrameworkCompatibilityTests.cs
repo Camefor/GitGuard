@@ -17,8 +17,8 @@ public sealed class HookFrameworkCompatibilityTests
     private const string COMPAT_GATE_ENVIRONMENT = "GITGUARD_HOOK_COMPAT";
     private const string PRE_COMMIT_EXECUTABLE_ENVIRONMENT = "GITGUARD_PRE_COMMIT";
 
-    private static readonly string[] INSTALL_COMMAND = new[] { "install" };
-    private static readonly string[] UNINSTALL_COMMAND = new[] { "uninstall" };
+    private static readonly string[] _installCommand = new[] { "install" };
+    private static readonly string[] _uninstallCommand = new[] { "uninstall" };
 
     /// <summary>
     /// TC-COMPAT-HUSKY / TC-COMPAT-LEFTHOOK / TC-COMPAT-PRECOMMIT：真实框架 Hook 被备份并包裹后，
@@ -44,7 +44,7 @@ public sealed class HookFrameworkCompatibilityTests
         long scansBeforeInstall = ReadPreCommitScanCount(harness);
 
         // TC-COMPAT-01：安装不得覆盖原框架 Hook —— 先备份，再写入 gitguard 分发脚本
-        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS, $"{framework} 仓库中 install 应成功");
+        harness.RunCli(_installCommand).ExitCode.Should().Be(ExitCodes.SUCCESS, $"{framework} 仓库中 install 应成功");
         File.Exists(harness.ResolvePath(fixture.HookPath + ".local.bak"))
             .Should().BeTrue($"{framework} 生成的 Hook 必须备份为 .local.bak");
         File.ReadAllText(harness.ResolvePath(fixture.HookPath))
@@ -85,7 +85,7 @@ public sealed class HookFrameworkCompatibilityTests
         File.Delete(harness.ResolvePath("src/leak.env"));
 
         // TC-COMPAT-04：卸载——原框架 Hook 逐字节还原，后续提交不再触发 GitGuard
-        harness.RunCli(UNINSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS, "uninstall 应成功恢复原框架 Hook");
+        harness.RunCli(_uninstallCommand).ExitCode.Should().Be(ExitCodes.SUCCESS, "uninstall 应成功恢复原框架 Hook");
         File.Exists(harness.ResolvePath(fixture.HookPath + ".local.bak"))
             .Should().BeFalse("恢复后备份文件必须被消费");
         File.ReadAllText(harness.ResolvePath(fixture.HookPath))

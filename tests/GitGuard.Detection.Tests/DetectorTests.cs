@@ -13,9 +13,9 @@ namespace GitGuard.Detection.Tests;
 /// </summary>
 public sealed class DetectorTests
 {
-    private static readonly string[] UNKNOWN_VALIDATORS = new[] { "unknown-validator" };
+    private static readonly string[] _unknownValidators = new[] { "unknown-validator" };
 
-    private static readonly string[] CROSS_CATEGORY_VALIDATORS = new[] { "shannon-entropy" };
+    private static readonly string[] _crossCategoryValidators = new[] { "shannon-entropy" };
 
     // ===== TC-FR-021：六条验收用例（docs/16-测试方案.md §4） =====
     [Fact]
@@ -316,7 +316,7 @@ public sealed class DetectorTests
             "GGD/SECRET/AWS-AKID",
             "引用未知校验器的规则",
             Severity.High,
-            RulePattern.Create("AKIA[0-9A-Z]{16}", validators: UNKNOWN_VALIDATORS));
+            RulePattern.Create("AKIA[0-9A-Z]{16}", validators: _unknownValidators));
 
         Action act = () => _ = new SecretDetector(new[] { rule }, TestSupport.CreateFactory());
 
@@ -330,7 +330,7 @@ public sealed class DetectorTests
             "GGD/PRIVACY/EMAIL",
             "引用跨类别校验器的规则",
             Severity.Low,
-            RulePattern.Create("[A-Za-z]+", validators: CROSS_CATEGORY_VALIDATORS));
+            RulePattern.Create("[A-Za-z]+", validators: _crossCategoryValidators));
 
         Action act = () => _ = new PrivacyDetector(new[] { rule }, TestSupport.CreateFactory());
 

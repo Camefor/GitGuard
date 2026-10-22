@@ -16,7 +16,7 @@ internal static class BenchmarkScenarios
     private const int SCAN_WARMUP = 1;
     private const double STAGED_TARGET_MS = 500;
     private const double PUSH_TARGET_MS = 2000;
-    private static readonly TimeSpan PROCESS_TIMEOUT = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan _processTimeout = TimeSpan.FromSeconds(120);
 
     /// <summary>NFR-P-001：冷启动（<c>gitguard version</c>）P95 ≤ 150 ms。</summary>
     /// <param name="options">基准选项。</param>
@@ -197,7 +197,7 @@ internal static class BenchmarkScenarios
             workingDirectory,
             standardInput,
             environment,
-            PROCESS_TIMEOUT,
+            _processTimeout,
             cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {

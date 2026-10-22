@@ -41,6 +41,8 @@
     <PackageVersion Include="xunit.v3" Version="4.0.2" />
     <!-- 断言库；锁定 7.x（Apache-2.0），8.x 起改为商业许可，MVP 不引入许可风险 -->
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
+    <!-- MTP 覆盖率扩展（16-测试方案 §11：CI 归档 coverage；与 xunit.v3 的 MTP v2 匹配） -->
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
   </ItemGroup>
 
 </Project>

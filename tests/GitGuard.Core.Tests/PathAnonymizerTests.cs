@@ -30,11 +30,11 @@ public sealed class PathAnonymizerTests
     [Fact]
     public void Anonymize_CanaryTokenInPath_NotExposed()
     {
-        string path = Path.Combine(TestData.SampleRepoPath, TestData.CanaryToken, "src");
+        string path = Path.Combine(TestData.SampleRepoPath, TestData.CANARY_TOKEN, "src");
 
         string hash = PathAnonymizer.Anonymize(path);
 
-        hash.Should().NotContain(TestData.CanaryToken);
+        hash.Should().NotContain(TestData.CANARY_TOKEN);
         hash.Should().NotContain("repo");
     }
 

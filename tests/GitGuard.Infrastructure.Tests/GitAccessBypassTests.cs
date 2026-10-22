@@ -11,7 +11,7 @@ namespace GitGuard.Infrastructure.Tests;
 /// </summary>
 public sealed class GitAccessBypassTests
 {
-    private const string EmptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+    private const string EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
     [Fact]
     public void GetGitDirectory_PlainRepository_ResolvesToDotGitDirectory()
@@ -69,7 +69,7 @@ public sealed class GitAccessBypassTests
         using var repo = new TempGitRepository();
         GitAccess access = CreateAccess(repo);
 
-        access.GetStagedTreeSha().Should().Be(EmptyTreeSha);
+        access.GetStagedTreeSha().Should().Be(EMPTY_TREE_SHA);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class GitAccessBypassTests
 
         string treeSha = access.GetStagedTreeSha();
 
-        treeSha.Should().NotBe(EmptyTreeSha);
+        treeSha.Should().NotBe(EMPTY_TREE_SHA);
         treeSha.Should().Be(repo.RunGit("write-tree"));
     }
 

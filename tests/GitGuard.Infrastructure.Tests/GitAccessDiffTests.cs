@@ -79,14 +79,14 @@ public sealed class GitAccessDiffTests
     public void GetStagedDiff_CanaryToken_ReturnsRawUnmaskedText()
     {
         using var repo = new TempGitRepository();
-        repo.WriteFile("config.env", $"token={TestData.CanaryToken}\n");
+        repo.WriteFile("config.env", $"token={TestData.CANARY_TOKEN}\n");
         repo.Stage("config.env");
         GitAccess access = CreateAccess(repo);
 
         string diff = access.GetStagedDiff();
 
         // 本层按契约返回 git 原始差异；DR-02 脱敏发生在 Finding 构建阶段（由 Core 负责）
-        diff.Should().Contain(TestData.CanaryToken);
+        diff.Should().Contain(TestData.CANARY_TOKEN);
     }
 
     [Fact]

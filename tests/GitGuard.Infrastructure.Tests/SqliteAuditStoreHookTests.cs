@@ -12,7 +12,7 @@ namespace GitGuard.Infrastructure.Tests;
 /// </summary>
 public sealed class SqliteAuditStoreHookTests
 {
-    private static readonly DateTimeOffset SampleInstalledAt = new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleInstalledAt = new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void SaveHookInstallation_NewRecord_InsertsActiveRowWithRawColumns()
@@ -20,7 +20,7 @@ public sealed class SqliteAuditStoreHookTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
-        var installation = HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3");
+        var installation = HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3");
 
         store.SaveHookInstallation(installation);
 
@@ -28,7 +28,7 @@ public sealed class SqliteAuditStoreHookTests
         SqliteTestHelpers.ReadScalarString(connection, "SELECT repo_path FROM hook_installations;").Should().Be(directory.Root);
         SqliteTestHelpers.ReadScalarString(connection, "SELECT hook_type FROM hook_installations;").Should().Be("pre-commit");
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT installed_at FROM hook_installations;")
-            .Should().Be(SampleInstalledAt.ToUnixTimeMilliseconds());
+            .Should().Be(_sampleInstalledAt.ToUnixTimeMilliseconds());
         SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be("1.2.3");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT status FROM hook_installations;").Should().Be("Active");
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT COUNT(*) FROM hook_installations WHERE original_hook_backup_path IS NULL;")
@@ -44,7 +44,7 @@ public sealed class SqliteAuditStoreHookTests
         var installation = HookInstallation.Create(
             directory.Root,
             HookType.PrePush,
-            SampleInstalledAt,
+            _sampleInstalledAt,
             "1.2.3",
             "pre-push.local.bak");
 
@@ -61,7 +61,7 @@ public sealed class SqliteAuditStoreHookTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
-        var installation = HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3");
+        var installation = HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3");
 
         store.SaveHookInstallation(installation);
 
@@ -70,7 +70,7 @@ public sealed class SqliteAuditStoreHookTests
         SqliteTestHelpers.ReadScalarString(connection, "SELECT event_type FROM audit_logs ORDER BY seq DESC LIMIT 1;")
             .Should().Be("HookInstalled");
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT occurred_at FROM audit_logs ORDER BY seq DESC LIMIT 1;")
-            .Should().Be(SampleInstalledAt.ToUnixTimeMilliseconds());
+            .Should().Be(_sampleInstalledAt.ToUnixTimeMilliseconds());
 
         string payloadJson = SqliteTestHelpers.ReadScalarString(connection, "SELECT payload_json FROM audit_logs ORDER BY seq DESC LIMIT 1;");
         using var payload = JsonDocument.Parse(payloadJson);
@@ -89,7 +89,7 @@ public sealed class SqliteAuditStoreHookTests
         var installation = HookInstallation.Create(
             directory.Root,
             HookType.PreCommit,
-            SampleInstalledAt,
+            _sampleInstalledAt,
             "1.2.3",
             "pre-commit.local.bak");
 
@@ -107,11 +107,11 @@ public sealed class SqliteAuditStoreHookTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
-        var first = HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3");
+        var first = HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3");
         var second = HookInstallation.Create(
             directory.Root,
             HookType.PreCommit,
-            SampleInstalledAt.AddDays(1),
+            _sampleInstalledAt.AddDays(1),
             "2.0.0",
             "pre-commit.local.bak");
 
@@ -121,7 +121,7 @@ public sealed class SqliteAuditStoreHookTests
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT COUNT(*) FROM hook_installations;").Should().Be(1);
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT installed_at FROM hook_installations;")
-            .Should().Be(SampleInstalledAt.AddDays(1).ToUnixTimeMilliseconds());
+            .Should().Be(_sampleInstalledAt.AddDays(1).ToUnixTimeMilliseconds());
         SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be("2.0.0");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT original_hook_backup_path FROM hook_installations;")
             .Should().Be("pre-commit.local.bak");
@@ -137,8 +137,8 @@ public sealed class SqliteAuditStoreHookTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
 
-        store.SaveHookInstallation(HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3"));
-        store.SaveHookInstallation(HookInstallation.Create(directory.Root, HookType.PrePush, SampleInstalledAt, "1.2.3"));
+        store.SaveHookInstallation(HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3"));
+        store.SaveHookInstallation(HookInstallation.Create(directory.Root, HookType.PrePush, _sampleInstalledAt, "1.2.3"));
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadStringColumn(connection, "SELECT hook_type FROM hook_installations ORDER BY hook_type;")
@@ -154,14 +154,14 @@ public sealed class SqliteAuditStoreHookTests
         var installed = HookInstallation.Create(
             directory.Root,
             HookType.PreCommit,
-            SampleInstalledAt,
+            _sampleInstalledAt,
             "1.2.3",
             "pre-commit.local.bak");
         store.SaveHookInstallation(installed);
         var uninstalled = HookInstallation.Create(
             directory.Root,
             HookType.PreCommit,
-            SampleInstalledAt.AddDays(3),
+            _sampleInstalledAt.AddDays(3),
             "2.0.0",
             "pre-commit.local.bak");
 
@@ -173,7 +173,7 @@ public sealed class SqliteAuditStoreHookTests
 
         // 05-数据库设计 §7：卸载仅翻转状态，保留首次安装的 installed_at / version / 备份路径
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT installed_at FROM hook_installations;")
-            .Should().Be(SampleInstalledAt.ToUnixTimeMilliseconds());
+            .Should().Be(_sampleInstalledAt.ToUnixTimeMilliseconds());
         SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be("1.2.3");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT original_hook_backup_path FROM hook_installations;")
             .Should().Be("pre-commit.local.bak");
@@ -192,7 +192,7 @@ public sealed class SqliteAuditStoreHookTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
-        var uninstalled = HookInstallation.Create(directory.Root, HookType.PrePush, SampleInstalledAt, "1.2.3");
+        var uninstalled = HookInstallation.Create(directory.Root, HookType.PrePush, _sampleInstalledAt, "1.2.3");
 
         store.SaveHookUninstallation(uninstalled, restoredLegacyHook: false);
 
@@ -209,12 +209,12 @@ public sealed class SqliteAuditStoreHookTests
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
-        store.SaveHookInstallation(HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3"));
+        store.SaveHookInstallation(HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3"));
         store.SaveHookUninstallation(
-            HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3"),
+            HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3"),
             restoredLegacyHook: false);
 
-        var reinstalled = HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt.AddDays(1), "2.0.0");
+        var reinstalled = HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt.AddDays(1), "2.0.0");
         store.SaveHookInstallation(reinstalled);
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
@@ -234,7 +234,7 @@ public sealed class SqliteAuditStoreHookTests
         long before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         store.SaveHookUninstallation(
-            HookInstallation.Create(directory.Root, HookType.PreCommit, SampleInstalledAt, "1.2.3"),
+            HookInstallation.Create(directory.Root, HookType.PreCommit, _sampleInstalledAt, "1.2.3"),
             restoredLegacyHook: false);
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);

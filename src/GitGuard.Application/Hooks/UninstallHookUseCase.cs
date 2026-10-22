@@ -14,7 +14,7 @@ namespace GitGuard.Application.Hooks;
 /// </summary>
 public sealed class UninstallHookUseCase
 {
-    private static readonly ImmutableArray<HookType> DEFAULT_HOOKS =
+    private static readonly ImmutableArray<HookType> _defaultHooks =
         ImmutableArray.Create(HookType.PreCommit, HookType.PrePush, HookType.PostCommit);
 
     private readonly IGitAccess _gitAccess;
@@ -72,7 +72,7 @@ public sealed class UninstallHookUseCase
     {
         if (hooks is null)
         {
-            return DEFAULT_HOOKS;
+            return _defaultHooks;
         }
 
         ArgumentOutOfRangeException.ThrowIfZero(hooks.Count, nameof(hooks));

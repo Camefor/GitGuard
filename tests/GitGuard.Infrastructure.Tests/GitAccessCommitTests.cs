@@ -8,8 +8,8 @@ namespace GitGuard.Infrastructure.Tests;
 /// <summary>GitAccess 提交枚举与批量差异集成测试（FR-030 预推送扫描的数据来源）。</summary>
 public sealed class GitAccessCommitTests
 {
-    private static readonly string[] UnknownSha = new[] { "0123456789abcdef0123456789abcdef01234567" };
-    private static readonly string[] LeadingDashSha = new[] { "--help" };
+    private static readonly string[] _unknownSha = new[] { "0123456789abcdef0123456789abcdef01234567" };
+    private static readonly string[] _leadingDashSha = new[] { "--help" };
 
     [Fact]
     public void ListCommitShas_SingleTipCommit_ReturnsAllReachableNewestFirst()
@@ -127,16 +127,16 @@ public sealed class GitAccessCommitTests
     public void GetCommitDiffs_CommitRemovingSecret_ShowsRemovalOnly()
     {
         using var repo = new TempGitRepository();
-        string withSecret = CreateCommit(repo, "cfg.txt", $"token={TestData.CanaryToken}\n", "add secret");
+        string withSecret = CreateCommit(repo, "cfg.txt", $"token={TestData.CANARY_TOKEN}\n", "add secret");
         string withoutSecret = CreateCommit(repo, "cfg.txt", "token=REMOVED\n", "remove secret");
         GitAccess access = CreateAccess(repo);
 
         // FR-030 场景：第 2 个提交含密钥、第 3 个提交已删除 —— 命中来自各自的提交差异
         IReadOnlyList<CommitDiff> diffs = access.GetCommitDiffs(new[] { withSecret, withoutSecret });
 
-        diffs[0].DiffText.Should().Contain($"+token={TestData.CanaryToken}");
-        diffs[1].DiffText.Should().Contain($"-token={TestData.CanaryToken}");
-        diffs[1].DiffText.Should().NotContain($"+token={TestData.CanaryToken}");
+        diffs[0].DiffText.Should().Contain($"+token={TestData.CANARY_TOKEN}");
+        diffs[1].DiffText.Should().Contain($"-token={TestData.CANARY_TOKEN}");
+        diffs[1].DiffText.Should().NotContain($"+token={TestData.CANARY_TOKEN}");
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public sealed class GitAccessCommitTests
         CreateCommit(repo, "a.txt", "one\n", "c1");
         GitAccess access = CreateAccess(repo);
 
-        Action act = () => access.GetCommitDiffs(UnknownSha);
+        Action act = () => access.GetCommitDiffs(_unknownSha);
 
         GitException exception = act.Should().Throw<GitException>().Which;
         exception.ErrorCode.Should().Be(GitException.GIT_COMMAND_FAILED);
@@ -209,7 +209,7 @@ public sealed class GitAccessCommitTests
         using var repo = new TempGitRepository();
         GitAccess access = CreateAccess(repo);
 
-        Action act = () => access.GetCommitDiffs(LeadingDashSha);
+        Action act = () => access.GetCommitDiffs(_leadingDashSha);
 
         act.Should().Throw<ArgumentException>();
     }

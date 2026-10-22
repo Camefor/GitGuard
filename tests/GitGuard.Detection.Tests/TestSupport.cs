@@ -15,9 +15,9 @@ internal static class TestSupport
     /// <summary>中性扫描路径：不命中任何降级 / 跳过条件（非测试样本文档，无示例文件名前缀）。</summary>
     public const string NEUTRAL_SCAN_PATH = "src/module/service.cs";
 
-    private static readonly IReadOnlyList<DetectionRule> RULES = BuiltinRuleLoader.LoadEmbedded();
+    private static readonly IReadOnlyList<DetectionRule> _rules = BuiltinRuleLoader.LoadEmbedded();
 
-    private static readonly FindingFactory FACTORY = new FindingFactory(new Fingerprinter(new byte[Fingerprinter.SALT_BYTES]));
+    private static readonly FindingFactory _factory = new FindingFactory(new Fingerprinter(new byte[Fingerprinter.SALT_BYTES]));
 
     /// <summary>创建确定性指纹盐（32 字节全零）的发现项工厂；同一原文跨扫描得到相同指纹。</summary>
     /// <returns>发现项工厂。</returns>
@@ -26,7 +26,7 @@ internal static class TestSupport
     /// <summary>装配 Privacy 检测器（可注入自定义选项，用于上下文门禁等行为测试）。</summary>
     /// <param name="options">检测器选项；<see langword="null"/> 使用默认值。</param>
     /// <returns>Privacy 检测器。</returns>
-    public static PrivacyDetector CreatePrivacyDetector(PrivacyDetectorOptions? options = null) => new PrivacyDetector(RULES, FACTORY, options);
+    public static PrivacyDetector CreatePrivacyDetector(PrivacyDetectorOptions? options = null) => new PrivacyDetector(_rules, _factory, options);
 
     /// <summary>按规则类别段（<c>SECRET</c> / <c>PRIVACY</c> / <c>LOCALPATH</c> / <c>URL</c>）装配内置检测器。</summary>
     /// <param name="category">规则类别段（规则 ID 第 2 段）。</param>
@@ -34,10 +34,10 @@ internal static class TestSupport
     /// <exception cref="ArgumentOutOfRangeException">未知类别段时抛出。</exception>
     public static IDetector CreateDetector(string category) => category switch
     {
-        "SECRET" => new SecretDetector(RULES, FACTORY),
-        "PRIVACY" => new PrivacyDetector(RULES, FACTORY),
-        "LOCALPATH" => new LocalPathDetector(RULES, FACTORY),
-        "URL" => new UrlDetector(RULES, FACTORY),
+        "SECRET" => new SecretDetector(_rules, _factory),
+        "PRIVACY" => new PrivacyDetector(_rules, _factory),
+        "LOCALPATH" => new LocalPathDetector(_rules, _factory),
+        "URL" => new UrlDetector(_rules, _factory),
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "未知的规则类别段"),
     };
 

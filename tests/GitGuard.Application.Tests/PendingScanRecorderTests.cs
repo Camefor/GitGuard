@@ -10,11 +10,11 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class PendingScanRecorderTests
 {
-    private const string ParentSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    private const string TreeSha = "cccccccccccccccccccccccccccccccccccccccc";
+    private const string PARENT_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private const string TREE_SHA = "cccccccccccccccccccccccccccccccccccccccc";
 
-    private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
-    private static readonly DateTimeOffset SampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly string _repoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
+    private static readonly DateTimeOffset _sampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Theory]
     [InlineData(false)]
@@ -22,15 +22,15 @@ public sealed class PendingScanRecorderTests
     public void Record_WritesParentTreeSkippedAndTimestamp(bool skipped)
     {
         var store = new RecordingPendingScanStore();
-        var recorder = CreateRecorder(store, parentSha: ParentSha);
+        var recorder = CreateRecorder(store, parentSha: PARENT_SHA);
 
         recorder.Record(skipped);
 
         PendingScan written = store.Writes.Should().ContainSingle().Subject;
-        written.ParentSha.Should().Be(ParentSha);
-        written.TreeSha.Should().Be(TreeSha);
+        written.ParentSha.Should().Be(PARENT_SHA);
+        written.TreeSha.Should().Be(TREE_SHA);
         written.Skipped.Should().Be(skipped);
-        written.RecordedAt.Should().Be(SampleUtcNow);
+        written.RecordedAt.Should().Be(_sampleUtcNow);
     }
 
     // 首个提交：HEAD 尚无指向，预测的父提交必须为空
@@ -49,7 +49,7 @@ public sealed class PendingScanRecorderTests
     public void Record_StoreWriteFailure_Propagates()
     {
         var store = new RecordingPendingScanStore { WriteException = new IOException("标记写入失败（测试注入）。") };
-        var recorder = CreateRecorder(store, parentSha: ParentSha);
+        var recorder = CreateRecorder(store, parentSha: PARENT_SHA);
 
         Action act = () => recorder.Record(skipped: false);
 
@@ -61,9 +61,9 @@ public sealed class PendingScanRecorderTests
     {
         var store = new RecordingPendingScanStore
         {
-            Stored = new PendingScan(ParentSha, TreeSha, skipped: false, SampleUtcNow),
+            Stored = new PendingScan(PARENT_SHA, TREE_SHA, skipped: false, _sampleUtcNow),
         };
-        var recorder = CreateRecorder(store, parentSha: ParentSha);
+        var recorder = CreateRecorder(store, parentSha: PARENT_SHA);
 
         recorder.Clear();
 
@@ -74,9 +74,9 @@ public sealed class PendingScanRecorderTests
     [Fact]
     public void Ctor_NullArguments_ThrowArgumentNullException()
     {
-        var git = new FakeGitAccess(RepoRoot);
+        var git = new FakeGitAccess(_repoRoot);
         var store = new RecordingPendingScanStore();
-        var clock = new FixedClock(SampleUtcNow);
+        var clock = new FixedClock(_sampleUtcNow);
 
         Action nullGit = () => _ = new PendingScanRecorder(null!, store, clock);
         Action nullStore = () => _ = new PendingScanRecorder(git, null!, clock);
@@ -90,9 +90,9 @@ public sealed class PendingScanRecorderTests
     private static PendingScanRecorder CreateRecorder(RecordingPendingScanStore store, string? parentSha)
     {
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             headCommitSha: () => parentSha,
-            stagedTreeSha: () => TreeSha);
-        return new PendingScanRecorder(git, store, new FixedClock(SampleUtcNow));
+            stagedTreeSha: () => TREE_SHA);
+        return new PendingScanRecorder(git, store, new FixedClock(_sampleUtcNow));
     }
 }

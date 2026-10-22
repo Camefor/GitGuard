@@ -18,21 +18,21 @@ public sealed class AuditUseCaseTests
         "run_id,repo_path,scan_type,started_at,duration_ms,result,exit_code," +
         "finding_id,rule_id,file_path,line_number,severity,fingerprint,snippet_masked,commit_sha";
 
-    private static readonly DateTimeOffset SampleNow = new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleNow = new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void List_PassesQueryThroughAndReturnsPage()
     {
         using var directory = new TempDirectory();
         var store = new RecordingAuditStore();
-        SaveCleanRun(store, directory.Root, SampleNow.AddMinutes(-2));
-        SaveWarnedRun(store, directory.Root, SampleNow.AddMinutes(-1));
-        SaveBlockedRun(store, directory.Root, SampleNow, findingCount: 1);
+        SaveCleanRun(store, directory.Root, _sampleNow.AddMinutes(-2));
+        SaveWarnedRun(store, directory.Root, _sampleNow.AddMinutes(-1));
+        SaveBlockedRun(store, directory.Root, _sampleNow, findingCount: 1);
         var useCase = new AuditListUseCase(store);
 
         AuditRunPage all = useCase.Execute(new AuditQuery());
         AuditRunPage filtered = useCase.Execute(
-            new AuditQuery(limit: 1, offset: 0, since: SampleNow.AddMinutes(-1), result: ScanResult.Warned));
+            new AuditQuery(limit: 1, offset: 0, since: _sampleNow.AddMinutes(-1), result: ScanResult.Warned));
 
         all.TotalCount.Should().Be(3);
         all.Runs.Should().HaveCount(3);
@@ -55,8 +55,8 @@ public sealed class AuditUseCaseTests
     {
         using var directory = new TempDirectory();
         var store = new RecordingAuditStore();
-        var blocked = SaveBlockedRun(store, directory.Root, SampleNow, findingCount: 2);
-        SaveCleanRun(store, directory.Root, SampleNow.AddMinutes(1));
+        var blocked = SaveBlockedRun(store, directory.Root, _sampleNow, findingCount: 2);
+        SaveCleanRun(store, directory.Root, _sampleNow.AddMinutes(1));
         string outputPath = Path.Combine(directory.Root, "audit.json");
 
         AuditExportReport report = CreateExportUseCase(store).Execute(outputPath, AuditExportFormat.Json);
@@ -98,7 +98,7 @@ public sealed class AuditUseCaseTests
         using var directory = new TempDirectory();
         var store = new RecordingAuditStore();
         SaveBlockedRunWithRiskyFields(store, directory.Root);
-        SaveCleanRun(store, directory.Root, SampleNow.AddMinutes(1));
+        SaveCleanRun(store, directory.Root, _sampleNow.AddMinutes(1));
         string outputPath = Path.Combine(directory.Root, "audit.csv");
 
         AuditExportReport report = CreateExportUseCase(store).Execute(outputPath, AuditExportFormat.Csv);
@@ -130,7 +130,7 @@ public sealed class AuditUseCaseTests
     {
         using var directory = new TempDirectory();
         var store = new RecordingAuditStore();
-        SaveCleanRun(store, directory.Root, SampleNow);
+        SaveCleanRun(store, directory.Root, _sampleNow);
         string outputPath = Path.Combine(directory.Root, "audit.csv");
         File.WriteAllText(outputPath, "stale");
 
@@ -144,7 +144,7 @@ public sealed class AuditUseCaseTests
     {
         using var directory = new TempDirectory();
         var store = new RecordingAuditStore();
-        SaveCleanRun(store, directory.Root, SampleNow);
+        SaveCleanRun(store, directory.Root, _sampleNow);
 
         Action act = () => CreateExportUseCase(store).Execute(directory.Root, AuditExportFormat.Json);
 
@@ -170,7 +170,7 @@ public sealed class AuditUseCaseTests
         var store = new FailingAuditStore();
 
         Action list = () => new AuditListUseCase(store).Execute(new AuditQuery());
-        Action export = () => new AuditExportUseCase(store, new FixedClock(SampleNow))
+        Action export = () => new AuditExportUseCase(store, new FixedClock(_sampleNow))
             .Execute("audit.json", AuditExportFormat.Json);
 
         list.Should().Throw<SqliteException>();
@@ -178,7 +178,7 @@ public sealed class AuditUseCaseTests
     }
 
     private static AuditExportUseCase CreateExportUseCase(RecordingAuditStore store) =>
-        new AuditExportUseCase(store, new FixedClock(SampleNow));
+        new AuditExportUseCase(store, new FixedClock(_sampleNow));
 
     private static ScanRun SaveCleanRun(RecordingAuditStore store, string repoPath, DateTimeOffset startedAt)
     {
@@ -227,7 +227,7 @@ public sealed class AuditUseCaseTests
             CreateFinding("GGD/SECRET/AWS-AKID", "src/a,b\"c.env", "AK,***"),
             CreateFinding("GGD/SECRET/GENERIC-PASSWORD", "=cmd.env", "AKIA****"),
         };
-        var run = ScanRun.Create(repoPath, ScanType.PreCommit, SampleNow, 12, ScanResult.Blocked, 1, findings);
+        var run = ScanRun.Create(repoPath, ScanType.PreCommit, _sampleNow, 12, ScanResult.Blocked, 1, findings);
         store.SaveScanRun(
             run,
             findings.ToDictionary(

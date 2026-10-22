@@ -16,7 +16,7 @@ namespace GitGuard.Infrastructure.Tests;
 /// </summary>
 public sealed class SqliteAuditStoreEventTests
 {
-    private const string MessageHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private const string MESSAGE_HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     [Fact]
     public void SavePolicyOverrideEvent_PersistsPolicyCategoryAndPayload()
@@ -62,7 +62,7 @@ public sealed class SqliteAuditStoreEventTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
 
-        store.SaveFailClosedEvent(14, "AUDIT_STORE_FAILED", MessageHash);
+        store.SaveFailClosedEvent(14, "AUDIT_STORE_FAILED", MESSAGE_HASH);
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadScalarString(connection, "SELECT category FROM audit_logs WHERE event_type = 'FailClosed';")
@@ -71,7 +71,7 @@ public sealed class SqliteAuditStoreEventTests
             SqliteTestHelpers.ReadScalarString(connection, "SELECT payload_json FROM audit_logs WHERE event_type = 'FailClosed';"));
         payload.RootElement.GetProperty("ExitCode").GetInt32().Should().Be(14);
         payload.RootElement.GetProperty("ErrorCode").GetString().Should().Be("AUDIT_STORE_FAILED");
-        payload.RootElement.GetProperty("MessageHash").GetString().Should().Be(MessageHash);
+        payload.RootElement.GetProperty("MessageHash").GetString().Should().Be(MESSAGE_HASH);
     }
 
     [Theory]
@@ -94,7 +94,7 @@ public sealed class SqliteAuditStoreEventTests
         using var directory = new TempDirectory();
         var store = new SqliteAuditStore(Path.Combine(directory.Root, "audit.db"));
 
-        Action act = () => store.SaveFailClosedEvent(1, "AUDIT_STORE_FAILED", MessageHash);
+        Action act = () => store.SaveFailClosedEvent(1, "AUDIT_STORE_FAILED", MESSAGE_HASH);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }

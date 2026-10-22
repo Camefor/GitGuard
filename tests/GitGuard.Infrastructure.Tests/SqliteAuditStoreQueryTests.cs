@@ -8,16 +8,16 @@ namespace GitGuard.Infrastructure.Tests;
 /// <summary>SqliteAuditStore 审计查询与导出读取（06-API接口设计 §5.6 / FR-023）。</summary>
 public sealed class SqliteAuditStoreQueryTests
 {
-    private static readonly DateTimeOffset SampleStartedAt = new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleStartedAt = new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void QueryScanRuns_OrdersByStartedAtDescendingAndPaginates()
     {
         using var directory = new TempDirectory();
         var store = CreateStore(directory);
-        var oldest = SaveCleanRun(store, directory.Root, SampleStartedAt.AddMinutes(-2));
-        var middle = SaveCleanRun(store, directory.Root, SampleStartedAt.AddMinutes(-1));
-        var newest = SaveCleanRun(store, directory.Root, SampleStartedAt);
+        var oldest = SaveCleanRun(store, directory.Root, _sampleStartedAt.AddMinutes(-2));
+        var middle = SaveCleanRun(store, directory.Root, _sampleStartedAt.AddMinutes(-1));
+        var newest = SaveCleanRun(store, directory.Root, _sampleStartedAt);
 
         AuditRunPage firstPage = store.QueryScanRuns(new AuditQuery(limit: 2, offset: 0));
         AuditRunPage secondPage = store.QueryScanRuns(new AuditQuery(limit: 2, offset: 2));
@@ -33,8 +33,8 @@ public sealed class SqliteAuditStoreQueryTests
     {
         using var directory = new TempDirectory();
         var store = CreateStore(directory);
-        var firstInserted = SaveCleanRun(store, directory.Root, SampleStartedAt);
-        var secondInserted = SaveCleanRun(store, directory.Root, SampleStartedAt);
+        var firstInserted = SaveCleanRun(store, directory.Root, _sampleStartedAt);
+        var secondInserted = SaveCleanRun(store, directory.Root, _sampleStartedAt);
 
         AuditRunPage page = store.QueryScanRuns(new AuditQuery());
 
@@ -46,14 +46,14 @@ public sealed class SqliteAuditStoreQueryTests
     {
         using var directory = new TempDirectory();
         var store = CreateStore(directory);
-        SaveCleanRun(store, directory.Root, SampleStartedAt);
-        var blocked = SaveBlockedRun(store, directory.Root, SampleStartedAt.AddMinutes(1), findingCount: 1);
-        SaveWarnedRun(store, directory.Root, SampleStartedAt.AddMinutes(2));
+        SaveCleanRun(store, directory.Root, _sampleStartedAt);
+        var blocked = SaveBlockedRun(store, directory.Root, _sampleStartedAt.AddMinutes(1), findingCount: 1);
+        SaveWarnedRun(store, directory.Root, _sampleStartedAt.AddMinutes(2));
 
-        AuditRunPage sinceFiltered = store.QueryScanRuns(new AuditQuery(since: SampleStartedAt.AddMinutes(1)));
+        AuditRunPage sinceFiltered = store.QueryScanRuns(new AuditQuery(since: _sampleStartedAt.AddMinutes(1)));
         AuditRunPage resultFiltered = store.QueryScanRuns(new AuditQuery(result: ScanResult.Blocked));
         AuditRunPage combined = store.QueryScanRuns(
-            new AuditQuery(since: SampleStartedAt.AddMinutes(2), result: ScanResult.Blocked));
+            new AuditQuery(since: _sampleStartedAt.AddMinutes(2), result: ScanResult.Blocked));
 
         sinceFiltered.TotalCount.Should().Be(2);
         sinceFiltered.Runs.Select(run => run.RunId).Should().Contain(blocked.Id);
@@ -69,14 +69,14 @@ public sealed class SqliteAuditStoreQueryTests
     {
         using var directory = new TempDirectory();
         var store = CreateStore(directory);
-        ScanRun run = SaveBlockedRun(store, directory.Root, SampleStartedAt, findingCount: 2);
+        ScanRun run = SaveBlockedRun(store, directory.Root, _sampleStartedAt, findingCount: 2);
 
         AuditRunSummary summary = store.QueryScanRuns(new AuditQuery()).Runs.Should().ContainSingle().Subject;
 
         summary.RunId.Should().Be(run.Id);
         summary.RepoPath.Should().Be(Path.TrimEndingDirectorySeparator(directory.Root));
         summary.ScanType.Should().Be(ScanType.PreCommit);
-        summary.StartedAt.Should().Be(SampleStartedAt);
+        summary.StartedAt.Should().Be(_sampleStartedAt);
         summary.DurationMs.Should().Be(15);
         summary.Result.Should().Be(ScanResult.Blocked);
         summary.ExitCode.Should().Be(1);
@@ -88,7 +88,7 @@ public sealed class SqliteAuditStoreQueryTests
     {
         using var directory = new TempDirectory();
         var store = CreateStore(directory);
-        var run = ScanRun.Create(directory.Root, ScanType.Bypass, SampleStartedAt, null, ScanResult.Clean, 0);
+        var run = ScanRun.Create(directory.Root, ScanType.Bypass, _sampleStartedAt, null, ScanResult.Clean, 0);
         store.SaveBypassEvent(run, BypassReason.NoVerify, "0123456789abcdef0123456789abcdef01234567");
 
         AuditRunSummary summary = store.QueryScanRuns(new AuditQuery()).Runs.Should().ContainSingle().Subject;
@@ -115,8 +115,8 @@ public sealed class SqliteAuditStoreQueryTests
     {
         using var directory = new TempDirectory();
         var store = CreateStore(directory);
-        var older = SaveBlockedRun(store, directory.Root, SampleStartedAt.AddMinutes(-1), findingCount: 2);
-        var newer = SaveBlockedRun(store, directory.Root, SampleStartedAt, findingCount: 1);
+        var older = SaveBlockedRun(store, directory.Root, _sampleStartedAt.AddMinutes(-1), findingCount: 2);
+        var newer = SaveBlockedRun(store, directory.Root, _sampleStartedAt, findingCount: 1);
 
         IReadOnlyList<ScanRun> runs = store.ListScanRunsForExport();
 

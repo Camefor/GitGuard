@@ -14,11 +14,11 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class InstallHookUseCaseTests
 {
-    private const string SampleVersion = "9.9.9-test";
-    private const string LegacyHookContent = "#!/bin/sh\necho legacy\n";
-    private const string InstallLockFileName = "gitguard.install.lock";
+    private const string SAMPLE_VERSION = "9.9.9-test";
+    private const string LEGACY_HOOK_CONTENT = "#!/bin/sh\necho legacy\n";
+    private const string INSTALL_LOCK_FILE_NAME = "gitguard.install.lock";
 
-    private static readonly DateTimeOffset SampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleUtcNow = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public void Execute_FreshRepository_InstallsAllHooksAndPersistsActiveRecords()
@@ -31,7 +31,7 @@ public sealed class InstallHookUseCaseTests
         HookInstallReport report = useCase.Execute(executablePath);
 
         report.RepoPath.Should().Be(repo.Root);
-        report.Version.Should().Be(SampleVersion);
+        report.Version.Should().Be(SAMPLE_VERSION);
         report.Results.Should().HaveCount(3);
         report.Results.Select(result => result.HookType)
             .Should().Equal(HookType.PreCommit, HookType.PrePush, HookType.PostCommit);
@@ -43,15 +43,15 @@ public sealed class InstallHookUseCaseTests
         File.Exists(Path.Combine(repo.Root, ".git", "hooks", "pre-push")).Should().BeTrue();
         File.ReadAllText(Path.Combine(repo.Root, ".git", "hooks", "post-commit")).Should().Contain("hook post-commit");
         string script = File.ReadAllText(preCommitPath);
-        script.Should().StartWith($"#!/bin/sh\n# gitguard-managed v{SampleVersion}\n");
+        script.Should().StartWith($"#!/bin/sh\n# gitguard-managed v{SAMPLE_VERSION}\n");
         script.Should().Contain($"GITGUARD_BIN=\"{HookTestSupport.ToUnixPath(Path.GetFullPath(executablePath))}\"");
         script.Should().NotContain("\r");
 
         store.SavedHookInstallations.Should().HaveCount(3);
         store.SavedHookInstallations.Should().OnlyContain(installation => installation.Status == HookInstallationStatus.Active);
         store.SavedHookInstallations.Should().OnlyContain(installation => installation.RepoPath == repo.Root);
-        store.SavedHookInstallations.Should().OnlyContain(installation => installation.InstalledAt == SampleUtcNow);
-        store.SavedHookInstallations.Should().OnlyContain(installation => installation.Version == SampleVersion);
+        store.SavedHookInstallations.Should().OnlyContain(installation => installation.InstalledAt == _sampleUtcNow);
+        store.SavedHookInstallations.Should().OnlyContain(installation => installation.Version == SAMPLE_VERSION);
         store.SavedHookInstallations.Should().OnlyContain(installation => installation.OriginalHookBackupPath == null);
     }
 
@@ -69,7 +69,7 @@ public sealed class InstallHookUseCaseTests
         HookInstallResult result = report.Results.Should().ContainSingle().Subject;
         result.Disposition.Should().Be(HookInstallDisposition.WrappedLegacy);
         result.BackupPath.Should().Be(hookPath + HookTypeExtensions.BACKUP_FILE_SUFFIX);
-        File.ReadAllText(result.BackupPath!).Should().Be(LegacyHookContent);
+        File.ReadAllText(result.BackupPath!).Should().Be(LEGACY_HOOK_CONTENT);
         string script = File.ReadAllText(hookPath);
         script.Should().Contain("# gitguard-managed v");
         script.Should().Contain("pre-commit.local.bak");
@@ -150,7 +150,7 @@ public sealed class InstallHookUseCaseTests
         Action act = () => useCase.Execute(CreateExecutable(repo), force: true, hooks: new[] { HookType.PreCommit });
 
         act.Should().Throw<HookException>().Which.ErrorCode.Should().Be(HookException.UNKNOWN_HOOK_PRESENT);
-        File.ReadAllText(hookPath).Should().Be(LegacyHookContent);
+        File.ReadAllText(hookPath).Should().Be(LEGACY_HOOK_CONTENT);
         File.ReadAllText(backupPath).Should().Be("#!/bin/sh\necho original\n");
         store.SavedHookInstallations.Should().BeEmpty();
     }
@@ -164,14 +164,14 @@ public sealed class InstallHookUseCaseTests
         var useCase = CreateUseCase(repo, store);
         string hookPath = Path.Combine(repo.Root, ".git", "hooks", "pre-commit");
         string backupPath = hookPath + HookTypeExtensions.BACKUP_FILE_SUFFIX;
-        File.WriteAllText(backupPath, LegacyHookContent);
+        File.WriteAllText(backupPath, LEGACY_HOOK_CONTENT);
 
         HookInstallReport report = useCase.Execute(CreateExecutable(repo), hooks: new[] { HookType.PreCommit });
 
         HookInstallResult result = report.Results.Should().ContainSingle().Subject;
         result.Disposition.Should().Be(HookInstallDisposition.Installed);
         result.BackupPath.Should().Be(backupPath);
-        File.ReadAllText(backupPath).Should().Be(LegacyHookContent);
+        File.ReadAllText(backupPath).Should().Be(LEGACY_HOOK_CONTENT);
         store.SavedHookInstallations.Should().ContainSingle()
             .Which.OriginalHookBackupPath.Should().Be("pre-commit.local.bak");
     }
@@ -186,8 +186,8 @@ public sealed class InstallHookUseCaseTests
         var useCase = new InstallHookUseCase(
             new FakeGitAccess(repo.Root, hooksPath: customHooksDirectory),
             store,
-            new FixedClock(SampleUtcNow),
-            SampleVersion);
+            new FixedClock(_sampleUtcNow),
+            SAMPLE_VERSION);
 
         HookInstallReport report = useCase.Execute(CreateExecutable(repo), hooks: new[] { HookType.PreCommit });
 
@@ -204,7 +204,7 @@ public sealed class InstallHookUseCaseTests
         using var repo = new TempGitRepository();
         var store = new RecordingAuditStore();
         var useCase = CreateUseCase(repo, store);
-        string lockPath = Path.Combine(repo.Root, ".git", InstallLockFileName);
+        string lockPath = Path.Combine(repo.Root, ".git", INSTALL_LOCK_FILE_NAME);
         using var heldLock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
 
         Action act = () => useCase.Execute(CreateExecutable(repo));
@@ -221,8 +221,8 @@ public sealed class InstallHookUseCaseTests
         var useCase = new InstallHookUseCase(
             new FakeGitAccess(repo.Root),
             new FailingAuditStore(),
-            new FixedClock(SampleUtcNow),
-            SampleVersion);
+            new FixedClock(_sampleUtcNow),
+            SAMPLE_VERSION);
 
         Action act = () => useCase.Execute(CreateExecutable(repo), hooks: new[] { HookType.PreCommit });
 
@@ -306,8 +306,8 @@ public sealed class InstallHookUseCaseTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
-    private static InstallHookUseCase CreateUseCase(TempGitRepository repo, RecordingAuditStore store, string version = SampleVersion) =>
-        new InstallHookUseCase(new FakeGitAccess(repo.Root), store, new FixedClock(SampleUtcNow), version);
+    private static InstallHookUseCase CreateUseCase(TempGitRepository repo, RecordingAuditStore store, string version = SAMPLE_VERSION) =>
+        new InstallHookUseCase(new FakeGitAccess(repo.Root), store, new FixedClock(_sampleUtcNow), version);
 
     private static string CreateExecutable(TempGitRepository repo)
     {
@@ -320,7 +320,7 @@ public sealed class InstallHookUseCaseTests
     private static string WriteLegacyHook(TempGitRepository repo, HookType hookType)
     {
         string hookPath = Path.Combine(repo.Root, ".git", "hooks", hookType.ToHookName());
-        File.WriteAllText(hookPath, LegacyHookContent);
+        File.WriteAllText(hookPath, LEGACY_HOOK_CONTENT);
         return hookPath;
     }
 }

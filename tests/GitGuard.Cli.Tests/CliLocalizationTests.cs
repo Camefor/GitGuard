@@ -9,9 +9,9 @@ namespace GitGuard.Cli.Tests;
 /// </summary>
 public sealed class CliLocalizationTests
 {
-    private static readonly string[] VERSION_ARGS = new[] { "version" };
-    private static readonly string[] VERSION_CHINESE_ARGS = new[] { "version", "--language", "zh-CN" };
-    private static readonly string[] VERSION_INVALID_LANGUAGE_ARGS = new[] { "version", "--language", "fr-FR" };
+    private static readonly string[] _versionArgs = new[] { "version" };
+    private static readonly string[] _versionChineseArgs = new[] { "version", "--language", "zh-CN" };
+    private static readonly string[] _versionInvalidLanguageArgs = new[] { "version", "--language", "fr-FR" };
 
     [Fact]
     public async Task Default_OutputsChinese()
@@ -63,7 +63,7 @@ public sealed class CliLocalizationTests
     {
         using var harness = new CliHarness();
 
-        int exitCode = await harness.RunAsync(VERSION_ARGS, string.Empty, languageEnvironment: "en");
+        int exitCode = await harness.RunAsync(_versionArgs, string.Empty, languageEnvironment: "en");
 
         exitCode.Should().Be(ExitCodes.SUCCESS);
         harness.Error.Should().Contain("Rules version");
@@ -75,7 +75,7 @@ public sealed class CliLocalizationTests
         using var harness = new CliHarness();
 
         int exitCode = await harness.RunAsync(
-            VERSION_CHINESE_ARGS,
+            _versionChineseArgs,
             string.Empty,
             languageEnvironment: "en-US");
 
@@ -100,7 +100,7 @@ public sealed class CliLocalizationTests
         using var harness = new CliHarness();
 
         int exitCode = await harness.RunAsync(
-            VERSION_INVALID_LANGUAGE_ARGS,
+            _versionInvalidLanguageArgs,
             string.Empty,
             languageEnvironment: "en");
 

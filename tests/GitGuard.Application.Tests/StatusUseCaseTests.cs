@@ -14,7 +14,7 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class StatusUseCaseTests
 {
-    private const string SampleVersion = "1.2.3-status";
+    private const string SAMPLE_VERSION = "1.2.3-status";
 
     [Fact]
     public void Execute_WithoutHooks_ReportsMissingAndNoAttention()
@@ -25,7 +25,7 @@ public sealed class StatusUseCaseTests
 
         report.RepoPath.Should().Be(repo.Root);
         report.GitVersion.Should().StartWith("git version");
-        report.GitGuardVersion.Should().Be(SampleVersion);
+        report.GitGuardVersion.Should().Be(SAMPLE_VERSION);
         report.Hooks.Should().HaveCount(3);
         report.Hooks.Should().OnlyContain(hook => hook.Kind == HookStatusKind.Missing);
         report.Hooks.Should().OnlyContain(hook => hook.ManagedVersion == null);
@@ -38,13 +38,13 @@ public sealed class StatusUseCaseTests
     {
         using var repo = new TempGitRepository();
         var git = new GitAccess(repo.Root);
-        new InstallHookUseCase(git, new RecordingAuditStore(), new SystemClock(), SampleVersion)
+        new InstallHookUseCase(git, new RecordingAuditStore(), new SystemClock(), SAMPLE_VERSION)
             .Execute("/opt/gitguard/gitguard");
 
         StatusReport report = CreateUseCase(repo).Execute();
 
         report.Hooks.Should().OnlyContain(hook => hook.Kind == HookStatusKind.Managed);
-        report.Hooks.Should().OnlyContain(hook => hook.ManagedVersion == SampleVersion);
+        report.Hooks.Should().OnlyContain(hook => hook.ManagedVersion == SAMPLE_VERSION);
         report.NeedsAttention.Should().BeFalse();
     }
 
@@ -94,13 +94,13 @@ public sealed class StatusUseCaseTests
     {
         using var plain = new TempPlainDirectory();
 
-        Action act = () => new StatusUseCase(new GitAccess(plain.Root), GitGuardConfig.Default, SampleVersion).Execute();
+        Action act = () => new StatusUseCase(new GitAccess(plain.Root), GitGuardConfig.Default, SAMPLE_VERSION).Execute();
 
         act.Should().Throw<GitException>().Which.ErrorCode.Should().Be(GitException.NOT_A_GIT_REPOSITORY);
     }
 
     private static StatusUseCase CreateUseCase(TempGitRepository repo) =>
-        new StatusUseCase(new GitAccess(repo.Root), GitGuardConfig.Default, SampleVersion);
+        new StatusUseCase(new GitAccess(repo.Root), GitGuardConfig.Default, SAMPLE_VERSION);
 
     /// <summary>非仓库临时目录（验证 FailClosed 分支）。</summary>
     private sealed class TempPlainDirectory : IDisposable

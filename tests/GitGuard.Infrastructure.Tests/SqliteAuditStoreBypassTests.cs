@@ -13,9 +13,9 @@ namespace GitGuard.Infrastructure.Tests;
 /// </summary>
 public sealed class SqliteAuditStoreBypassTests
 {
-    private const string CommitSha = "0123456789abcdef0123456789abcdef01234567";
+    private const string COMMIT_SHA = "0123456789abcdef0123456789abcdef01234567";
 
-    private static readonly DateTimeOffset SampleDetectedAt = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _sampleDetectedAt = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public void SaveBypassEvent_PersistsCleanBypassRunWithoutDuration()
@@ -25,7 +25,7 @@ public sealed class SqliteAuditStoreBypassTests
         var store = new SqliteAuditStore(dbPath);
         ScanRun run = CreateBypassRun(directory.Root);
 
-        store.SaveBypassEvent(run, BypassReason.NoVerify, CommitSha);
+        store.SaveBypassEvent(run, BypassReason.NoVerify, COMMIT_SHA);
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT COUNT(*) FROM scan_runs;").Should().Be(1);
@@ -47,20 +47,20 @@ public sealed class SqliteAuditStoreBypassTests
         var store = new SqliteAuditStore(dbPath);
         ScanRun run = CreateBypassRun(directory.Root);
 
-        store.SaveBypassEvent(run, reason, CommitSha);
+        store.SaveBypassEvent(run, reason, COMMIT_SHA);
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT COUNT(*) FROM audit_logs;").Should().Be(1);
         SqliteTestHelpers.ReadScalarString(connection, "SELECT category FROM audit_logs;").Should().Be("Bypass");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT event_type FROM audit_logs;").Should().Be("BypassDetected");
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT occurred_at FROM audit_logs;")
-            .Should().Be(SampleDetectedAt.ToUnixTimeMilliseconds());
+            .Should().Be(_sampleDetectedAt.ToUnixTimeMilliseconds());
 
         string payloadJson = SqliteTestHelpers.ReadScalarString(connection, "SELECT payload_json FROM audit_logs;");
         using var payload = JsonDocument.Parse(payloadJson);
         payload.RootElement.GetProperty("RunId").GetString().Should().Be(run.Id.ToString());
-        payload.RootElement.GetProperty("CommitSha").GetString().Should().Be(CommitSha);
-        payload.RootElement.GetProperty("DetectedAt").GetInt64().Should().Be(SampleDetectedAt.ToUnixTimeMilliseconds());
+        payload.RootElement.GetProperty("CommitSha").GetString().Should().Be(COMMIT_SHA);
+        payload.RootElement.GetProperty("DetectedAt").GetInt64().Should().Be(_sampleDetectedAt.ToUnixTimeMilliseconds());
         payload.RootElement.GetProperty("Reason").GetString().Should().Be(expectedReason);
     }
 
@@ -71,8 +71,8 @@ public sealed class SqliteAuditStoreBypassTests
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
 
-        store.SaveBypassEvent(CreateBypassRun(directory.Root), BypassReason.NoVerify, CommitSha);
-        store.SaveBypassEvent(CreateBypassRun(directory.Root), BypassReason.GitGuardSkip, CommitSha);
+        store.SaveBypassEvent(CreateBypassRun(directory.Root), BypassReason.NoVerify, COMMIT_SHA);
+        store.SaveBypassEvent(CreateBypassRun(directory.Root), BypassReason.GitGuardSkip, COMMIT_SHA);
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadScalarLong(connection, "SELECT COUNT(*) FROM scan_runs;").Should().Be(2);
@@ -134,7 +134,7 @@ public sealed class SqliteAuditStoreBypassTests
         using var directory = new TempDirectory();
         var store = new SqliteAuditStore(Path.Combine(directory.Root, "audit.db"));
 
-        Action act = () => store.SaveBypassEvent(null!, BypassReason.NoVerify, CommitSha);
+        Action act = () => store.SaveBypassEvent(null!, BypassReason.NoVerify, COMMIT_SHA);
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -145,7 +145,7 @@ public sealed class SqliteAuditStoreBypassTests
         using var directory = new TempDirectory();
         var store = new SqliteAuditStore(Path.Combine(directory.Root, "audit.db"));
 
-        Action act = () => store.SaveBypassEvent(CreateBypassRun(directory.Root), (BypassReason)99, CommitSha);
+        Action act = () => store.SaveBypassEvent(CreateBypassRun(directory.Root), (BypassReason)99, COMMIT_SHA);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -158,12 +158,12 @@ public sealed class SqliteAuditStoreBypassTests
         var preCommit = ScanRun.Create(
             directory.Root,
             ScanType.PreCommit,
-            SampleDetectedAt,
+            _sampleDetectedAt,
             durationMs: 12,
             ScanResult.Clean,
             exitCode: 0);
 
-        Action act = () => store.SaveBypassEvent(preCommit, BypassReason.NoVerify, CommitSha);
+        Action act = () => store.SaveBypassEvent(preCommit, BypassReason.NoVerify, COMMIT_SHA);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -172,7 +172,7 @@ public sealed class SqliteAuditStoreBypassTests
         ScanRun.Create(
             repoPath,
             ScanType.Bypass,
-            SampleDetectedAt,
+            _sampleDetectedAt,
             durationMs: null,
             ScanResult.Clean,
             exitCode: 0);

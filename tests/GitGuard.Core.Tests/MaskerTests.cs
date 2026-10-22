@@ -10,9 +10,9 @@ public sealed class MaskerTests
     [Fact]
     public void Mask_CanaryToken_FullTokenAbsentAndPinEdges()
     {
-        var masked = Masker.Mask(TestData.CanaryToken);
+        var masked = Masker.Mask(TestData.CANARY_TOKEN);
 
-        masked.Value.Should().NotContain(TestData.CanaryToken);
+        masked.Value.Should().NotContain(TestData.CANARY_TOKEN);
         masked.Value.Should().StartWith("AK").And.EndWith("ab");
         masked.Value.Should().HaveLength(SnippetMasked.MAX_LENGTH);
     }

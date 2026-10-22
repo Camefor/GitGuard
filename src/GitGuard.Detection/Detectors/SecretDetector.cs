@@ -21,10 +21,10 @@ public sealed class SecretDetector : RegexRuleDetector
     private const int LONG_LINE_THRESHOLD = 2048;
 
     /// <summary>整文件跳过的后缀：锁文件与压缩产物（模块设计 Secret §6）。</summary>
-    private static readonly string[] SKIPPED_FILE_SUFFIXES = new[] { ".lock", ".min.js", ".min.css" };
+    private static readonly string[] _skippedFileSuffixes = new[] { ".lock", ".min.js", ".min.css" };
 
     /// <summary>长行场景保留的高置信度规则（跳过 GENERIC-PASSWORD / AWS-SECRET 等低置信度启发式）。</summary>
-    private static readonly HashSet<string> HIGH_CONFIDENCE_RULE_IDS = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly HashSet<string> _highConfidenceRuleIds = new HashSet<string>(StringComparer.Ordinal)
     {
         "GGD/SECRET/AWS-AKID",
         "GGD/SECRET/GITHUB-TOKEN",
@@ -50,7 +50,7 @@ public sealed class SecretDetector : RegexRuleDetector
     /// <returns>跳过返回 <see langword="true"/>。</returns>
     protected override bool ShouldSkipFile(FileChange change)
     {
-        foreach (string suffix in SKIPPED_FILE_SUFFIXES)
+        foreach (string suffix in _skippedFileSuffixes)
         {
             if (change.Path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
             {
@@ -66,7 +66,7 @@ public sealed class SecretDetector : RegexRuleDetector
     /// <param name="line">当前变更行。</param>
     /// <returns>跳过返回 <see langword="true"/>。</returns>
     protected override bool ShouldSkipRuleForLine(DetectionRule rule, ChangedLine line) =>
-        line.Text.Length > LONG_LINE_THRESHOLD && !HIGH_CONFIDENCE_RULE_IDS.Contains(rule.RuleId);
+        line.Text.Length > LONG_LINE_THRESHOLD && !_highConfidenceRuleIds.Contains(rule.RuleId);
 
     private static Dictionary<string, Func<string, bool>> BuildValidators(SecretDetectorOptions options)
     {

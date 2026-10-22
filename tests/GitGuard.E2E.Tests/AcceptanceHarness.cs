@@ -28,7 +28,7 @@ internal sealed class AcceptanceHarness : IDisposable
     private const string REMOTES_DIRECTORY_NAME = "remotes";
     private const string GITGUARD_EXECUTABLE_NAME = "gitguard";
 
-    private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+    private static readonly UTF8Encoding _utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     private readonly string _homeDirectory;
     private readonly string _localAppDataDirectory;
@@ -137,7 +137,7 @@ internal sealed class AcceptanceHarness : IDisposable
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(path, content, Utf8NoBom);
+        File.WriteAllText(path, content, _utf8NoBom);
     }
 
     /// <summary>写入 POSIX sh 脚本（无 BOM、LF 行尾保证 shebang 生效；非 Windows 置 0755 可执行位）。</summary>
@@ -153,7 +153,7 @@ internal sealed class AcceptanceHarness : IDisposable
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(filePath, "#!/bin/sh\n" + body, Utf8NoBom);
+        File.WriteAllText(filePath, "#!/bin/sh\n" + body, _utf8NoBom);
         if (!OperatingSystem.IsWindows())
         {
             UnixFileMode mode =

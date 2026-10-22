@@ -14,7 +14,7 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class HookEndToEndTests
 {
-    private const string SampleVersion = "1.2.3-e2e";
+    private const string SAMPLE_VERSION = "1.2.3-e2e";
 
     // TC-FR-010-01：全新仓库安装 → 分发脚本落盘 + hook_installations 行 + HookInstalled 事件
     [Fact]
@@ -26,19 +26,19 @@ public sealed class HookEndToEndTests
         var store = new SqliteAuditStore(databasePath);
         string stub = CreateStub(repo);
 
-        HookInstallReport report = new InstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        HookInstallReport report = new InstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(stub, hooks: new[] { HookType.PreCommit });
 
         report.RepoPath.Should().Be(git.GetRepositoryRoot());
         report.Results.Should().ContainSingle().Which.Disposition.Should().Be(HookInstallDisposition.Installed);
         File.ReadAllText(Path.Combine(repo.Root, ".git", "hooks", "pre-commit"))
-            .Should().StartWith($"#!/bin/sh\n# gitguard-managed v{SampleVersion}\n");
+            .Should().StartWith($"#!/bin/sh\n# gitguard-managed v{SAMPLE_VERSION}\n");
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(databasePath);
         SqliteTestHelpers.ReadScalarString(connection, "SELECT repo_path FROM hook_installations;")
             .Should().Be(git.GetRepositoryRoot());
         SqliteTestHelpers.ReadScalarString(connection, "SELECT hook_type FROM hook_installations;").Should().Be("pre-commit");
-        SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be(SampleVersion);
+        SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be(SAMPLE_VERSION);
         SqliteTestHelpers.ReadScalarString(connection, "SELECT status FROM hook_installations;").Should().Be("Active");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT category FROM audit_logs ORDER BY seq DESC LIMIT 1;").Should().Be("Hook");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT event_type FROM audit_logs ORDER BY seq DESC LIMIT 1;")
@@ -57,12 +57,12 @@ public sealed class HookEndToEndTests
         const string legacyContent = "#!/bin/sh\necho husky-like hook\n";
         File.WriteAllText(hookPath, legacyContent);
 
-        HookInstallReport installReport = new InstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        HookInstallReport installReport = new InstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(CreateStub(repo), hooks: new[] { HookType.PreCommit });
         installReport.Results.Should().ContainSingle()
             .Which.Disposition.Should().Be(HookInstallDisposition.WrappedLegacy);
 
-        HookUninstallReport uninstallReport = new UninstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        HookUninstallReport uninstallReport = new UninstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(force: true, hooks: new[] { HookType.PreCommit });
 
         uninstallReport.Results.Should().ContainSingle()
@@ -75,7 +75,7 @@ public sealed class HookEndToEndTests
         SqliteTestHelpers.ReadScalarString(connection, "SELECT status FROM hook_installations;").Should().Be("Uninstalled");
 
         // 卸载仅翻转状态：首次安装的 version / 备份路径保留（05-数据库设计 §7）
-        SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be(SampleVersion);
+        SqliteTestHelpers.ReadScalarString(connection, "SELECT version FROM hook_installations;").Should().Be(SAMPLE_VERSION);
         SqliteTestHelpers.ReadScalarString(connection, "SELECT original_hook_backup_path FROM hook_installations;")
             .Should().Be("pre-commit.local.bak");
         SqliteTestHelpers.ReadScalarString(connection, "SELECT event_type FROM audit_logs ORDER BY seq DESC LIMIT 1;")
@@ -97,7 +97,7 @@ public sealed class HookEndToEndTests
         repo.WriteFile("a.txt", "hello\n");
         repo.Stage("a.txt");
 
-        new InstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        new InstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(stub, hooks: new[] { HookType.PreCommit });
         string commitSha = repo.Commit("init");
 
@@ -120,7 +120,7 @@ public sealed class HookEndToEndTests
         EnableRepoHooks(repo);
         repo.WriteFile("a.txt", "hello\n");
         repo.Stage("a.txt");
-        new InstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        new InstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(stub, hooks: new[] { HookType.PreCommit });
 
         Action act = () => repo.Commit("init");
@@ -152,7 +152,7 @@ public sealed class HookEndToEndTests
         string legacyLog = Path.Combine(repo.Root, "legacy.log");
         string stub = CreateStub(repo, guardLog, guardExitCode);
         string hookPath = WriteLegacyHookWithLog(repo, legacyLog, legacyExitCode);
-        new InstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        new InstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(stub, hooks: new[] { HookType.PreCommit });
 
         int exitCode = HookTestSupport.RunScript(shPath, hookPath, repo.Root, "alpha", "beta");
@@ -179,7 +179,7 @@ public sealed class HookEndToEndTests
         string legacyLog = Path.Combine(repo.Root, "legacy.log");
         string stub = CreateStub(repo, Path.Combine(repo.Root, "guard.log"));
         string hookPath = WriteLegacyHookWithLog(repo, legacyLog);
-        new InstallHookUseCase(git, store, new SystemClock(), SampleVersion)
+        new InstallHookUseCase(git, store, new SystemClock(), SAMPLE_VERSION)
             .Execute(stub, hooks: new[] { HookType.PreCommit });
         File.Delete(stub);
 

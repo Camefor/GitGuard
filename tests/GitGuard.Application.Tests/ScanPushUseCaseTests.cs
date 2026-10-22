@@ -18,13 +18,13 @@ public sealed class ScanPushUseCaseTests
     private const string COMMIT_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private const string COMMIT_C = "cccccccccccccccccccccccccccccccccccccccc";
 
-    private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
-    private static readonly DateTimeOffset ScanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly string _repoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
+    private static readonly DateTimeOffset _scanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task ExecuteAsync_EmptyStdin_ReturnsCleanWithoutGitCalls()
     {
-        var git = new FakeGitAccess(RepoRoot);
+        var git = new FakeGitAccess(_repoRoot);
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         ScanOutcome outcome = await useCase.ExecuteAsync(string.Empty, TestContext.Current.CancellationToken);
@@ -42,9 +42,9 @@ public sealed class ScanPushUseCaseTests
     {
         string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {ZERO_SHA}\n";
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             listCommitShas: range => range == LOCAL_SHA ? new[] { COMMIT_A } : Array.Empty<string>(),
-            commitDiff: _ => DiffSamples.SingleAddedLine);
+            commitDiff: _ => DiffSamples.SINGLE_ADDED_LINE);
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
@@ -59,9 +59,9 @@ public sealed class ScanPushUseCaseTests
     {
         string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {REMOTE_SHA}\n";
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             listCommitShas: range => range == $"{REMOTE_SHA}..{LOCAL_SHA}" ? new[] { COMMIT_A } : Array.Empty<string>(),
-            commitDiff: _ => DiffSamples.SingleAddedLine);
+            commitDiff: _ => DiffSamples.SINGLE_ADDED_LINE);
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
@@ -73,7 +73,7 @@ public sealed class ScanPushUseCaseTests
     public async Task ExecuteAsync_DeletionUpdate_IsSkippedWithoutRevList()
     {
         string stdin = $"refs/heads/gone {ZERO_SHA} refs/heads/gone {REMOTE_SHA}\n";
-        var git = new FakeGitAccess(RepoRoot);
+        var git = new FakeGitAccess(_repoRoot);
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
@@ -90,11 +90,11 @@ public sealed class ScanPushUseCaseTests
             $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {REMOTE_SHA}\n" +
             $"{LOCAL_REF} {LOCAL_SHA_2} {LOCAL_REF} {ZERO_SHA}\n";
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             listCommitShas: range => range == $"{REMOTE_SHA}..{LOCAL_SHA}"
                 ? new[] { COMMIT_A, COMMIT_B }
                 : new[] { COMMIT_B, COMMIT_C },
-            commitDiff: _ => DiffSamples.SingleAddedLine);
+            commitDiff: _ => DiffSamples.SINGLE_ADDED_LINE);
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
@@ -109,7 +109,7 @@ public sealed class ScanPushUseCaseTests
     public async Task ExecuteAsync_NoCommitsInRange_SkipsBatchDiffCall()
     {
         string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {REMOTE_SHA}\n";
-        var git = new FakeGitAccess(RepoRoot);
+        var git = new FakeGitAccess(_repoRoot);
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
         ScanOutcome outcome = await useCase.ExecuteAsync(stdin, TestContext.Current.CancellationToken);
@@ -125,9 +125,9 @@ public sealed class ScanPushUseCaseTests
     {
         string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {ZERO_SHA}\n";
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             listCommitShas: _ => new[] { COMMIT_A },
-            commitDiff: _ => DiffSamples.SingleAddedLine);
+            commitDiff: _ => DiffSamples.SINGLE_ADDED_LINE);
         var detector = new StubDetector("secret", change => new List<Finding>
         {
             FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical, commitSha: change.CommitSha),
@@ -144,9 +144,9 @@ public sealed class ScanPushUseCaseTests
     [Fact]
     public async Task ExecuteAsync_MalformedStdin_ReturnsFailedWithExitCodeTen()
     {
-        var git = new FakeGitAccess(RepoRoot);
+        var git = new FakeGitAccess(_repoRoot);
         var store = new RecordingAuditStore();
-        var useCase = new ScanPushUseCase(git, new List<IDetector> { new StubDetector("secret", _ => Array.Empty<Finding>()) }, store, new FixedClock(ScanStart));
+        var useCase = new ScanPushUseCase(git, new List<IDetector> { new StubDetector("secret", _ => Array.Empty<Finding>()) }, store, new FixedClock(_scanStart));
 
         ScanOutcome outcome = await useCase.ExecuteAsync("not-enough-fields\n", TestContext.Current.CancellationToken);
 
@@ -161,7 +161,7 @@ public sealed class ScanPushUseCaseTests
     {
         string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {ZERO_SHA}\n";
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             listCommitShas: _ => throw new GitException(GitException.GIT_COMMAND_FAILED, "rev-list 失败（测试注入）。"));
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
 
@@ -176,7 +176,7 @@ public sealed class ScanPushUseCaseTests
     {
         string stdin = $"{LOCAL_REF} {LOCAL_SHA} {LOCAL_REF} {ZERO_SHA}\n";
         var git = new FakeGitAccess(
-            RepoRoot,
+            _repoRoot,
             listCommitShas: _ => new[] { COMMIT_A },
             commitDiff: _ => throw new GitException(GitException.GIT_COMMAND_FAILED, "批量差异失败（测试注入）。"));
         ScanPushUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()));
@@ -192,5 +192,5 @@ public sealed class ScanPushUseCaseTests
             gitAccess,
             new List<IDetector> { detector },
             new RecordingAuditStore(),
-            new FixedClock(ScanStart));
+            new FixedClock(_scanStart));
 }

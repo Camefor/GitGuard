@@ -10,13 +10,13 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class HookScriptBuilderTests
 {
-    private const string SampleVersion = "1.2.3";
-    private const string SampleExecutable = "/opt/gitguard/gitguard";
+    private const string SAMPLE_VERSION = "1.2.3";
+    private const string SAMPLE_EXECUTABLE = "/opt/gitguard/gitguard";
 
     [Fact]
     public void Render_PreCommit_ProducesManagedPosixScript()
     {
-        string script = HookScriptBuilder.Render(HookType.PreCommit, SampleExecutable, SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PreCommit, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
         // 首两行即托管标记（HookFileOperations.Inspect 的识别窗口）
         script.Should().StartWith("#!/bin/sh\n# gitguard-managed v1.2.3\n");
@@ -32,7 +32,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_PrePush_UsesPushScanAndOwnLegacyBackup()
     {
-        string script = HookScriptBuilder.Render(HookType.PrePush, SampleExecutable, SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PrePush, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
         script.Should().Contain("scan --push");
         script.Should().NotContain("scan --staged");
@@ -43,7 +43,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_GitGuardFailure_StillInvokesLegacyHookAndKeepsGuardExitCode()
     {
-        string script = HookScriptBuilder.Render(HookType.PreCommit, SampleExecutable, SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PreCommit, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
         // set -e 会在 GitGuard 非零退出时提前终止、跳过原 Hook（模块设计/Hook.md §7 模板缺陷）：不得出现
         script.Should().NotContain("set -e");
@@ -57,7 +57,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_WindowsStyleExecutablePath_NormalizesToForwardSlashes()
     {
-        string script = HookScriptBuilder.Render(HookType.PreCommit, @"C:\tools\gitguard.exe", SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PreCommit, @"C:\tools\gitguard.exe", SAMPLE_VERSION);
 
         // MSYS sh 把反斜杠当转义字符：Windows 上必须固化为正斜杠路径
         string expected = OperatingSystem.IsWindows() ? "C:/tools/gitguard.exe" : @"C:\tools\gitguard.exe";
@@ -67,7 +67,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_MissingExecutable_ExitsWithDistinctCodeBeforeScan()
     {
-        string script = HookScriptBuilder.Render(HookType.PreCommit, SampleExecutable, SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PreCommit, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
         // GITGUARD_BIN 失效（如卸载残留、路径迁移）时给出可辨识退出码，而不是让 hook 静默通过
         script.Should().Contain("if [ ! -x \"$GITGUARD_BIN\" ]");
@@ -77,7 +77,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_PostCommit_CallsBypassDetectionWithOwnLegacyBackup()
     {
-        string script = HookScriptBuilder.Render(HookType.PostCommit, SampleExecutable, SampleVersion);
+        string script = HookScriptBuilder.Render(HookType.PostCommit, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
         // FR-050：post-commit 只做绕过检测，不再触发暂存区扫描
         script.Should().Contain("hook post-commit");
@@ -90,7 +90,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_UndefinedHookType_ThrowsArgumentOutOfRange()
     {
-        Action act = () => HookScriptBuilder.Render((HookType)99, SampleExecutable, SampleVersion);
+        Action act = () => HookScriptBuilder.Render((HookType)99, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -98,7 +98,7 @@ public sealed class HookScriptBuilderTests
     [Fact]
     public void Render_NullExecutablePath_ThrowsArgumentNullException()
     {
-        Action act = () => HookScriptBuilder.Render(HookType.PreCommit, null!, SampleVersion);
+        Action act = () => HookScriptBuilder.Render(HookType.PreCommit, null!, SAMPLE_VERSION);
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -108,7 +108,7 @@ public sealed class HookScriptBuilderTests
     [InlineData("   ")]
     public void Render_BlankExecutablePath_ThrowsArgumentException(string executablePath)
     {
-        Action act = () => HookScriptBuilder.Render(HookType.PreCommit, executablePath, SampleVersion);
+        Action act = () => HookScriptBuilder.Render(HookType.PreCommit, executablePath, SAMPLE_VERSION);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -118,7 +118,7 @@ public sealed class HookScriptBuilderTests
     [InlineData("   ")]
     public void Render_BlankVersion_ThrowsArgumentException(string version)
     {
-        Action act = () => HookScriptBuilder.Render(HookType.PreCommit, SampleExecutable, version);
+        Action act = () => HookScriptBuilder.Render(HookType.PreCommit, SAMPLE_EXECUTABLE, version);
 
         act.Should().Throw<ArgumentException>();
     }

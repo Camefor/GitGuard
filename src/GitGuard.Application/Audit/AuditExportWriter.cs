@@ -20,13 +20,13 @@ internal static class AuditExportWriter
         "run_id,repo_path,scan_type,started_at,duration_ms,result,exit_code," +
         "finding_id,rule_id,file_path,line_number,severity,fingerprint,snippet_masked,commit_sha";
 
-    private static readonly JsonWriterOptions JSON_OPTIONS = new JsonWriterOptions
+    private static readonly JsonWriterOptions _jsonOptions = new JsonWriterOptions
     {
         Indented = true,
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
     };
 
-    private static readonly SearchValues<char> CSV_SPECIAL_CHARS = SearchValues.Create(",\"\r\n");
+    private static readonly SearchValues<char> _csvSpecialChars = SearchValues.Create(",\"\r\n");
 
     /// <summary>写出 JSON 导出（UTF-8 无 BOM）。</summary>
     /// <param name="stream">目标流。</param>
@@ -38,7 +38,7 @@ internal static class AuditExportWriter
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(runs);
 
-        using var writer = new Utf8JsonWriter(stream, JSON_OPTIONS);
+        using var writer = new Utf8JsonWriter(stream, _jsonOptions);
         writer.WriteStartObject();
         writer.WriteString("schema", EXPORT_SCHEMA);
         writer.WriteString("exported_at", FormatTimestamp(exportedAt));
@@ -169,7 +169,7 @@ internal static class AuditExportWriter
             ? "'" + value
             : value;
 
-        return guarded.AsSpan().IndexOfAny(CSV_SPECIAL_CHARS) >= 0
+        return guarded.AsSpan().IndexOfAny(_csvSpecialChars) >= 0
             ? "\"" + guarded.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
             : guarded;
     }

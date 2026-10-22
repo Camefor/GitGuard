@@ -11,8 +11,8 @@ namespace GitGuard.Application.Tests;
 /// </summary>
 public sealed class ScanRuleTimingTests
 {
-    private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
-    private static readonly DateTimeOffset ScanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly string _repoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
+    private static readonly DateTimeOffset _scanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task ExecuteAsync_RuleTimingEnabled_AggregatesAndSortsByRuleId()
@@ -63,10 +63,10 @@ public sealed class ScanRuleTimingTests
 
     private static ScanStagedUseCase CreateUseCase(IDetector detector, bool collectRuleTimings, string diff) =>
         new ScanStagedUseCase(
-            new FakeGitAccess(RepoRoot, stagedDiff: () => diff),
+            new FakeGitAccess(_repoRoot, stagedDiff: () => diff),
             new List<IDetector> { detector },
             new RecordingAuditStore(),
-            new FixedClock(ScanStart),
+            new FixedClock(_scanStart),
             collectRuleTimings: collectRuleTimings);
 
     private static string DiffFor(string path) =>

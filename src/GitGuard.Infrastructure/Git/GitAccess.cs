@@ -16,7 +16,7 @@ namespace GitGuard.Infrastructure.Git;
 public sealed class GitAccess : IGitAccess
 {
     /// <summary>单条 git 命令超时（模块设计/Hook.md §4：30s）；超时即终止子进程并直接失败。</summary>
-    private static readonly TimeSpan COMMAND_TIMEOUT = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan _defaultCommandTimeout = TimeSpan.FromSeconds(30);
 
     private readonly string _repositoryRoot;
     private readonly string _gitExecutable;
@@ -43,7 +43,7 @@ public sealed class GitAccess : IGitAccess
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(gitExecutable);
 
-        _commandTimeout = commandTimeout ?? COMMAND_TIMEOUT;
+        _commandTimeout = commandTimeout ?? _defaultCommandTimeout;
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_commandTimeout, TimeSpan.Zero, nameof(commandTimeout));
         _gitExecutable = gitExecutable;
         _repositoryRoot = ResolveRepositoryRoot(Path.GetFullPath(repositoryPath));

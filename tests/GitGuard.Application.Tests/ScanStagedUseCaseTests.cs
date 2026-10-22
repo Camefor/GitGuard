@@ -10,15 +10,15 @@ namespace GitGuard.Application.Tests;
 /// <summary>暂存区扫描用例测试：判定聚合、退出码与全部 FailClosed 分支（子进程级行为由 E2E 覆盖）。</summary>
 public sealed class ScanStagedUseCaseTests
 {
-    private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
-    private static readonly DateTimeOffset ScanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
-    private static readonly string[] VendorExcludePaths = { "**/vendor/**" };
-    private static readonly string[] MinJsExcludeFiles = { "*.min.js" };
+    private static readonly string _repoRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "gitguard-fake-repo"));
+    private static readonly DateTimeOffset _scanStart = new DateTimeOffset(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
+    private static readonly string[] _vendorExcludePaths = { "**/vendor/**" };
+    private static readonly string[] _minJsExcludeFiles = { "*.min.js" };
 
     [Fact]
     public async Task ExecuteAsync_NoStagedChanges_ReturnsCleanWithZeroFiles()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => string.Empty);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => string.Empty);
         var store = new RecordingAuditStore();
         var detector = new StubDetector("secret", _ => Array.Empty<Finding>());
         ScanStagedUseCase useCase = CreateUseCase(git, detector, store);
@@ -39,7 +39,7 @@ public sealed class ScanStagedUseCaseTests
     public async Task ExecuteAsync_CriticalFinding_ReturnsBlockedWithExitCodeOne()
     {
         Finding finding = FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical);
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         var store = new RecordingAuditStore();
         ScanStagedUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => new List<Finding> { finding }), store);
 
@@ -57,7 +57,7 @@ public sealed class ScanStagedUseCaseTests
     public async Task ExecuteAsync_MediumFinding_ReturnsWarnedWithExitCodeZero()
     {
         Finding finding = FindingTestData.Create("GGD/SECRET/JWT", Severity.Medium);
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         ScanStagedUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => new List<Finding> { finding }), new RecordingAuditStore());
 
         ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
@@ -70,7 +70,7 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_GitFailure_ReturnsFailedWithExitCodeTen()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => throw new GitException(GitException.GIT_COMMAND_FAILED, "git 失败（测试注入）。"));
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => throw new GitException(GitException.GIT_COMMAND_FAILED, "git 失败（测试注入）。"));
         var store = new RecordingAuditStore();
         ScanStagedUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()), store);
 
@@ -85,7 +85,7 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_DetectorException_ReturnsFailedWithExitCodeEleven()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         var detector = new StubDetector("secret", _ => throw new DetectionException("检测失败（测试注入）。"));
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore());
 
@@ -98,7 +98,7 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_GitFailureDuringDetection_ReturnsFailedWithExitCodeTen()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         var detector = new StubDetector("secret", _ => throw new GitException(GitException.GIT_COMMAND_FAILED, "git 失败（测试注入）。"));
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore());
 
@@ -111,7 +111,7 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_ScanTimeout_ReturnsFailedWithExitCodeTwelve()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         var store = new RecordingAuditStore();
         var settings = new ScanSettings { Timeout = TimeSpan.FromMilliseconds(50) };
         ScanStagedUseCase useCase = CreateUseCase(git, new BlockingDetector(), store, settings);
@@ -126,7 +126,7 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_ExternalCancellation_PropagatesOperationCanceledException()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         var store = new RecordingAuditStore();
         using var cancellationSource = new CancellationTokenSource();
         cancellationSource.Cancel();
@@ -142,7 +142,7 @@ public sealed class ScanStagedUseCaseTests
     public async Task ExecuteAsync_AuditWriteFailure_ReportsDegradeFlagWithoutChangingResult()
     {
         Finding finding = FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical);
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffSamples.SingleAddedLine);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
         ScanStagedUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => new List<Finding> { finding }), new FailingAuditStore());
 
         ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
@@ -161,7 +161,7 @@ public sealed class ScanStagedUseCaseTests
             "+++ b/big.txt\n" +
             "@@ -0,0 +1 @@\n" +
             "+0123456789\n";
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => diff);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => diff);
         var detector = new StubDetector("secret", _ => Array.Empty<Finding>());
         var settings = new ScanSettings { MaxFileBytes = 8 };
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore(), settings);
@@ -183,7 +183,7 @@ public sealed class ScanStagedUseCaseTests
             "diff --git a/img.png b/img.png\n" +
             "new file mode 100644\n" +
             "Binary files /dev/null and b/img.png differ\n";
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => diff);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => diff);
         var detector = new StubDetector("secret", _ => Array.Empty<Finding>());
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore());
 
@@ -206,7 +206,7 @@ public sealed class ScanStagedUseCaseTests
             "+++ /dev/null\n" +
             "@@ -1 +0,0 @@\n" +
             "-doomed\n";
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => diff);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => diff);
         var detector = new StubDetector("secret", _ => Array.Empty<Finding>());
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore());
 
@@ -221,7 +221,7 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_ExcludedPath_IsNeitherScannedNorReportedAsSkipped()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => DiffFor("vendor/lib/app.env"));
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffFor("vendor/lib/app.env"));
         var detector = new StubDetector("secret", _ => new List<Finding>
         {
             FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical),
@@ -229,7 +229,7 @@ public sealed class ScanStagedUseCaseTests
         var policy = new ScanPolicy(
             SeverityPolicy.Default,
             Array.Empty<AllowlistEntry>(),
-            VendorExcludePaths,
+            _vendorExcludePaths,
             Array.Empty<string>());
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore(), policy: policy);
 
@@ -246,13 +246,13 @@ public sealed class ScanStagedUseCaseTests
     public async Task ExecuteAsync_ExcludedFileName_MatchesAtAnyDepthAndLeavesOtherFilesScanned()
     {
         string diff = DiffFor("dist/assets/bundle.min.js") + DiffFor("src/app.ts");
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => diff);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => diff);
         var detector = new StubDetector("secret", _ => Array.Empty<Finding>());
         var policy = new ScanPolicy(
             SeverityPolicy.Default,
             Array.Empty<AllowlistEntry>(),
             Array.Empty<string>(),
-            MinJsExcludeFiles);
+            _minJsExcludeFiles);
         ScanStagedUseCase useCase = CreateUseCase(git, detector, new RecordingAuditStore(), policy: policy);
 
         ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
@@ -266,14 +266,14 @@ public sealed class ScanStagedUseCaseTests
     [Fact]
     public async Task ExecuteAsync_RunAggregate_CarriesRepoPathScanTypeAndClockStart()
     {
-        var git = new FakeGitAccess(RepoRoot, stagedDiff: () => string.Empty);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => string.Empty);
         ScanStagedUseCase useCase = CreateUseCase(git, new StubDetector("secret", _ => Array.Empty<Finding>()), new RecordingAuditStore());
 
         ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        outcome.Run.RepoPath.Should().Be(RepoRoot);
+        outcome.Run.RepoPath.Should().Be(_repoRoot);
         outcome.Run.ScanType.Should().Be(ScanType.PreCommit);
-        outcome.Run.StartedAt.Should().Be(ScanStart);
+        outcome.Run.StartedAt.Should().Be(_scanStart);
         outcome.Run.DurationMs.Should().BeGreaterThanOrEqualTo(0);
     }
 
@@ -281,10 +281,10 @@ public sealed class ScanStagedUseCaseTests
     public void Constructor_EmptyDetectors_ThrowsArgumentException()
     {
         Action act = () => _ = new ScanStagedUseCase(
-            new FakeGitAccess(RepoRoot),
+            new FakeGitAccess(_repoRoot),
             new List<IDetector>(),
             new RecordingAuditStore(),
-            new FixedClock(ScanStart));
+            new FixedClock(_scanStart));
 
         act.Should().Throw<ArgumentException>();
     }
@@ -293,10 +293,10 @@ public sealed class ScanStagedUseCaseTests
     public void Constructor_NonPositiveSettings_ThrowsArgumentOutOfRangeException()
     {
         Action act = () => _ = new ScanStagedUseCase(
-            new FakeGitAccess(RepoRoot),
+            new FakeGitAccess(_repoRoot),
             new List<IDetector> { new BlockingDetector() },
             new RecordingAuditStore(),
-            new FixedClock(ScanStart),
+            new FixedClock(_scanStart),
             new ScanSettings { MaxFileBytes = 0 });
 
         act.Should().Throw<ArgumentOutOfRangeException>();
@@ -312,7 +312,7 @@ public sealed class ScanStagedUseCaseTests
             gitAccess,
             new List<IDetector> { detector },
             auditStore,
-            new FixedClock(ScanStart),
+            new FixedClock(_scanStart),
             settings,
             policy);
 

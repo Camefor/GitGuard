@@ -28,7 +28,7 @@ public sealed class SqliteAuditStore : IAuditStore
     /// </summary>
     private const int COMMAND_TIMEOUT_SECONDS = 1;
 
-    private static readonly TimeSpan[] DEFAULT_BUSY_RETRY_DELAYS = new[]
+    private static readonly TimeSpan[] _defaultBusyRetryDelays = new[]
     {
         TimeSpan.FromMilliseconds(50),
         TimeSpan.FromMilliseconds(100),
@@ -250,7 +250,7 @@ public sealed class SqliteAuditStore : IAuditStore
     {
         if (delays is null)
         {
-            return DEFAULT_BUSY_RETRY_DELAYS;
+            return _defaultBusyRetryDelays;
         }
 
         var copy = new TimeSpan[delays.Count];

@@ -240,7 +240,7 @@ public sealed class UnifiedDiffParserTests
     [Fact]
     public void Parse_CommitShaArgument_IsAttachedToEveryFile()
     {
-        IReadOnlyList<ParsedDiffFile> files = UnifiedDiffParser.Parse(DiffSamples.SingleAddedLine, COMMIT_SHA);
+        IReadOnlyList<ParsedDiffFile> files = UnifiedDiffParser.Parse(DiffSamples.SINGLE_ADDED_LINE, COMMIT_SHA);
 
         ParsedDiffFile file = files.Should().ContainSingle().Subject;
         file.CommitSha.Should().Be(COMMIT_SHA);
@@ -306,7 +306,7 @@ public sealed class UnifiedDiffParserTests
     {
         const string diff =
             "warning: unrelated preamble\n" +
-            DiffSamples.SingleAddedLine;
+            DiffSamples.SINGLE_ADDED_LINE;
 
         IReadOnlyList<ParsedDiffFile> files = UnifiedDiffParser.Parse(diff);
 

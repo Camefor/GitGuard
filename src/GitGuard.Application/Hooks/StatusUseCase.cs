@@ -15,7 +15,7 @@ namespace GitGuard.Application.Hooks;
 public sealed class StatusUseCase
 {
     /// <summary>安装 / 检查的 Hook 集合（FR-010：pre-commit + pre-push；FR-050：post-commit）。</summary>
-    private static readonly ImmutableArray<HookType> INSPECTED_HOOKS =
+    private static readonly ImmutableArray<HookType> _inspectedHooks =
         ImmutableArray.Create(HookType.PreCommit, HookType.PrePush, HookType.PostCommit);
 
     private readonly IGitAccess _gitAccess;
@@ -48,8 +48,8 @@ public sealed class StatusUseCase
         string? configuredHooksPath = _gitAccess.GetConfiguredHooksPath();
         string hooksDirectory = configuredHooksPath ?? Path.Combine(_gitAccess.GetGitCommonDirectory(), "hooks");
 
-        var hooks = ImmutableArray.CreateBuilder<HookStatus>(INSPECTED_HOOKS.Length);
-        foreach (HookType hookType in INSPECTED_HOOKS)
+        var hooks = ImmutableArray.CreateBuilder<HookStatus>(_inspectedHooks.Length);
+        foreach (HookType hookType in _inspectedHooks)
         {
             string hookPath = Path.Combine(hooksDirectory, hookType.ToHookName());
             hooks.Add(InspectHook(hookType, hookPath));

@@ -35,7 +35,7 @@ public sealed class GitGuardConfigLoader
 
     // IgnoreUnmatchedProperties：宽松解析（Policy.md §9「未知字段：警告但不阻断」）——未知键由
     // CollectUnknownKeyWarnings 记入警告，反序列化阶段必须放行，否则会在产生警告前先抛 YAML 语法错误（退出码 13）。
-    private static readonly IDeserializer Deserializer =
+    private static readonly IDeserializer _deserializer =
         new StaticDeserializerBuilder(new GitGuardConfigYamlContext())
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .IgnoreUnmatchedProperties()
@@ -45,7 +45,7 @@ public sealed class GitGuardConfigLoader
     /// 各层级已知键（宽松解析的「未知字段 → 警告」依据，Policy.md §9）。
     /// 未列出的键不做键名校验。
     /// </summary>
-    private static readonly ImmutableDictionary<string, ImmutableHashSet<string>> KNOWN_KEYS =
+    private static readonly ImmutableDictionary<string, ImmutableHashSet<string>> _knownKeys =
         new Dictionary<string, ImmutableHashSet<string>>(StringComparer.Ordinal)
         {
             [string.Empty] = ImmutableHashSet.Create(StringComparer.Ordinal, "version", "scan", "logging", "rules", "policy", "exclude", "allowlist"),
@@ -152,7 +152,7 @@ public sealed class GitGuardConfigLoader
         GitGuardConfigDocument? document;
         try
         {
-            document = Deserializer.Deserialize<GitGuardConfigDocument?>(yaml);
+            document = _deserializer.Deserialize<GitGuardConfigDocument?>(yaml);
         }
         catch (YamlException ex)
         {
@@ -550,7 +550,7 @@ public sealed class GitGuardConfigLoader
 
     /// <summary>
     /// 未知键扫描（Policy.md §9「未知字段：警告但不阻断」）：以原始 YAML 语法树逐层比对已知键集合，
-    /// 仅对 <see cref="KNOWN_KEYS"/> 覆盖的层级做校验（更深的自定义结构不做判定）。
+    /// 仅对 <see cref="_knownKeys"/> 覆盖的层级做校验（更深的自定义结构不做判定）。
     /// </summary>
     private static void CollectUnknownKeyWarnings(string yaml, string path, List<string> warnings)
     {
@@ -575,7 +575,7 @@ public sealed class GitGuardConfigLoader
 
     private static void VisitMapping(YamlMappingNode mapping, string path, string sourcePath, List<string> warnings)
     {
-        if (KNOWN_KEYS.TryGetValue(path, out ImmutableHashSet<string>? known))
+        if (_knownKeys.TryGetValue(path, out ImmutableHashSet<string>? known))
         {
             foreach (YamlNode key in mapping.Children.Keys)
             {

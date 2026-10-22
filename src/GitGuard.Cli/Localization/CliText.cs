@@ -8,8 +8,8 @@ namespace GitGuard.Cli.Localization;
 /// </summary>
 internal sealed class CliText
 {
-    private static readonly CliText CHINESE = new CliText(CliLanguage.Chinese);
-    private static readonly CliText ENGLISH = new CliText(CliLanguage.English);
+    private static readonly CliText _chinese = new CliText(CliLanguage.Chinese);
+    private static readonly CliText _english = new CliText(CliLanguage.English);
 
     private readonly CliLanguage _language;
 
@@ -21,8 +21,8 @@ internal sealed class CliText
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="language"/> 不是已登记取值。</exception>
     internal static CliText For(CliLanguage language) => language switch
     {
-        CliLanguage.Chinese => CHINESE,
-        CliLanguage.English => ENGLISH,
+        CliLanguage.Chinese => _chinese,
+        CliLanguage.English => _english,
         _ => throw new ArgumentOutOfRangeException(nameof(language), language, "未知的输出语言"),
     };
 

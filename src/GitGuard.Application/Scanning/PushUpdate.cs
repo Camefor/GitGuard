@@ -11,7 +11,7 @@ public sealed class PushUpdate
 {
     private const int SHA1_HEX_LENGTH = 40;
     private const int SHA256_HEX_LENGTH = 64;
-    private static readonly char[] FIELD_SEPARATORS = new[] { ' ', '\t' };
+    private static readonly char[] _fieldSeparators = new[] { ' ', '\t' };
 
     /// <summary>初始化推送信息行。</summary>
     /// <param name="localRef">本地引用（如 <c>refs/heads/main</c>）。</param>
@@ -81,7 +81,7 @@ public sealed class PushUpdate
                 continue;
             }
 
-            string[] fields = line.Split(FIELD_SEPARATORS, StringSplitOptions.RemoveEmptyEntries);
+            string[] fields = line.Split(_fieldSeparators, StringSplitOptions.RemoveEmptyEntries);
             if (fields.Length != 4 || !IsValidSha(fields[1]) || !IsValidSha(fields[3]))
             {
                 throw new GitException(

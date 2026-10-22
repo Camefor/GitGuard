@@ -11,9 +11,9 @@ namespace GitGuard.E2E.Tests;
 /// </summary>
 public sealed class MvpScenarioTests
 {
-    private static readonly string[] INSTALL_COMMAND = new[] { "install" };
-    private static readonly string[] INSTALL_PRE_PUSH_COMMAND = new[] { "install", "--hook", "pre-push" };
-    private static readonly string[] INSTALL_PRE_COMMIT_COMMAND = new[] { "install", "--hook", "pre-commit" };
+    private static readonly string[] _installCommand = new[] { "install" };
+    private static readonly string[] _installPrePushCommand = new[] { "install", "--hook", "pre-push" };
+    private static readonly string[] _installPreCommitCommand = new[] { "install", "--hook", "pre-commit" };
 
     /// <summary>S1（16-测试方案 §12）：已暂存密钥 → 阻断 commit，且阻断判定落库审计。</summary>
     [Fact]
@@ -26,7 +26,7 @@ public sealed class MvpScenarioTests
         harness.Stage("README.md");
         harness.CommitOrThrow("baseline");
 
-        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS, "install 应成功写入 Hook 分发脚本");
+        harness.RunCli(_installCommand).ExitCode.Should().Be(ExitCodes.SUCCESS, "install 应成功写入 Hook 分发脚本");
 
         harness.WriteFile("config/leak.env", $"AWS_ACCESS_KEY_ID={canary}\n");
         harness.Stage("config/leak.env");
@@ -55,7 +55,7 @@ public sealed class MvpScenarioTests
         harness.Stage("docs/notes.md");
         harness.CommitOrThrow("baseline");
 
-        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.RunCli(_installCommand).ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         // 已跟踪文件的工作区修改：不暂存，扫描器（--staged）不得看到该内容
         harness.WriteFile("docs/notes.md", $"# Notes\nAWS_ACCESS_KEY_ID={canary}\n");
@@ -84,7 +84,7 @@ public sealed class MvpScenarioTests
         harness.RunGitOrThrow("push", "origin", "master");
         harness.RemoteMasterSha(remotePath).Should().Be(baseSha);
 
-        harness.RunCli(INSTALL_PRE_PUSH_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.RunCli(_installPrePushCommand).ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         harness.WriteFile("src/settings.env", $"AWS_ACCESS_KEY_ID={canary}\n");
         harness.Stage("src/settings.env");
@@ -114,7 +114,7 @@ public sealed class MvpScenarioTests
         string remotePath = harness.CreateBareRemote("origin");
         harness.RunGitOrThrow("push", "origin", "master");
 
-        harness.RunCli(INSTALL_PRE_PUSH_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.RunCli(_installPrePushCommand).ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         harness.WriteFile("config/leak.env", $"AWS_ACCESS_KEY_ID={canary}\n");
         harness.Stage("config/leak.env");
@@ -141,7 +141,7 @@ public sealed class MvpScenarioTests
         harness.Stage("README.md");
         harness.CommitOrThrow("baseline");
 
-        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.RunCli(_installCommand).ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         string guide =
             "# 文档示例\n\n" +
@@ -173,7 +173,7 @@ public sealed class MvpScenarioTests
 
         harness.WritePosixScript(".git/hooks/pre-commit", "printf 'LEGACY\\n' >> legacy.log\nexit 0\n");
 
-        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.RunCli(_installCommand).ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         File.Exists(harness.ResolvePath(".git/hooks/pre-commit.local.bak")).Should().BeTrue("原有 Hook 必须备份为 .local.bak");
         File.ReadAllText(harness.ResolvePath(".git/hooks/pre-commit")).Should().Contain("gitguard-managed");
@@ -199,7 +199,7 @@ public sealed class MvpScenarioTests
 
         // 注入不存在的扫描器路径：install 照常写入分发脚本，但脚本执行时 [ ! -x ] 分支阻断
         string missingExecutable = Path.Combine(harness.Root, "missing", "gitguard");
-        harness.RunCliInProcess(INSTALL_PRE_COMMIT_COMMAND, standardInput: null, executablePath: missingExecutable)
+        harness.RunCliInProcess(_installPreCommitCommand, standardInput: null, executablePath: missingExecutable)
             .ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         harness.WriteFile("src/app.txt", "hello\n");
@@ -229,7 +229,7 @@ public sealed class MvpScenarioTests
 
         // 替身扫描器放在 .git/ 内（工作树外，不会被当成待提交内容）；写入 stub.log 用于证明分发脚本真实执行
         string stubPath = harness.WritePosixScript(".git/stub-gitguard", $"printf 'invoked\\n' >> stub.log\nexit {exitCode}\n");
-        harness.RunCliInProcess(INSTALL_PRE_COMMIT_COMMAND, standardInput: null, executablePath: stubPath)
+        harness.RunCliInProcess(_installPreCommitCommand, standardInput: null, executablePath: stubPath)
             .ExitCode.Should().Be(ExitCodes.SUCCESS);
 
         harness.WriteFile("src/app.txt", "hello\n");
@@ -254,7 +254,7 @@ public sealed class MvpScenarioTests
         harness.WriteFile("README.md", "# Sample\n");
         harness.Stage("README.md");
         harness.CommitOrThrow("baseline");
-        harness.RunCli(INSTALL_COMMAND).ExitCode.Should().Be(ExitCodes.SUCCESS, "install 应写入 pre-commit 与 post-commit 分发脚本");
+        harness.RunCli(_installCommand).ExitCode.Should().Be(ExitCodes.SUCCESS, "install 应写入 pre-commit 与 post-commit 分发脚本");
         File.Exists(harness.ResolvePath(".git/hooks/post-commit")).Should().BeTrue();
 
         // 1) 正常提交：pre-commit 记录预测 → post-commit 消费标记，不产生绕过事件

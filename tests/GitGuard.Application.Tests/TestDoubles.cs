@@ -383,7 +383,7 @@ internal static class FindingTestData
 internal static class DiffSamples
 {
     /// <summary>单文件修改：新增一行 <c>added line</c>（新侧行号 1）。</summary>
-    internal const string SingleAddedLine =
+    internal const string SINGLE_ADDED_LINE =
         "diff --git a/app.txt b/app.txt\n" +
         "index 1111111..2222222 100644\n" +
         "--- a/app.txt\n" +
