@@ -67,6 +67,48 @@ public sealed class ScanStagedUseCaseTests
         outcome.Decisions[finding].Action.Should().Be(PolicyAction.Warn);
     }
 
+    // ADR-0003 配套机制：多引擎命中同一文件 / 行 / 指纹时保留来源优先级最高者，严重度取最高
+    [Fact]
+    public async Task ExecuteAsync_CrossEngineDuplicate_KeepsHigherPrioritySourceWithHighestSeverity()
+    {
+        Finding builtin = FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical);
+        Finding gitleaks = FindingTestData.Create("GLK/SECRET/AWS-ACCESS-TOKEN", Severity.High);
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
+        var useCase = new ScanStagedUseCase(
+            git,
+            new List<IDetector>
+            {
+                new StubDetector("secret", _ => new List<Finding> { builtin }),
+                new StubDetector("gitleaks", _ => new List<Finding> { gitleaks }),
+            },
+            new RecordingAuditStore(),
+            new FixedClock(_scanStart));
+
+        ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        Finding finding = outcome.Findings.Should().ContainSingle().Subject;
+        finding.RuleId.Should().Be("GLK/SECRET/AWS-ACCESS-TOKEN", "ADR-0003 去重优先级为 USR > GLK > GGD");
+        finding.Severity.Should().Be(Severity.Critical, "严重度不一致时合并为最高值");
+    }
+
+    // 同一密钥出现在不同文件是多个独立事实：指纹相同但路径不同，不得去重
+    [Fact]
+    public async Task ExecuteAsync_SameFingerprintOnDifferentFiles_KeepsBothFindings()
+    {
+        Finding first = FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical, path: "config/a.env");
+        Finding second = FindingTestData.Create("GGD/SECRET/AWS-AKID", Severity.Critical, path: "config/b.env");
+        var git = new FakeGitAccess(_repoRoot, stagedDiff: () => DiffSamples.SINGLE_ADDED_LINE);
+        var useCase = new ScanStagedUseCase(
+            git,
+            new List<IDetector> { new StubDetector("secret", _ => new List<Finding> { first, second }) },
+            new RecordingAuditStore(),
+            new FixedClock(_scanStart));
+
+        ScanOutcome outcome = await useCase.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        outcome.Findings.Should().HaveCount(2);
+    }
+
     [Fact]
     public async Task ExecuteAsync_GitFailure_ReturnsFailedWithExitCodeTen()
     {

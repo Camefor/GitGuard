@@ -24,7 +24,7 @@ namespace GitGuard.Application.Configuration;
 ///   <item><description><c>policy.critical: allow</c> 违反硬下限 → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
 ///   <item><description>未知字段、<c>fail_closed: false</c>、<c>pre_commit</c> / <c>pre_push</c>（语义接线顺延）→ 宽松处理：记入 <see cref="GitGuardConfig.Warnings"/>，不阻断。</description></item>
 ///   <item><description><c>exclude.paths</c> / <c>exclude.files</c> 含空项 → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
-///   <item><description><c>rules.secrets.use_gitleaks: true</c>（P2 未实现）→ 抛 <see cref="ConfigurationException"/>：无法兑现的开关静默忽略会构成 FailOpen。</description></item>
+///   <item><description><c>rules.secrets.gitleaks_path</c> 为空白 → 抛 <see cref="ConfigurationException"/>（退出码 13）；路径存在性与版本在启动期探测。</description></item>
 /// </list>
 /// </summary>
 public sealed class GitGuardConfigLoader
@@ -109,7 +109,7 @@ public sealed class GitGuardConfigLoader
     /// <summary>加载并合并配置。</summary>
     /// <returns>有效配置（含加载链与宽松解析警告）。</returns>
     /// <exception cref="ConfigurationException">
-    /// 文件存在但 YAML 语法错误、<c>version</c> 缺失或不受支持、字段取值非法、违反硬下限、或使用了未实现的开关（<c>use_gitleaks</c>）。
+    /// 文件存在但 YAML 语法错误、<c>version</c> 缺失或不受支持、字段取值非法、违反硬下限。
     /// </exception>
     public GitGuardConfig Load()
     {
@@ -248,6 +248,7 @@ public sealed class GitGuardConfigLoader
                     Enabled = project?.Secrets?.Enabled ?? user?.Secrets?.Enabled,
                     DisabledRules = project?.Secrets?.DisabledRules ?? user?.Secrets?.DisabledRules,
                     UseGitleaks = project?.Secrets?.UseGitleaks ?? user?.Secrets?.UseGitleaks,
+                    GitleaksPath = project?.Secrets?.GitleaksPath ?? user?.Secrets?.GitleaksPath,
                     MinEntropy = project?.Secrets?.MinEntropy ?? user?.Secrets?.MinEntropy,
                 },
             Privacy = BothNull(user?.Privacy, project?.Privacy)
@@ -390,12 +391,6 @@ public sealed class GitGuardConfigLoader
 
     private static SecretRulesSettings BuildSecrets(SecretRulesSectionDto? dto, List<string> warnings)
     {
-        if (dto?.UseGitleaks == true)
-        {
-            throw new ConfigurationException(
-                "rules.secrets.use_gitleaks: true 需要 GitleaksAdapter（FR-090 / P2），本版本不支持；静默忽略会构成 FailOpen，故拒绝启动。");
-        }
-
         if (dto?.MinEntropy is { } entropy && (double.IsNaN(entropy) || double.IsInfinity(entropy) || entropy < 0))
         {
             throw new ConfigurationException($"rules.secrets.min_entropy 必须为非负有限数（当前 {dto.MinEntropy}）");
@@ -406,11 +401,24 @@ public sealed class GitGuardConfigLoader
             warnings.Add("rules.secrets.min_entropy 为 0：高熵门禁形同关闭，命中量与误报都会上升。");
         }
 
+        string? gitleaksPath = null;
+        if (dto?.GitleaksPath is { } rawPath)
+        {
+            if (string.IsNullOrWhiteSpace(rawPath))
+            {
+                throw new ConfigurationException("rules.secrets.gitleaks_path 不能为空字符串；省略该字段表示在 PATH 中查找 gitleaks");
+            }
+
+            gitleaksPath = rawPath.Trim();
+        }
+
         return new SecretRulesSettings
         {
             Enabled = dto?.Enabled ?? true,
             DisabledRules = NormalizeList(dto?.DisabledRules, "rules.secrets.disabled_rules"),
             MinEntropy = dto?.MinEntropy ?? SecretRulesSettings.Default.MinEntropy,
+            UseGitleaks = dto?.UseGitleaks ?? SecretRulesSettings.Default.UseGitleaks,
+            GitleaksPath = gitleaksPath,
         };
     }
 

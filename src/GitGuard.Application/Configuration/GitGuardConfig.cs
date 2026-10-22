@@ -162,6 +162,18 @@ public sealed record SecretRulesSettings
 
     /// <summary>高熵判定阈值（<c>min_entropy</c>）。</summary>
     public double MinEntropy { get; init; } = 4.0;
+
+    /// <summary>
+    /// 是否启用 GitleaksAdapter（<c>use_gitleaks</c>，FR-090）：默认关闭；
+    /// 启用后启动期探测可执行文件，缺失时仅告警降级，不阻断扫描。
+    /// </summary>
+    public bool UseGitleaks { get; init; }
+
+    /// <summary>
+    /// Gitleaks 可执行文件路径（<c>gitleaks_path</c>）：<see langword="null"/> 表示在 <c>PATH</c> 中查找；
+    /// 支持 <c>~</c> 前缀。仅在 <see cref="UseGitleaks"/> 为 <see langword="true"/> 时消费。
+    /// </summary>
+    public string? GitleaksPath { get; init; }
 }
 
 /// <summary>隐私检测类别设置（<c>rules.privacy</c>）。</summary>

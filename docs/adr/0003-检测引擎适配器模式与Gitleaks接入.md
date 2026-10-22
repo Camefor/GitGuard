@@ -60,9 +60,9 @@
 ### 配套机制
 
 - **规则 ID 命名空间**：`GGD/` 内置、`GLK/` Gitleaks 来源、`USR/` 用户自定义。三者不冲突。
-- **去重策略**：按 `fingerprint` 去重；多引擎命中同一指纹时保留第一个（优先级 USR > GLK > GGD）。
+- **去重策略**：按（提交 SHA、文件路径、行号、指纹）去重；多引擎命中同一位置同一指纹时保留来源优先级最高者（USR > GLK > GGD），严重度不一致取最高。
 - **冲突策略**：严重度不一致时取最高；用户可通过策略配置覆写。
-- **Gitleaks 版本锁定**：`GitleaksAdapter` 启动期验证 `gitleaks version`，锁定支持区间；超出区间时打印警告（不阻断）。
+- **Gitleaks 版本锁定**：`GitleaksAdapter` 启动期执行 `gitleaks version` 探测；8.x 为支持区间，其他可解析版本打印警告但不阻断，版本探测失败则禁用适配器（不阻断扫描）。
 
 ## 替代方案
 
@@ -88,12 +88,13 @@
 
 ## 后续动作
 
-- [ ] MVP：实现 `IDetector` 抽象 + 4 个内置检测器（`GGD-0006`）。
-- [ ] P2：实现 `GitleaksAdapter`，在 CI 下跑 Mock + 真实二进制两套测试。
-- [ ] P2：补充 Finding 聚合与去重的单元测试。
+- [x] MVP：实现 `IDetector` 抽象 + 4 个内置检测器（`GGD-0006`）。
+- [x] P2：实现 `GitleaksAdapter`（`GGD-0035`）；Mock 契约测试 + 探测 / 进程执行测试已落地，真实二进制测试保留为本地可选验证。
+- [x] P2：补充 Finding 聚合与去重的单元测试（`FindingDeduplicator` / `ScanStagedUseCaseTests`，`GGD-0035`）。
 - [ ] P2：发行物中可选内置 Gitleaks 二进制（二进制 vs 用户自装的权衡再做一次 ADR）。
 
 ## 备注
 
 - 本 ADR 决定「什么时候引入 Gitleaks」，不决定「是否最终引入」；若 P2 阶段证明 MVP 规则加白名单已满足真实场景，可延后或不引入。
 - Trufflehog / detect-secrets 等同类工具，均可用相同的 `IDetector` 模式接入，不需额外 ADR。
+- 实施记录（2026-10-22，`GGD-0035`）：适配器位于 `GitGuard.Detection.Adapters`；逐文件在 0700 临时目录暂存变更行后调用 `gitleaks detect --no-git --report-format json`，报告 `StartLine` 映射回 diff 原始行号，临时目录在 `finally` 删除；启动探测缺失 / 不可执行时告警降级，扫描期非零退出、报告缺失 / 非法或清理失败按 `DETECTOR_FAILED`（退出码 11）FailClosed。

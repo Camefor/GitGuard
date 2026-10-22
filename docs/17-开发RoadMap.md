@@ -37,7 +37,7 @@
 - **目标**：完善白名单治理、引入全量扫描与 GitleaksAdapter；可以让一个 10 人团队平稳使用。
 - **交付物**：
   - `gitguard scan --all`（已于 `GGD-0031` 落地）与基线文件（FR-061，已于 `GGD-0032` 落地） / `gitguard rules`（`gitguard allowlist` 已于 `GGD-0030` 提前落地）。
-  - `GitleaksAdapter` 实现（ADR-0003 落地）。
+  - `GitleaksAdapter` 实现（ADR-0003 落地，已于 `GGD-0035` 落地）。
   - 内置规则扩充至 40 条（已于 `GGD-0033` 落地：Secret 16 / Privacy 9 / LocalPath 7 / Url 8）。
   - 规则分级与项目自定义正则。
   - 误报治理指南文档。
@@ -87,7 +87,7 @@
 | 2 | `GGD-0032` | FR-061 基线文件生成与消费 | P1 | 3d |
 | 2 | `GGD-0033` | 内置规则扩充至 ≥40 条 | P1 | 4d |
 | 2 | `GGD-0034` | FR-080 自定义正则规则与 `gitguard rules` | P2 | 4d |
-| 2 | `GGD-0035` | FR-090 GitleaksAdapter | P2 | 3d |
+| 2 | `GGD-0035` | FR-090 GitleaksAdapter（已完成） | P2 | 3d |
 | 2 | `GGD-0036` | `gitguard audit view <run-id>` | P2 | 2d |
 | 2 | `GGD-0037` | 误报治理指南与 v0.2 验收支撑 | P2 | 1d |
 
@@ -101,7 +101,7 @@
 | M2：commit 拦截闭环 | 2026-11-21 | GGD-0006 ~ 0007 | 对内 |
 | M3：Hook 一键安装 | 2026-12-10 | GGD-0008 ~ 0009 | 对内 |
 | M4：MVP 完成 | 2026-12-31 | GGD-0010 ~ 0012 + 8 场景通过 | 对外 v0.1 |
-| M5：Gitleaks 适配器就绪 | 2027-02-15 | FR-090 落地 | 对外 v0.2 PR 预览 |
+| M5：Gitleaks 适配器就绪 | 2027-02-15 | FR-090 落地（2026-10-22 提前完成，`GGD-0035`） | 对外 v0.2 PR 预览 |
 | M6：v0.2 发布 | 2027-03-15 | 阶段 2 全部交付 | 对外 |
 | M7：桌面端预览 | 2027-05-30 | 桌面端核心页面可用 | 对外预览 |
 | M8：v0.3 发布 | 2027-06-30 | 阶段 3 全部交付 | 对外 |
@@ -143,3 +143,4 @@ flowchart LR
 | 0.1.10 | 2026-10-22 | GGD-0031：FR-060 全量扫描落地（HEAD 空树差异快照 / `--include-history` 历史扫描 / `--since` 续扫 / `--max-files` 提交边界软截断 + `next_since_sha`）；§2.2 交付物同步；新增 36 项测试（Application 16 / Infrastructure 8 / CLI 12），全量 1112 项通过 |
 | 0.1.11 | 2026-10-22 | GGD-0032：FR-061 基线文件落地（`gitguard.baseline.v1` / `--baseline` 生成 / 默认消费 / `AllowedByBaseline` / 13、31 错误码）；§2.2 交付物同步；新增 20 项测试，全量 1132 项通过（1123 通过 + 9 跳过） |
 | 0.1.12 | 2026-10-22 | GGD-0033：内置规则扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），每条规则夹具 ≥3 正 / ≥3 负 / 边界正反各 ≥1；§2.2 交付物与退出条件同步 |
+| 0.1.13 | 2026-10-22 | GGD-0035：GitleaksAdapter 提前落地（启动探测 / 逐文件暂存 / `detect --no-git` 报告映射 / `GLK/` 命名空间 / 跨引擎去重），§2.2 交付物、任务表与 M5 里程碑同步 |

@@ -29,6 +29,28 @@ public sealed class CliScanCommandTests
         harness.Error.Should().NotContain(canary, "报告与日志不得回显密钥原文");
     }
 
+    // FR-090 / ADR-0003：use_gitleaks 可执行文件缺失时降级为警告，扫描继续并保持退出码 0
+    [Fact]
+    public async Task UseGitleaksWithMissingExecutable_ScanSucceedsWithWarning()
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("notes.txt", "clean\n");
+        harness.Stage("notes.txt");
+        string missing = Path.Combine(harness.Root, "missing", "gitleaks.exe").Replace('\\', '/');
+        harness.WriteProjectConfig($"""
+            version: 1
+            rules:
+              secrets:
+                use_gitleaks: true
+                gitleaks_path: "{missing}"
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.Error.Should().Contain("Gitleaks 适配器已禁用");
+    }
+
     // TC-FR-020-02：未暂存文件含密钥、暂存区干净 → 退出码 0（DR-04）
     [Fact]
     public async Task UnstagedSecret_IsNotScanned()

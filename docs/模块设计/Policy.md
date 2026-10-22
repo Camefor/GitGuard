@@ -125,6 +125,7 @@ rules:
     enabled: true
     disabled_rules: []
     use_gitleaks: false
+    gitleaks_path: null              # 可省略；支持 ~ 与 PATH 裸名称，空白值 → 13
     min_entropy: 4.0
 
   privacy:
@@ -183,6 +184,8 @@ allowlist:
 
 **自定义规则语义（GGD-0034）**：`rules.custom` 为列表，项目级声明整体替换用户级列表。`id` 必须以 `USR/` 开头并满足规则 ID 命名契约；`name` / `severity` / `pattern` 必填；同一列表内 ID 重复、正则在加载期编译失败、`context_keywords` / `file_path_globs` 含空白项 → `CONFIG_INVALID`（退出码 13）。规则按声明顺序追加在内置规则之后（`RuleSource.User`），受 `disabled_rules` 与所属类别 `enabled` 共同约束；`enabled: false` 仅关闭该规则。上下文关键字为大小写不敏感子串，声明多个时任一命中即通过；文件 glob 使用与 `exclude` 相同的 `GlobMatcher`。自定义规则与内置规则共用 200ms 正则超时（超时 FailClosed），且自定义 SECRET 规则在超长行（> 2048 字符）不跳过。
 
+**Gitleaks 适配器语义（GGD-0035）**：`rules.secrets.use_gitleaks` 默认 `false`，开启后 `DetectorAssembly` 在内置 SECRET 检测器之后装配 `GitleaksAdapter`（检测顺序 `Secret → Gitleaks → Privacy → LocalPath → Url`）。`gitleaks_path` 支持 `~` 展开；未配置或仅裸名称时按 PATH 查找（Windows 自动补 `.exe`），空白字符串 → `CONFIG_INVALID`（退出码 13），项目级与用户级按字段覆盖。启动期探测失败（文件缺失 / 无法执行 / `version` 探测失败）→ 警告并禁用适配器，扫描继续使用内置规则；可运行但非 8.x 的版本 → 警告但仍可用。扫描期非零退出码（0 / 1 除外）、报告缺失或 JSON 非法 → `DETECTOR_FAILED`（退出码 11），不重试。Gitleaks 规则 ID 映射为 `GLK/SECRET/*`；`disabled_rules` 同时接受原始 ID 与 GLK 命名空间写法（大小写不敏感），`GGD/` / `USR/` 条目由内置规则选择消费。多引擎命中按（提交、文件、行、指纹）去重，优先级 `USR > GLK > GGD`，严重度取最高。
+
 ## 8. 质量属性
 
 | 属性 | 目标 |
@@ -223,3 +226,4 @@ allowlist:
 | 0.1.7 | 2026-10-22 | GGD-0030：§3 新增白名单来源规则（配置文件与 SQLite 条目合并、读取失败 FailClosed）；§9 增补 SQLite 白名单管理测试项 |
 | 0.1.8 | 2026-10-22 | GGD-0032：§2.2 / §3 / §6.1 补基线覆盖（`ScanExecutor` 按指纹覆盖为 `Allow + IgnoredByBaseline`，白名单优先）与 `PolicyDecision.IgnoredByBaseline` 字段 |
 | 0.1.9 | 2026-10-22 | GGD-0034：§1 承担 FR 补 `FR-080`；§3 / §6.2 / §7 新增 `rules.custom` 自定义规则（加载期校验、列表替换、`RuleSource.User` 追加、有效启用语义、200ms 超时与超长行不跳过）；§9 增补配置 / 目录 / 检测测试项 |
+| 0.1.10 | 2026-10-22 | GGD-0035：§7 Schema 补 `rules.secrets.gitleaks_path`，并新增 Gitleaks 适配器配置语义（开关、路径解析、启动期降级 / 扫描期 FailClosed、`GLK/` 过滤与跨引擎去重） |

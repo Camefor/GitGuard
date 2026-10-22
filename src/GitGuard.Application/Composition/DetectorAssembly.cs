@@ -6,13 +6,14 @@ using GitGuard.Core.Abstractions;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
 using GitGuard.Core.Rules;
+using GitGuard.Detection.Adapters;
 using GitGuard.Detection.Detectors;
 using GitGuard.Detection.Rules;
 
 namespace GitGuard.Application.Composition;
 
 /// <summary>
-/// 检测器装配（FR-021 固定顺序 Secret → Privacy → LocalPath → Url；<c>模块设计/Policy.md</c> §7 <c>rules</c> 段落接线）：
+/// 检测器装配（FR-021 固定顺序 Secret → Gitleaks → Privacy → LocalPath → Url；<c>模块设计/Policy.md</c> §7 <c>rules</c> 段落接线）：
 /// 内置规则集与 <c>rules.custom</c> 自定义规则合并后，经 <c>disabled_rules</c> 重标为禁用再交给四类检测器
 /// （基类按类别段过滤并剔除禁用规则）；类别 <c>enabled: false</c> 则完全不装配该检测器；
 /// 全部类别禁用视为配置无效（FailClosed，退出码 13）。
@@ -52,6 +53,30 @@ internal static class DetectorAssembly
             {
                 EntropyThreshold = config.Secrets.MinEntropy,
             }));
+
+            // FR-090 / ADR-0003：GitleaksAdapter 可独立开关；启动期探测缺失时仅告警降级，
+            // 不阻断扫描（与 use_gitleaks 未实现时代的 FailClosed 行为相反）
+            if (config.Secrets.UseGitleaks)
+            {
+                GitleaksProbeResult probe = GitleaksProbe.Probe(
+                    config.Secrets.GitleaksPath,
+                    new GitleaksProcessRunner());
+                if (probe.Warning is { } probeWarning)
+                {
+                    warnings.Add(probeWarning);
+                }
+
+                if (probe.IsAvailable && probe.ExecutablePath is not null)
+                {
+                    detectors.Add(new GitleaksAdapter(
+                        new GitleaksAdapterOptions
+                        {
+                            ExecutablePath = probe.ExecutablePath,
+                            DisabledRuleIds = config.Secrets.DisabledRules,
+                        },
+                        factory));
+                }
+            }
         }
 
         if (config.Privacy.Enabled)
@@ -144,7 +169,7 @@ internal sealed record DetectorSet
         PolicyOverrides = policyOverrides;
     }
 
-    /// <summary>检测器列表（FR-021 顺序：Secret → Privacy → LocalPath → Url）。</summary>
+    /// <summary>检测器列表（FR-021 顺序：Secret → Gitleaks → Privacy → LocalPath → Url；Gitleaks 仅在启用且探测可用时存在）。</summary>
     internal ImmutableArray<IDetector> Detectors { get; }
 
     /// <summary>本次扫描参与评估的启用规则总数。</summary>

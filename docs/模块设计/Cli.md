@@ -45,7 +45,7 @@
 | 彩色策略 | TTY + `NO_COLOR` 未设 + `--no-color` 未指定 时才启用 |
 | 输出分流 | 文本报告走 stderr；`--format json` 的机器可读结果走 stdout，日志始终走 stderr |
 | 脱敏 | 所有写往终端与日志的文本过 `MessageSanitizer`（去 ANSI / 控制字符、折行） |
-| 子进程行为 | 不启动任何子进程（除 Git 和可选 Gitleaks，这些由 Infrastructure 层做） |
+| 子进程行为 | 不启动任何子进程（Git 由 Infrastructure 的 `GitAccess` 调用，可选 Gitleaks 由 Detection 的 `GitleaksAdapter` 调用） |
 
 ## 4. 外部依赖
 
@@ -196,3 +196,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | 0.1.7 | 2026-10-22 | GGD-0031：§3 新增全量扫描规则（三选一、历史选项组合、截断续扫）；新增 §6.2 `scan --all` 入口流程（原 post-commit / 异常捕获顺延为 §6.3 / §6.4）；§9 勾选全量扫描测试项（`CliScanAllTests`） |
 | 0.1.8 | 2026-10-22 | GGD-0032：§3 新增基线文件规则；§6.2 流程补生成 / 消费分支与 `baseline` 输出；§6.4 异常捕获补 `BaselineException` → 13 / 31；§9 勾选基线文件测试项（`CliScanBaselineTests`） |
 | 0.1.9 | 2026-10-22 | GGD-0034：§2.2 输出补规则查询；§3 新增规则查询规则、JSON Schema 补 `rules.list.v1` / `rules.view.v1`；§9 勾选规则查询测试项（`CliRulesCommandTests`） |
+| 0.1.10 | 2026-10-22 | GGD-0035：§3 子进程行为更正——Git 由 Infrastructure `GitAccess` 调用，可选 Gitleaks 由 Detection `GitleaksAdapter` 调用（CLI 层不启动子进程） |

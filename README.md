@@ -6,14 +6,14 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发中，2026-10-22）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则与自定义正则规则已落地。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则与可选 Gitleaks 引擎已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
 | 范围 | 完成度 | 说明 |
 | --- | --- | --- |
 | P0 核心功能（11 条） | 约 95% | 10 条完整实现；终端报告缺少逐规则「建议」文案（其余字段齐全） |
-| 全部 FR（21 条） | 约 88% | 18 条完整 + 1 条部分 + 2 条未实现（完整计 1、部分计 0.5） |
+| 全部 FR（21 条） | 约 93% | 19 条完整 + 1 条部分 + 1 条未实现（完整计 1、部分计 0.5） |
 
 已可用：
 
@@ -26,6 +26,7 @@
 - `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
 - 40 条内置规则：Secret 16 / Privacy 9 / LocalPath 7 / Url 8（每条规则均含正反例夹具）
 - 自定义正则规则：`.gitguard.yml` 的 `rules.custom` 支持命名、严重度、上下文关键字与文件 glob；`gitguard rules list` / `view` 只读查看规则目录
+- 可选 Gitleaks 引擎：`rules.secrets.use_gitleaks: true` + `gitleaks_path` 接入外部 Gitleaks 8.x，命中映射为 `GLK/SECRET/*` 并与内置规则按指纹去重；可执行文件缺失时告警降级，不阻断扫描
 - 文本 / JSON 报告、严重度策略、配置文件 + SQLite 白名单、`exclude` 路径排除
 - `--no-verify` 与 `GITGUARD_SKIP=1` 绕过检测及 SQLite 审计落库
 - 中英文输出、Native AOT 单文件发布
@@ -33,7 +34,6 @@
 尚未实现（不影响核心试用）：
 
 - `audit view <run-id>` 单次运行明细（v0.2）
-- GitleaksAdapter（v0.2）
 - Avalonia 桌面端（v0.3）
 
 ## 快速开始（从源码构建）

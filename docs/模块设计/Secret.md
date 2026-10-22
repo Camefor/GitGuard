@@ -4,7 +4,7 @@
 
 - **一句话定位**：扫描暂存区 / 推送差异文本中的凭据与密钥（API Key、Token、JWT、数据库连接串、SSH 私钥等），命中即输出高严重度 Finding。
 - **所属限界上下文**：Scanning Context
-- **承担 FR**：`FR-021`（四类检测器之一）、`FR-090`（P2 的 GitleaksAdapter 挂接）
+- **承担 FR**：`FR-021`（四类检测器之一）、`FR-090`（GitleaksAdapter 挂接，v0.2 已实现）
 - **承担 DR**：`DR-01, DR-02, DR-03, DR-04`
 - **关联 ADR**：`ADR-0003`（检测引擎适配器策略）
 
@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | `ScanStagedUseCase` / `ScanPushUseCase` | 差异文本 Hunk（新增/修改行） | `FileChange { Path, Lines[ChangedLine] }` | UTF-8 字符串 | 行列表为空时空跑 |
 | 规则库 | 内置规则集 `BuiltinRules.yaml` 的 `secret` 分类 | DetectionRule | - | 为空时模块空跑 |
-| 可选：GitleaksAdapter（P2） | 外部进程输出 | JSON | - | 不可用时降级 |
+| 可选：GitleaksAdapter（`GGD-0035`） | 外部进程输出 | JSON | - | 启动期不可用时告警降级；扫描期失败 FailClosed |
 
 ### 2.2 输出
 
@@ -45,14 +45,14 @@
 | `GGD/SECRET/HUGGINGFACE-TOKEN` | Hugging Face Token | High | `hf_` + ≥ 34 位字母数字 |
 | `GGD/SECRET/AZURE-STORAGE-KEY` | Azure Storage Account Key | High | 86 位 Base64 + `==`，且同行含 `accountkey` / `azure` / `storage` / `存储账户` 上下文 |
 
-> v0.2 规则升级（GGD-0033）在 MVP 8 条基础上新增 8 条高置信度平台 Token 规则；Azure 存储密钥依赖上下文关键字控制误报。GitleaksAdapter 仍作为后续补充召回率的扩展位。
+> v0.2 规则升级（GGD-0033）在 MVP 8 条基础上新增 8 条高置信度平台 Token 规则；Azure 存储密钥依赖上下文关键字控制误报。GitleaksAdapter 已作为可选引擎接入（`GGD-0035`），默认关闭，启用后与内置 SECRET 规则并行检测并按指纹去重。
 
 ## 4. 外部依赖
 
 | 依赖 | 用途 | 许可 / 成本 | 超时 | 失败降级 |
 | --- | --- | --- | --- | --- |
 | Regex 引擎（.NET 内置） | 正则匹配 | 内置 | 200ms / 规则 | 禁用该规则并 FailClosed |
-| Gitleaks CLI（P2） | 补强召回率 | MIT | 10s / 调用 | 整体适配器禁用 |
+| Gitleaks CLI（可选，`GGD-0035`） | 补强召回率 | MIT | 10s / 调用 | 启动期缺失 / 不可执行 → 整体适配器禁用（告警，不阻断）；扫描期异常 → `DETECTOR_FAILED`（不重试） |
 
 ## 5. 数据模型
 
@@ -85,8 +85,8 @@ flowchart LR
 | `rules.secrets.enabled` | bool | true | 全局启用/禁用本模块 |
 | `rules.secrets.disabled_rules` | string[] | [] | 禁用的规则 ID（Critical 规则禁用需审计登记） |
 | `rules.secrets.min_entropy` | float | 4.0 | 用于高熵判定（AWS-SECRET 等） |
-| `rules.secrets.use_gitleaks` | bool | false | 启用 GitleaksAdapter（P2） |
-| `rules.secrets.gitleaks_path` | string? | null | Gitleaks 可执行路径（默认 PATH 查找） |
+| `rules.secrets.use_gitleaks` | bool | false | 启用 GitleaksAdapter（`GGD-0035`） |
+| `rules.secrets.gitleaks_path` | string? | null | Gitleaks 可执行路径（支持 `~`；未配置或裸名称时按 PATH 查找）；空白值 → 退出码 13 |
 
 ## 8. 质量属性
 
@@ -101,13 +101,13 @@ flowchart LR
 - [x] 每条规则 ≥ 3 条 positive + 3 条 negative（`BuiltinRuleFixtureTests`，16 条 Secret 规则全覆盖）。
 - [x] `TC-FR-021-S-*` 测试全部通过。
 - [ ] ReDoS 用例集对正则进行回溯测试。
-- [ ] GitleaksAdapter（P2）在 Mock 模式下的契约测试。
+- [x] GitleaksAdapter（`GGD-0035`）契约测试：Mock 子进程映射 / 行号还原 / 禁用规则 / 缺失报告 / 非法 JSON / 路径逃逸 / 临时目录清理（`GitleaksAdapterTests`），以及探测、路径定位与进程超时（`GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests`）。
 - [ ] 金丝雀 Token 自检（DR-02）。
 
 ## 10. 演进与扩展位
 
 - `IDetector` 接口是扩展位：
-  - 二期：接入 Gitleaks → `GitleaksAdapter : IDetector`。
+  - v0.2：已接入 Gitleaks → `GitleaksAdapter : IDetector`（`GGD-0035`，默认关闭）。
   - 三期：可接入自定义正则列表 → `UserRegexDetector : IDetector`。
 - 规则升级策略：
   - 新规则默认 `enabled: false`，经过一轮灰度再默认启用。
@@ -123,3 +123,4 @@ flowchart LR
 | 0.1.3 | 2026-10-21 | GGD-0020：§8 单规则耗时测量方式改为 `--verbose` 的 `Scan.RuleTiming`（`duration_us`），替换未落地的 BenchmarkDotNet 引用 |
 | 0.1.4 | 2026-10-22 | GGD-0033：规则库扩充至 16 条 Secret 规则（新增 Google API Key / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face / Azure Storage Key）；§6 长行高置信度规则集同步扩充；§9 勾选样本覆盖项 |
 | 0.1.5 | 2026-10-22 | GGD-0034：§6 明确自定义 `USR/SECRET/*` 规则视为高置信度，超长行不跳过（`SecretDetector` 按 `RuleSource.User` 保持求值） |
+| 0.1.6 | 2026-10-22 | GGD-0035：GitleaksAdapter 由扩展位转为已实现可选引擎——§1 / §2 / §3 / §4 去除 P2 表述并补充启动期降级与扫描期 FailClosed 语义；§7 明确 `gitleaks_path` 支持 `~`、PATH 查找与空白值 FailClosed；§9 勾选契约测试；§10 标注 v0.2 接入 |

@@ -164,7 +164,7 @@
   - 版本字段 `version: 1` 必填；未知版本 → FailClosed。
   - 未知字段：警告但不阻断（宽松解析），警告经 `gitguard status` 与扫描报告的 `warnings` 透出。
   - 取值越界（`scan.max_file_bytes` / `scan.timeout_ms` / `logging.file.*` / `rules.secrets.min_entropy`）→ FailClosed（退出码 13）。
-  - `rules.secrets.use_gitleaks: true`（P2 未实现）→ FailClosed：无法兑现的开关静默忽略会构成 FailOpen。
+  - `rules.secrets.use_gitleaks`（bool，默认 false）：启用 GitleaksAdapter（`GGD-0035`）。`rules.secrets.gitleaks_path` 为空白字符串 → FailClosed（退出码 13）；未配置时按 `gitleaks` 在 PATH 中查找。启用但可执行文件缺失 / 无法执行 → 告警并禁用适配器，不阻断扫描。
   - `exclude.paths`：glob 匹配仓库相对路径；`exclude.files`：glob 匹配任意目录下的文件名。命中文件在扫描管线中直接跳过（暂存区与推送共用），不产生 Finding，也不计入 `skipped_files`；空项 → 退出码 13。
   - `scan.pre_commit: false` / `scan.pre_push: false`：仅警告，扫描类型开关尚未接线（Hook 分发脚本恒调用扫描）。
   - `scan.fail_closed: false`：仅警告，MVP 行为恒为 FailClosed（DR-03）。
@@ -196,15 +196,23 @@
 - **v0.2 实现状态**：已实现（`GGD-0034`）。
 - **关联测试用例**：`TC-FR-080-01` ~ `TC-FR-080-04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`）
 
-### 2.13 `FR-090` GitleaksAdapter（P2）
+### 2.13 `FR-090` GitleaksAdapter
 
-- **描述**：通过实现 `IDetector`，把 Gitleaks 命令行作为可选秘密检测引擎接入。
+- **描述**：通过实现 `IDetector`，把外部 Gitleaks CLI 作为可选秘密检测引擎接入；未启用或不可用时不影响内置检测器。
 - **处理规则**：
-  - 启动时探测 `gitleaks` 可执行路径；不存在 → 禁用适配器，不阻断。
-  - 调用方式：`gitleaks detect --no-git --source <staged-tmp> --report-format json`。
-  - 适配器把 Gitleaks 输出映射为 `Finding`，规则 ID 前缀 `GLK/`。
+  - 配置：`rules.secrets.use_gitleaks`（默认 `false`）控制装配；`rules.secrets.gitleaks_path` 可指定可执行文件（支持 `~`），未配置或仅裸名称时按 PATH 查找（Windows 自动补 `.exe`）；空白路径 → FailClosed（退出码 13）。
+  - 启动期探测：定位成功后执行 `gitleaks version`；8.x 直接可用，其他可解析版本告警但继续可用；文件缺失 / 无法执行 / 版本探测失败 → 禁用适配器并记录警告，扫描继续使用内置规则（不阻断）。
+  - 调用：为每个 `FileChange` 建立隔离临时目录，按原顺序仅写入变更行并保留仓库相对路径（路径逃逸 `..` 直接拒绝）；执行 `gitleaks detect --no-git --source <tmp>/source --report-format json --report-path <tmp>/report.json`，默认 10s 超时，超时终止进程树且不重试。
+  - 退出码：0 / 1 均以 JSON 报告为准（1 表示有命中）；其他非零退出码 → `DetectionException`（`DETECTOR_FAILED`，退出码 11）。退出码 0 且未生成报告视为无命中；退出码 1 且未生成报告 → FailClosed。
+  - 映射：报告 `RuleID` 规范化为 `GLK/SECRET/<UPPER_SNAKE>`（仅保留 `[A-Z0-9_-]`）；严重度统一为 `High`；`StartLine` 是暂存文件行序号，经 `FileChange.Lines` 还原为 diff 原始行号，越界条目跳过。`Secret` / `Match` 仅用于脱敏与指纹，不进入 Finding。
+  - 禁用规则：`disabled_rules` 同时接受 Gitleaks 原始 ID 与 `GLK/...` 命名空间写法（大小写不敏感）；`GGD/` / `USR/` 条目由内置规则选择消费，适配器忽略。
+  - 去重：同一提交、文件、行、指纹的多引擎命中保留一条，来源优先级 `USR > GLK > GGD`，严重度取最高（`FindingDeduplicator`）。
+  - 报告校验：根节点必须为数组、条目必须为对象且包含 `RuleID` 与整数 `StartLine`；JSON 非法 / 结构不符 → `DETECTOR_FAILED`（退出码 11）。
+  - 清理：临时目录（含暂存原文与报告）在 `finally` 中递归删除，Unix 目录权限 0700；清理失败 FailClosed，避免敏感原文残留（DR-02）。
 - **关联 ADR**：`ADR-0003`
-- **v0.1 实现状态**：未实现（v0.2）。`rules.secrets.use_gitleaks: true` 时按配置无效 FailClosed（退出码 13），避免静默 FailOpen。
+- **实现**：`GitGuard.Detection.Adapters.GitleaksAdapter` / `GitleaksProbe` / `GitleaksExecutableLocator` / `GitleaksProcessRunner`、`GitGuard.Application.Scanning.FindingDeduplicator`（`GGD-0035`）。
+- **v0.2 实现状态**：已实现（`GGD-0035`）。
+- **关联测试用例**：`TC-FR-090-01~04`（`GitleaksAdapterTests` / `GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests` / `GitGuardConfigLoaderTests` / `GitGuardSessionTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`）
 
 ## 3. 数据需求
 
@@ -226,7 +234,7 @@
 | 对外（配置） | `.gitguard.yml` / 用户级 config | 规则与策略 | 解析失败 → FailClosed |
 | 对外（审计查询 / 导出） | `gitguard audit list` / `gitguard audit export --output <path> --format json/csv` | 用户事后分析 | 已实现（`GGD-0022`）：分页 / 时间 / 结果筛选，导出仅含脱敏片段与 HMAC 指纹；`audit view` 仍为 v0.2 |
 | 对内（Git） | `git diff --cached`、`git rev-list`、`git log --no-walk=unsorted --stdin` | 读取仓库差异 | 失败即 FailClosed |
-| 对内（可选） | `gitleaks` CLI | P2 秘密检测补强 | 不可用时降级，不阻断 |
+| 对内（可选） | `gitleaks` CLI | v0.2 秘密检测补强（`GGD-0035`） | 启动期缺失 / 不可执行 → 降级禁用，不阻断；扫描期执行失败 → FailClosed |
 
 CLI 命令细节见 `06-API接口设计.md`。
 
@@ -320,7 +328,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~05`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` / `06-API接口设计` §5.7 | `TC-FR-080-01~04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`） | 已实现（`GGD-0034`） |
-| `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | 无 | 未实现（v0.2） |
+| `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-01~04`（`GitleaksAdapterTests` / `GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests` / `GitGuardConfigLoaderTests` / `GitGuardSessionTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现（`GGD-0035`） |
 | `FR-100` | 全部 | `11-前端UI设计` | 无 | 未实现（v0.3） |
 
 ## 9. 未解问题
@@ -353,3 +361,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.16 | 2026-10-22 | GGD-0032：新增 §2.11.1 FR-061 基线文件（schema / 默认路径、生成不抑制当次命中、默认自动消费、`AllowedByBaseline` 动作与 `Warned` 结果、允许清单优先级、13 / 31 错误码、本地盐不可移植限制）；§8 追溯矩阵 FR-061 更新测试类并标记已实现 |
 | 0.1.17 | 2026-10-22 | GGD-0033：§2.5 FR-021 规则库扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），补四类检测器覆盖说明与夹具有效性要求；§8 追溯矩阵标记 40 条规则 |
 | 0.1.18 | 2026-10-22 | GGD-0034：新增 §2.12.2 FR-080 自定义正则规则（`rules.custom` 字段 / 校验 / 合并与启用语义、200ms 超时、超长行不跳过、`gitguard rules list/view` 与退出码 7 / 40）；§8 追溯矩阵标记已实现；§9 Q-02 记录命名捕获组决议 |
+| 0.1.19 | 2026-10-22 | GGD-0035：§2.12 更新 `use_gitleaks` / `gitleaks_path` 配置语义（空白路径 → 13，缺失可执行文件 → 告警降级）；§2.13 FR-090 按实现重写（启动探测、逐文件暂存、命令与退出码、GLK 映射、禁用规则过滤、跨引擎去重、FailClosed 与临时目录清理）；§4 可选依赖说明与 §8 追溯矩阵同步标记已实现 |

@@ -125,6 +125,9 @@ internal sealed class ScanExecutor
                 }
             }
 
+            // ADR-0003 配套机制：多引擎命中同一提交 / 文件 / 行 / 指纹时按 USR > GLK > GGD 保留一条，严重度取最高
+            findings = FindingDeduplicator.Deduplicate(findings);
+
             return Complete(
                 scanType,
                 startedAt,

@@ -3,7 +3,7 @@
 ## 1. 架构目标
 
 - **本地独立运行**：无网络依赖，无服务器依赖；仅依赖本机 Git 与 SQLite 文件。
-- **可拆插的检测器**：Secret/Privacy/LocalPath/Url 四类检测器与未来的 GitleaksAdapter 共享 `IDetector` 契约，可独立启用/禁用/替换。
+- **可拆插的检测器**：Secret/Privacy/LocalPath/Url 四类检测器与 GitleaksAdapter（v0.2 可选）共享 `IDetector` 契约，可独立启用/禁用/替换。
 - **FailClosed 优先于性能**：任何异常路径默认阻断；只在明确安全的分支（如纯警告级发现）才允许放行。
 - **启动极快**：目标 Native AOT 单文件冷启动 ≤ 150ms，使 Hook 调用对用户几乎无感。
 - **可演进为桌面端**：核心逻辑与 CLI 层解耦；Avalonia 桌面端（P3）复用同一套 `GitGuard.Core`。
@@ -21,7 +21,7 @@
 | Git 交互 | 调用系统 `git` CLI（通过 `Process`） | 兼容 Git ≥ 2.9 | 兼容既有仓库、hooks、远程；不引入 LibGit2Sharp 的 Native 绑定复杂度 | ADR-0002 |
 | 本地存储 | SQLite（嵌入） via `Microsoft.Data.Sqlite` | 最新稳定 | 单文件、零运维、跨平台；满足审计规模 | - |
 | 配置解析 | `YamlDotNet` | 最新稳定 | `.gitguard.yml` 友好；社区成熟 | - |
-| 秘密检测补强（可选，P2） | Gitleaks（外部二进制） | 最新稳定 | 规则库成熟；MIT 许可证；通过适配器隔离 | ADR-0003 |
+| 秘密检测补强（可选，v0.2 已实现） | Gitleaks（外部二进制） | 8.x | 规则库成熟；MIT 许可证；通过适配器隔离 | ADR-0003 |
 | 日志 | `Microsoft.Extensions.Logging` + 自写 Sink（SQLite + 控制台） | 10.0 | 标准接口；自写 Sink 可强制脱敏 | - |
 | 单元测试 | xUnit v3 | 最新稳定 | 与 .NET 10 兼容；并行执行好 | - |
 | 集成测试 | xUnit v3 + 临时 Git 仓库 Fixture | - | 集成测试直接 fork Git CLI 验证 Hook 行为 | - |
@@ -69,7 +69,7 @@ flowchart LR
     CLI -->|git diff --cached / rev-list| Git
     CLI -->|读写| Config[.gitguard.yml / 用户配置]
     CLI -->|审计| DB[(SQLite)]
-    CLI -. 可选 .-> Gitleaks[gitleaks 外部二进制]
+    CLI -. 可选（经 GitleaksAdapter） .-> Gitleaks[gitleaks 外部二进制]
     CLI -->|链式调用| Legacy[Husky / lefthook / 自定义 Hook]
     Dev <-->|CLI 直接调用| CLI
 ```
@@ -94,7 +94,7 @@ flowchart TB
     Infra --> Core
 ```
 
-> **依赖方向**：仅允许 `Cli / Desktop → Application → Core`；`Infrastructure` 作为端口实现对 `Application` 暴露接口；`Detection` 既实现 `IDetector`（Core 定义）又可依赖 `Infrastructure`（如调用 Gitleaks）。
+> **依赖方向**：仅允许 `Cli / Desktop → Application → Core`；`Infrastructure` 作为端口实现对 `Application` 暴露接口；`Detection` 仅实现 `IDetector`（Core 定义），Gitleaks 子进程调用封装在 `Detection.Adapters` 内，不引入 `Detection → Infrastructure` 依赖。
 
 ### 5.1 解决方案结构
 
@@ -112,7 +112,7 @@ GitGuard/
 │  │  ├─ Privacy/
 │  │  ├─ LocalPath/
 │  │  ├─ Url/
-│  │  └─ Adapters/                # GitleaksAdapter（P2）
+│  │  └─ Adapters/                # GitleaksAdapter（v0.2，GGD-0035）
 │  ├─ GitGuard.Application/       # 用例：ScanStaged / ScanPush / Install / Uninstall / Status
 │  │  ├─ Scanning/
 │  │  ├─ Hooks/
@@ -306,7 +306,7 @@ flowchart LR
   - `IAuditStore`：未来可能把 SQLite 替换为团队共享的 LiteDB / 远程 Audit API。
   - `IRuleSource`：当前为 YAML；未来可加 JSON / 远程只读 API。
 - **可能的演进路径**：
-  - **MVP → P2**：引入 GitleaksAdapter，不改 Core。
+  - **MVP → v0.2**：已引入 GitleaksAdapter（`GGD-0035`），不改 Core。
   - **P2 → P3**：Avalonia 桌面端复用 `Application`，Infra 保持不变。
   - **远期**：若需要团队协作，可将审计表从 SQLite 升级到 LiteDB（仍为本地文件），再往后考虑加 CLI 导出到团队内部 API。
 
@@ -319,3 +319,4 @@ flowchart LR
 | 0.1.2 | 2026-10-21 | GGD-0020：§5.1 结构树更新 benchmarks 实际内容（自研 harness + startup / run 脚本），移除未落地的 `scripts/` 占位（AOT 发布由 `.github/workflows/release.yml` 承担） |
 | 0.1.3 | 2026-10-21 | GGD-0023：§7.2 推送扫描时序图改为一次批量 `git log --no-walk=unsorted --stdin` 取回全部提交差异，再逐提交解析与检测 |
 | 0.1.4 | 2026-10-22 | GGD-0031：§13 质量属性表跨平台 CI 表述改为「不再计划（`GGD-0028` 已取消）」 |
+| 0.1.5 | 2026-10-22 | GGD-0035：§4 上下文图标注 Gitleaks 经 `GitleaksAdapter` 调用；§5 依赖方向更正——`Detection` 不依赖 `Infrastructure`，Gitleaks 子进程封装在 `Detection.Adapters` |

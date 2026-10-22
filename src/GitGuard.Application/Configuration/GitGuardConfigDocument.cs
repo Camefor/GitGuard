@@ -146,8 +146,11 @@ internal sealed class SecretRulesSectionDto
     /// <summary>禁用的规则 ID 列表。</summary>
     public List<string>? DisabledRules { get; set; }
 
-    /// <summary>是否启用 Gitleaks 适配器（MVP 不支持，置 <see langword="true"/> → 退出码 13）。</summary>
+    /// <summary>是否启用 Gitleaks 适配器（FR-090；缺失可执行文件时降级，不阻断）。</summary>
     public bool? UseGitleaks { get; set; }
+
+    /// <summary>Gitleaks 可执行文件路径（支持 <c>~</c> 前缀；省略时在 PATH 中查找）。</summary>
+    public string? GitleaksPath { get; set; }
 
     /// <summary>熵阈值（用于高熵字符串候选过滤）。</summary>
     public double? MinEntropy { get; set; }

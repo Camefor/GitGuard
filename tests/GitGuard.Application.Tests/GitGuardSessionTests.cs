@@ -50,6 +50,24 @@ public sealed class GitGuardSessionTests
         session.Warnings.Should().NotContainNulls();
     }
 
+    // FR-090 / ADR-0003：use_gitleaks 缺失可执行文件时降级为警告，扫描能力不受影响
+    [Fact]
+    public void UseGitleaksWithMissingExecutable_DegradesWithWarningAndKeepsBuiltInRules()
+    {
+        using var repo = new TempGitRepository();
+        using var data = new TempDirectory();
+        string missingPath = Path.Combine(data.Root, "tools", "gitleaks.exe").Replace('\\', '/');
+        repo.WriteFile(
+            ".gitguard.yml",
+            $"version: 1\nrules:\n  secrets:\n    use_gitleaks: true\n    gitleaks_path: \"{missingPath}\"\n");
+        GitGuardSession session = CreateSession(repo.Root, data.Root);
+
+        int ruleCount = session.RuleCount;
+
+        ruleCount.Should().BePositive("缺失 Gitleaks 只禁用适配器，内置规则照常装配");
+        session.Warnings.Should().Contain(warning => warning.Contains("Gitleaks 适配器已禁用"));
+    }
+
     [Fact]
     public void Config_LoadsProjectFileFromWorkingDirectory()
     {

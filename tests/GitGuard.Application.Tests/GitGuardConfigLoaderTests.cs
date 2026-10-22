@@ -185,16 +185,66 @@ public sealed class GitGuardConfigLoaderTests
         act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("policy.low 取值非法");
     }
 
+    // FR-090：use_gitleaks / gitleaks_path 自 v0.2 起为正式配置项（不再是「未实现即拒绝」）
     [Fact]
-    public void Load_UseGitleaks_IsRejectedInsteadOfSilentlyIgnored()
+    public void Load_UseGitleaks_IsParsedWithTrimmedPath()
     {
         using var project = new TempDirectory();
-        const string yaml = "version: 1\nrules:\n  secrets:\n    use_gitleaks: true\n";
+        const string yaml = """
+            version: 1
+            rules:
+              secrets:
+                use_gitleaks: true
+                gitleaks_path: "  C:/tools/gitleaks.exe  "
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        config.Secrets.UseGitleaks.Should().BeTrue();
+        config.Secrets.GitleaksPath.Should().Be("C:/tools/gitleaks.exe");
+        config.Warnings.Should().BeEmpty("use_gitleaks / gitleaks_path 均为已知配置项");
+    }
+
+    [Fact]
+    public void Load_ProjectGitleaksSettings_OverrideUserLevelPerField()
+    {
+        using var project = new TempDirectory();
+        string userConfigPath = Path.Combine(project.Root, "user-config.yml");
+        const string userYaml = """
+            version: 1
+            rules:
+              secrets:
+                use_gitleaks: false
+                gitleaks_path: C:/user/gitleaks.exe
+            """;
+        const string projectYaml = """
+            version: 1
+            rules:
+              secrets:
+                use_gitleaks: true
+            """;
+        File.WriteAllText(userConfigPath, userYaml);
+        File.WriteAllText(ProjectConfigPath(project), projectYaml);
+
+        GitGuardConfig config = CreateLoader(project.Root, userConfigPath).Load();
+
+        config.Secrets.UseGitleaks.Should().BeTrue("项目级覆盖开关");
+        config.Secrets.GitleaksPath.Should().Be("C:/user/gitleaks.exe", "未覆盖的路径字段沿用用户级");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Load_BlankGitleaksPath_FailsClosed(string value)
+    {
+        using var project = new TempDirectory();
+        string yaml = $"version: 1\nrules:\n  secrets:\n    gitleaks_path: \"{value}\"\n";
         File.WriteAllText(ProjectConfigPath(project), yaml);
 
         Action act = () => CreateLoader(project.Root).Load();
 
-        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("use_gitleaks");
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("gitleaks_path");
     }
 
     [Fact]
