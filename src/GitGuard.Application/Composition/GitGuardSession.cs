@@ -243,6 +243,28 @@ public sealed class GitGuardSession
             collectRuleTimings);
     }
 
+    /// <summary>装配全量扫描用例（FR-060：HEAD 全量树 + 可选历史提交；扫描设置与策略映射全部来自有效配置）。</summary>
+    /// <param name="collectRuleTimings">是否采集规则级耗时（NFR-M-002，CLI <c>--verbose</c>）；<see langword="false"/> 时无计时开销。</param>
+    /// <returns>已接线配置的全量扫描用例。</returns>
+    /// <exception cref="ConfigurationException">配置无效（解析失败 / 违反硬下限 / 类别全禁）。</exception>
+    /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public ScanAllUseCase CreateFullScan(bool collectRuleTimings = false)
+    {
+        GitGuardConfig config = Config;
+        IAuditStore auditStore = AuditStore;
+        DetectorSet detectors = _detectors.Value;
+        RecordPolicyOverrides(auditStore, detectors.PolicyOverrides);
+        return new ScanAllUseCase(
+            GitAccess,
+            detectors.Detectors,
+            auditStore,
+            _clock,
+            config.Scan,
+            BuildScanPolicy(config),
+            collectRuleTimings);
+    }
+
     /// <summary>装配待提交预测记录器（FR-050：pre-commit 扫描通过 / 按 GITGUARD_SKIP 跳过后记录）。</summary>
     /// <returns>已接线的记录器（不触发审计库打开，标记存储按当前工作树隔离）。</returns>
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>

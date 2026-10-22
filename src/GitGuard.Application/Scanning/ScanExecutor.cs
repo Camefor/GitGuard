@@ -77,16 +77,16 @@ internal sealed class ScanExecutor
     /// <summary>
     /// 执行一次扫描；差异获取与检测共享扫描级超时窗口（<c>scan.timeout_ms</c>）。
     /// </summary>
-    /// <param name="scanType">扫描类型（PreCommit / PrePush 等）。</param>
-    /// <param name="acquireDiffFiles">差异获取委托：返回按提交归属的逐文件解析结果；git 失败抛 <see cref="GitException"/>。</param>
+    /// <param name="scanType">扫描类型（PreCommit / PrePush / Manual 等）。</param>
+    /// <param name="acquireInput">差异获取委托：返回按提交归属的逐文件解析结果与用例级摘要；git 失败抛 <see cref="GitException"/>。</param>
     /// <param name="cancellationToken">调用方取消令牌；外部取消原样上抛（CLI 映射退出码 12），超时则内部转 FailClosed。</param>
     /// <returns>扫描结果（成功与 FailClosed 均返回；不抛 GitException / DetectionException）。</returns>
     internal async Task<ScanOutcome> RunAsync(
         ScanType scanType,
-        Func<CancellationToken, IReadOnlyList<ParsedDiffFile>> acquireDiffFiles,
+        Func<CancellationToken, ScanInput> acquireInput,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(acquireDiffFiles);
+        ArgumentNullException.ThrowIfNull(acquireInput);
 
         DateTimeOffset startedAt = _clock.UtcNow;
         var stopwatch = Stopwatch.StartNew();
@@ -97,13 +97,14 @@ internal sealed class ScanExecutor
 
         // 仅 --verbose 路径创建采集器；未启用时检测器走无计时开销的 DetectAsync
         RuleTimingCollector? timingCollector = _collectRuleTimings ? new RuleTimingCollector() : null;
+        ScanInput? input = null;
 
         try
         {
-            IReadOnlyList<ParsedDiffFile> parsedFiles = acquireDiffFiles(timeoutSource.Token);
+            input = acquireInput(timeoutSource.Token);
             var changes = new List<FileChange>();
             var skippedFiles = new List<SkippedFile>();
-            PartitionFiles(parsedFiles, changes, skippedFiles);
+            PartitionFiles(input.Files, changes, skippedFiles);
 
             var findings = new List<Finding>();
             foreach (FileChange change in changes)
@@ -129,19 +130,38 @@ internal sealed class ScanExecutor
                 changes.Count,
                 findings,
                 skippedFiles,
-                SnapshotTimings(timingCollector));
+                SnapshotTimings(timingCollector),
+                input.Summary);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return Fail(scanType, EXIT_CODE_TIMEOUT, startedAt, stopwatch.ElapsedMilliseconds, SnapshotTimings(timingCollector));
+            return Fail(
+                scanType,
+                EXIT_CODE_TIMEOUT,
+                startedAt,
+                stopwatch.ElapsedMilliseconds,
+                SnapshotTimings(timingCollector),
+                input?.Summary);
         }
         catch (GitException)
         {
-            return Fail(scanType, EXIT_CODE_GIT_FAILED, startedAt, stopwatch.ElapsedMilliseconds, SnapshotTimings(timingCollector));
+            return Fail(
+                scanType,
+                EXIT_CODE_GIT_FAILED,
+                startedAt,
+                stopwatch.ElapsedMilliseconds,
+                SnapshotTimings(timingCollector),
+                input?.Summary);
         }
         catch (DetectionException)
         {
-            return Fail(scanType, EXIT_CODE_DETECTOR_FAILED, startedAt, stopwatch.ElapsedMilliseconds, SnapshotTimings(timingCollector));
+            return Fail(
+                scanType,
+                EXIT_CODE_DETECTOR_FAILED,
+                startedAt,
+                stopwatch.ElapsedMilliseconds,
+                SnapshotTimings(timingCollector),
+                input?.Summary);
         }
     }
 
@@ -193,7 +213,8 @@ internal sealed class ScanExecutor
         int filesScanned,
         List<Finding> findings,
         IReadOnlyList<SkippedFile> skippedFiles,
-        ImmutableArray<RuleTiming> ruleTimings)
+        ImmutableArray<RuleTiming> ruleTimings,
+        FullScanSummary? fullScanSummary)
     {
         var decisions = PolicyEvaluator.Evaluate(findings, _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
 
@@ -206,7 +227,7 @@ internal sealed class ScanExecutor
         var run = ScanRun.Create(_gitAccess.GetRepositoryRoot(), scanType, startedAt, durationMs, result, exitCode, findings);
         bool auditWriteFailed = !TryPersistAudit(run, decisions);
 
-        return new ScanOutcome(run, decisions, filesScanned, skippedFiles, auditWriteFailed, ruleTimings);
+        return new ScanOutcome(run, decisions, filesScanned, skippedFiles, auditWriteFailed, ruleTimings, fullScanSummary);
     }
 
     /// <summary>FailClosed 路径收尾：以 Failed + 指定退出码（10 / 11 / 12）落库并返回（不携带 Findings）。</summary>
@@ -215,7 +236,8 @@ internal sealed class ScanExecutor
         int exitCode,
         DateTimeOffset startedAt,
         long durationMs,
-        ImmutableArray<RuleTiming> ruleTimings)
+        ImmutableArray<RuleTiming> ruleTimings,
+        FullScanSummary? fullScanSummary)
     {
         var decisions = PolicyEvaluator.Evaluate(
             Array.Empty<Finding>(), _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
@@ -223,7 +245,14 @@ internal sealed class ScanExecutor
         var run = ScanRun.Create(_gitAccess.GetRepositoryRoot(), scanType, startedAt, durationMs, ScanResult.Failed, exitCode);
         bool auditWriteFailed = !TryPersistAudit(run, decisions);
 
-        return new ScanOutcome(run, decisions, filesScanned: 0, Array.Empty<SkippedFile>(), auditWriteFailed, ruleTimings);
+        return new ScanOutcome(
+            run,
+            decisions,
+            filesScanned: 0,
+            Array.Empty<SkippedFile>(),
+            auditWriteFailed,
+            ruleTimings,
+            fullScanSummary);
     }
 
     /// <summary>单事务落库；失败按 AuditWriteFailed 降级（10-异常处理设计 §5 / Audit.md §4），不改变扫描判定。</summary>

@@ -4,22 +4,23 @@
 
 面向开发者的本地 Git 敏感信息防泄漏工具：在 `git commit` 与 `git push` 前通过 Hook 拦截 Token、密钥、密码、手机号、本地路径、内网 URL 等敏感信息。所有扫描与审计均在本机完成，不上传任何数据。
 
-## 当前状态（v0.1，2026-10-22）
+## 当前状态（v0.1 已完成，v0.2 开发中，2026-10-22）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的首项能力 `scan --all` 已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
 | 范围 | 完成度 | 说明 |
 | --- | --- | --- |
 | P0 核心功能（11 条） | 约 95% | 10 条完整实现；终端报告缺少逐规则「建议」文案（其余字段齐全） |
-| 全部 FR（21 条） | 约 74% | 15 条完整 + 1 条部分 + 5 条未实现（完整计 1、部分计 0.5） |
+| 全部 FR（21 条） | 约 79% | 16 条完整 + 1 条部分 + 4 条未实现（完整计 1、部分计 0.5） |
 
 已可用：
 
 - `gitguard install` / `uninstall` / `status`：安装、卸载与查询 Hook（`pre-commit` / `pre-push` / `post-commit`）
 - `gitguard scan --staged`：暂存区扫描（严格基于 `git diff --cached`）
 - `gitguard scan --push`：推送范围扫描（覆盖范围内全部提交，一次批量取差异，Finding 带来源 commit SHA）
+- `gitguard scan --all`：HEAD 全量快照扫描；`--include-history` 扫描历史提交，`--max-files` 截断后可用 `--since` 续扫
 - `gitguard audit list` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）与脱敏 JSON / CSV 导出
 - `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
 - 21 条内置规则：Secret 8 / Privacy 5 / LocalPath 4 / Url 4
@@ -29,9 +30,9 @@
 
 尚未实现（不影响核心试用）：
 
-- `scan --all` 全量扫描与基线文件（v0.2）
+- 基线文件生成与消费（v0.2，`GGD-0032`）
 - `audit view <run-id>` 单次运行明细（v0.2）
-- 自定义正则规则、GitleaksAdapter（v0.2）
+- 自定义正则规则与 `gitguard rules`、GitleaksAdapter（v0.2）
 - Avalonia 桌面端（v0.3）
 
 ## 快速开始（从源码构建）
@@ -196,6 +197,19 @@ printf 'refs/heads/master %s refs/heads/master %s\n' \
 
 `remote-sha` 全零表示新分支，扫描从 `local-sha` 可达的全部提交。
 
+全量扫描（v0.2）：
+
+```bash
+gitguard scan --all                               # HEAD 全部被跟踪文件（不读工作区）
+gitguard scan --all --include-history             # 追加扫描全部历史提交
+gitguard scan --all --include-history --max-files 500
+gitguard scan --all --since <next_since_sha>      # 按上次截断点续扫更早历史
+```
+
+- `--staged` / `--push` / `--all` 三选一；`--include-history` / `--since` / `--max-files` 只能与 `--all` 组合。
+- `--max-files` 按提交边界软截断：当前提交会完整扫描，可能略超上限；JSON 的 `full_scan.next_since_sha` 给出续扫起点。
+- HEAD 快照通过空树差异读取已提交内容，不会把未提交的工作区改动算入结果；空仓库按 Clean 处理。
+
 ### 5. 审计查询与导出
 
 `audit` 查询整个本地审计库（包含所有仓库），不要求当前目录是 Git 仓库：
@@ -303,7 +317,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1076 用例（1067 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1112 用例（1103 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
@@ -314,7 +328,7 @@ dotnet test GitGuard.sln
 - CI 当前仅运行 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 `strace` 作业不再计划（`GGD-0028` 已取消）。
 - Windows 下审计库目前依赖用户目录默认 ACL，显式收紧计划中。
 - Git 2.9.3 / 2.40.1 / 最新稳定版已由 CI `git-compat` 矩阵覆盖；更老版本未验证。
-- `scan --staged` 只扫描暂存区，不读取未暂存内容；全量历史扫描尚未实现。
+- `scan --staged` 只扫描暂存区，不读取未暂存内容；全量扫描（`scan --all`）已支持 HEAD 快照与历史续扫，基线文件尚未实现。
 
 ## 文档入口
 

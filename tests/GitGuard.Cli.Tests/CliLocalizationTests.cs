@@ -118,7 +118,7 @@ public sealed class CliLocalizationTests
         exitCode.Should().Be(ExitCodes.USAGE_ERROR);
         harness.Error.Should()
             .Contain("Usage error")
-            .And.Contain("scan requires exactly one of --staged or --push")
+            .And.Contain("scan requires exactly one of --staged, --push or --all")
             .And.Contain("Run gitguard --help for usage.");
     }
 

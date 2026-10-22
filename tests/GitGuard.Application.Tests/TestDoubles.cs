@@ -10,6 +10,7 @@ namespace GitGuard.Application.Tests;
 internal sealed class FakeGitAccess : IGitAccess
 {
     private readonly Func<string> _stagedDiff;
+    private readonly Func<string, string> _fullTreeDiff;
     private readonly Func<string, IReadOnlyList<string>> _listCommitShas;
     private readonly Func<string, string> _commitDiff;
     private readonly Func<string?> _headCommitSha;
@@ -20,6 +21,7 @@ internal sealed class FakeGitAccess : IGitAccess
     internal FakeGitAccess(
         string repositoryRoot,
         Func<string>? stagedDiff = null,
+        Func<string, string>? fullTreeDiff = null,
         Func<string, IReadOnlyList<string>>? listCommitShas = null,
         Func<string, string>? commitDiff = null,
         string? hooksPath = null,
@@ -29,6 +31,7 @@ internal sealed class FakeGitAccess : IGitAccess
     {
         RepositoryRoot = repositoryRoot;
         _stagedDiff = stagedDiff ?? (() => string.Empty);
+        _fullTreeDiff = fullTreeDiff ?? (_ => string.Empty);
         _listCommitShas = listCommitShas ?? (_ => Array.Empty<string>());
         _commitDiff = commitDiff ?? (_ => string.Empty);
         _hooksPath = hooksPath;
@@ -46,6 +49,10 @@ internal sealed class FakeGitAccess : IGitAccess
     internal int CommitDiffBatchCalls { get; private set; }
 
     internal int StagedDiffCalls { get; private set; }
+
+    internal int FullTreeDiffCalls { get; private set; }
+
+    internal List<string> RequestedFullTreeRevisions { get; } = new List<string>();
 
     public string GetRepositoryRoot() => RepositoryRoot;
 
@@ -65,6 +72,13 @@ internal sealed class FakeGitAccess : IGitAccess
     {
         StagedDiffCalls++;
         return _stagedDiff();
+    }
+
+    public string GetFullTreeDiff(string revision)
+    {
+        FullTreeDiffCalls++;
+        RequestedFullTreeRevisions.Add(revision);
+        return _fullTreeDiff(revision);
     }
 
     public string GetStagedTreeSha() => _stagedTreeSha();

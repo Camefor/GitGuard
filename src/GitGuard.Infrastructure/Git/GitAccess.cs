@@ -27,6 +27,7 @@ public sealed class GitAccess : IGitAccess
     private readonly Lazy<string> _gitDirectory;
     private readonly Lazy<string?> _configuredHooksPath;
     private readonly Lazy<string> _headCommitSha;
+    private readonly Lazy<string> _emptyTreeSha;
 
     /// <summary>在指定路径下创建 Git 访问实例；构造时预检仓库有效性（非 Git 工作区立即 FailClosed）。</summary>
     /// <param name="repositoryPath">仓库内任意目录（通常为当前工作目录）；命令统一切换到工作区根目录执行。</param>
@@ -51,6 +52,7 @@ public sealed class GitAccess : IGitAccess
         _gitDirectory = new Lazy<string>(ResolveGitDirectory);
         _configuredHooksPath = new Lazy<string?>(ResolveConfiguredHooksPath);
         _headCommitSha = new Lazy<string>(ResolveHeadCommitSha);
+        _emptyTreeSha = new Lazy<string>(ResolveEmptyTreeSha);
     }
 
     /// <inheritdoc />
@@ -123,6 +125,27 @@ public sealed class GitAccess : IGitAccess
         // -c core.quotepath=false 让非 ASCII 路径以原始 UTF-8 输出（默认会转成 \NNN 八进制转义，破坏解析层路径与 glob 匹配）
         var result = RunGit("-c", "core.quotepath=false", "diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv");
         EnsureGitSucceeded(result, "diff --cached -U0");
+        return result.StandardOutput;
+    }
+
+    /// <inheritdoc />
+    public string GetFullTreeDiff(string revision)
+    {
+        ValidateRevisionArgument(revision, nameof(revision));
+
+        // 空树 → 目标修订：所有跟踪文件均以新增形式出现，等效读取整棵 HEAD 树但不触碰工作区（DR-04）；
+        // 选项与暂存区差异保持一致，保证输出恒为标准 unified-0 格式且路径不被 quote。
+        var result = RunGit(
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            _emptyTreeSha.Value,
+            revision,
+            "-U0",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv");
+        EnsureGitSucceeded(result, $"diff <empty-tree> {revision} -U0");
         return result.StandardOutput;
     }
 
@@ -426,6 +449,14 @@ public sealed class GitAccess : IGitAccess
     {
         var result = RunGit("rev-parse", "HEAD");
         EnsureGitSucceeded(result, "rev-parse HEAD");
+        return result.StandardOutput.Trim();
+    }
+
+    /// <summary>计算当前仓库对象格式下的空树 SHA（空输入经 stdin 哈希，不写入对象库）。</summary>
+    private string ResolveEmptyTreeSha()
+    {
+        var result = RunGitAt(_repositoryRoot, standardInput: string.Empty, "hash-object", "-t", "tree", "--stdin");
+        EnsureGitSucceeded(result, "hash-object -t tree --stdin");
         return result.StandardOutput.Trim();
     }
 

@@ -53,6 +53,14 @@ public interface IGitAccess
     /// <exception cref="GitException">git 命令失败时抛出（FailClosed）。</exception>
     string GetStagedDiff();
 
+    /// <summary>获取指定修订相对空树的完整差异（<c>git diff &lt;empty-tree&gt; &lt;revision&gt; -U0</c>），用于 FR-060 全量扫描。</summary>
+    /// <remarks>DR-04：以 Git 对象库中的树内容作为差异来源，不读取工作区文件；空树 SHA 按仓库对象格式动态计算（兼容 SHA-1 / SHA-256）。</remarks>
+    /// <param name="revision">目标修订（通常为 <c>HEAD</c>）。</param>
+    /// <returns>unified-0 格式的差异文本；全部跟踪文件均以新增形式出现，无文件时为空字符串。</returns>
+    /// <exception cref="ArgumentException"><paramref name="revision"/> 为空、空白或以 <c>-</c> 开头。</exception>
+    /// <exception cref="GitException">修订不存在或 git 命令失败时抛出（FailClosed）。</exception>
+    string GetFullTreeDiff(string revision);
+
     /// <summary>获取暂存区的树 SHA（<c>git write-tree</c>），用于 FR-050 的待提交身份预测。</summary>
     /// <remarks>该命令仅写入索引对应的 tree 对象，不创建提交；索引存在未合并条目时 git 失败。</remarks>
     /// <returns>十六进制树 SHA。</returns>

@@ -35,6 +35,7 @@
 | 解析失败 | 未知命令 / 未知选项 / 受限取值非法 / 参数组合非法 → 退出码 7（`CLI_USAGE_ERROR`），在命令动作执行前返回，不触碰仓库与配置 |
 | JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` / `bypass.v1` / `audit.list.v1` / `audit.export.summary.v1` / `allowlist.add.v1` / `allowlist.remove.v1` / `allowlist.list.v1` 版本号；单行紧凑、中文不转义 |
 | 白名单管理 | `allowlist add/remove/list` 直接读写本地审计库，不要求当前目录是 Git 仓库；`add` 校验失败映射 20、`remove` 条目不存在映射 21、库读写失败映射 14；分页参数非法映射 7 |
+| 全量扫描 | `scan --staged` / `--push` / `--all` 三选一（否则 7）；`--include-history` / `--since` / `--max-files` 仅能与 `--all` 组合；`--since` 从指定提交的父提交向更早历史扫描，`--max-files` 按提交边界截断；文本报告展示历史进度，JSON 输出 `full_scan`（`GGD-0031`） |
 | 审计格式化 | `audit export` 的文件格式由子命令 `--format json\|csv` 决定，与全局 `--format text\|json` 同名但作用于不同层级；导出为同目录临时文件 + 原子替换，失败映射 31 |
 | 隐藏命令 | `hook post-commit`（FR-050）：仅供分发的 `post-commit` 脚本调用，不出现在 `--help`；恒返回 0，审计失败映射 14 |
 | 隐藏选项 | `scan --record-pending`：仅供 `pre-commit` 脚本调用，记录待提交预测；不能与 `--push` 组合（退出码 7） |
@@ -76,7 +77,26 @@ flowchart LR
 
 装配边界：Cli 不引用 Infrastructure；`GitGuardSession`（`GitGuard.Application.Composition`）在 Application 层完成 Infrastructure 装配并按需延迟构建（`status` / `version` 等只读命令不打开审计库、不生成指纹盐）。
 
-### 6.2 `gitguard hook post-commit` 入口（FR-050）
+### 6.2 `gitguard scan --all` 入口（FR-060）
+
+```mermaid
+flowchart LR
+    Entry[scan --all] --> Scope{staged / push / all}
+    Scope -- 非唯一 --> E7[退出码 7]
+    Scope -- all --> UseCase[ScanAllUseCase.ExecuteAsync]
+    UseCase --> Head[GetFullTreeDiff HEAD：全量树快照]
+    UseCase -- includeHistory / since / maxFiles --> History[ListCommitShas + GetCommitDiffs 批量历史差异]
+    History -- max-files 截断 --> Resume[报告 next_since_sha]
+    Head --> Pipeline[ScanExecutor：检测 / 策略 / 审计]
+    History --> Pipeline
+    Pipeline --> Render{Output}
+    Render -- text --> StdErr[stderr：历史进度 / 续扫提示]
+    Render -- json --> StdOut[stdout：full_scan 对象]
+```
+
+选项校验与历史摘要由 `ScanCommand` / `ScanAllUseCase` 完成；HEAD 全量树差异不读取工作区（DR-04），空仓库直接按 Clean 处理。
+
+### 6.3 `gitguard hook post-commit` 入口（FR-050）
 
 ```mermaid
 flowchart LR
@@ -92,7 +112,7 @@ flowchart LR
 
 `--record-pending` 在 `scan` 动作内处理：`GITGUARD_SKIP=1` 时绕过扫描并写入 `skipped` 标记；否则扫描通过后写入标记、阻断 / 失败时清理旧标记。标记操作失败仅降级为警告，不改变扫描退出码。
 
-### 6.3 全局异常捕获
+### 6.4 全局异常捕获
 
 ```mermaid
 flowchart LR
@@ -143,6 +163,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 - [x] 规则级耗时（GGD-0020）：`--verbose` 输出 `Scan.RuleTiming`（`rule_id` / `duration_us`）、默认级别不输出、英文文案（`CliRuleTimingTests`）。
 - [x] 审计查询与导出（GGD-0022）：`audit list` 分页 / `--since` / `--result`、`audit export` JSON / CSV 脱敏、全局与子命令 `--format` 区分、非法参数 7、写入失败 31（`CliAuditCommandTests`）。
 - [x] 白名单管理（GGD-0030）：`allowlist add/remove/list` 文本 / JSON 渲染、无仓库环境可用、校验失败 20、条目不存在 21、非法 ID / 分页参数 7、SQLite 条目参与扫描放行（`CliAllowlistCommandTests` + `ExitCodeMapperTests`）。
+- [x] 全量扫描（GGD-0031）：`scan --all` HEAD 快照 / 历史提交扫描、`full_scan` JSON 字段、`--max-files` 截断与 `--since` 续扫、三选一与历史选项组合校验（`CliScanAllTests`）。
 - [ ] `--help` 覆盖所有命令（随 Shell 补全一并补测）。
 
 ## 10. 演进与扩展位
@@ -162,3 +183,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | 0.1.4 | 2026-10-21 | GGD-0020：§7 `--verbose` 说明补充规则耗时摘要；§8 冷启动标注实测入口；§9 勾选规则耗时测试项（`CliRuleTimingTests`） |
 | 0.1.5 | 2026-10-21 | GGD-0022：§2.2 输出补审计查询 / 导出；§3 JSON Schema 补 `audit.list.v1` / `audit.export.summary.v1` 并新增审计格式化规则；§9 勾选审计查询与导出测试项（`CliAuditCommandTests`） |
 | 0.1.6 | 2026-10-22 | GGD-0030：§2.2 输出补白名单管理；§3 JSON Schema 补 `allowlist.add.v1` / `allowlist.remove.v1` / `allowlist.list.v1` 并新增白名单管理规则；§9 勾选白名单管理测试项（`CliAllowlistCommandTests`） |
+| 0.1.7 | 2026-10-22 | GGD-0031：§3 新增全量扫描规则（三选一、历史选项组合、截断续扫）；新增 §6.2 `scan --all` 入口流程（原 post-commit / 异常捕获顺延为 §6.3 / §6.4）；§9 勾选全量扫描测试项（`CliScanAllTests`） |

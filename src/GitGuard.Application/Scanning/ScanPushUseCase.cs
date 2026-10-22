@@ -49,7 +49,7 @@ public sealed class ScanPushUseCase
     {
         ArgumentNullException.ThrowIfNull(pushStdin);
 
-        return _executor.RunAsync(ScanType.PrePush, _ => AcquireDiffFiles(pushStdin), cancellationToken);
+        return _executor.RunAsync(ScanType.PrePush, _ => new ScanInput(AcquireDiffFiles(pushStdin)), cancellationToken);
     }
 
     /// <summary>获取全部待扫描提交的差异：枚举各推送区间 → 去重 → 一次批量取回 → 逐提交解析（发现项经 FileChange 绑定提交 SHA）。</summary>

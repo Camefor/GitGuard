@@ -689,6 +689,25 @@ internal sealed class ReportWriter
         WriteIndented(_text.Get(CliTextKey.LabelResult), summary);
         WriteIndented(_text.Get(CliTextKey.LabelDuration), durationText);
 
+        // FR-060：全量扫描展示历史扫描进度；截断时给出可直接复用的 --since 续扫命令
+        if (outcome.FullScanSummary is { } fullScan)
+        {
+            if (fullScan.IncludeHistory)
+            {
+                WriteIndented(
+                    _text.Get(CliTextKey.LabelHistory),
+                    _text.Format(CliTextKey.ScanHistorySummary, fullScan.CommitsScanned, fullScan.RemainingCommits));
+                if (fullScan.Truncated && fullScan.NextSinceSha is { } nextSinceSha)
+                {
+                    WriteIndented(_text.Get(CliTextKey.LabelHint), _text.Format(CliTextKey.ScanHistoryTruncated, nextSinceSha));
+                }
+            }
+            else
+            {
+                WriteIndented(_text.Get(CliTextKey.LabelHistory), _text.Get(CliTextKey.ScanHistoryDisabled));
+            }
+        }
+
         if (outcome.Result == ScanResult.Failed)
         {
             WriteIndented(_text.Get(CliTextKey.LabelHint), FailureHint(outcome.ExitCode, _text));
@@ -804,6 +823,18 @@ internal sealed class ReportWriter
             writer.WriteNumber("warned", warned);
             writer.WriteNumber("ignored_by_allowlist", ignored);
             writer.WriteEndObject();
+
+            // FR-060：仅 --all 携带 full_scan；暂存区 / 推送扫描保持既有契约不变
+            if (outcome.FullScanSummary is { } fullScan)
+            {
+                writer.WriteStartObject("full_scan");
+                writer.WriteBoolean("include_history", fullScan.IncludeHistory);
+                writer.WriteNumber("commits_scanned", fullScan.CommitsScanned);
+                writer.WriteNumber("remaining_commits", fullScan.RemainingCommits);
+                writer.WriteBoolean("truncated", fullScan.Truncated);
+                writer.WriteString("next_since_sha", fullScan.NextSinceSha);
+                writer.WriteEndObject();
+            }
 
             writer.WriteStartArray("skipped_files");
             foreach (SkippedFile skipped in outcome.SkippedFiles)

@@ -45,7 +45,7 @@ public sealed partial class CliUsageErrorTests
         using var harness = new CliHarness();
 
         (await harness.RunAsync("scan")).Should().Be(ExitCodes.USAGE_ERROR);
-        harness.Error.Should().Contain("必须且只能指定 --staged 或 --push");
+        harness.Error.Should().Contain("必须且只能指定 --staged、--push 或 --all");
 
         int both = await harness.RunAsync("scan", "--staged", "--push");
         both.Should().Be(ExitCodes.USAGE_ERROR);

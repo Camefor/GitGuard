@@ -90,11 +90,11 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **成功指标**：老仓库接入零摩擦；基线清晰可维护。
 - **失败分支**：仓库过大导致超时 → 支持 `--since <commit>` / `--max-files` 分段。
 - **对应功能需求**：`FR-060, FR-061`
-- **v0.1 落地状态**：未实现。`gitguard scan --all` / `--since` / `--max-files` 当前按未识别选项拒绝（用法错误 7），随 v0.2 交付。
+- **v0.2 落地状态**：FR-060 已实现（`GGD-0031`）：默认扫描 HEAD 全部被跟踪文件；`--include-history` 扫描历史提交差异；`--since` 从指定提交的父提交续扫；`--max-files` 按提交边界截断并输出 `next_since_sha`。FR-061 基线文件仍待 `GGD-0032`。
 
 ## 4. 功能优先级
 
-| 编号 | 功能 | 优先级 | 对应场景 | 验收要点 | v0.1 实现状态 |
+| 编号 | 功能 | 优先级 | 对应场景 | 验收要点 | 实现状态 |
 | --- | --- | --- | --- | --- | --- |
 | `FR-010` | `gitguard install` 安装 Hook | P0 | 3.1 | 安装后 `pre-commit` / `pre-push` 均被注入；原 Hook 保留并被链式调用 | 已实现（GGD-0008） |
 | `FR-011` | `gitguard uninstall` 卸载 Hook | P0 | 3.1 | 仅移除 GitGuard 注册项；原 Hook 恢复可运行 | 已实现（GGD-0008） |
@@ -106,11 +106,11 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | `FR-030` | 推送扫描（`gitguard scan --push`） | P0 | 3.3 | 覆盖推送范围内每个提交；无法确定远程时降级为扫描所有未推送提交 | 已实现（GGD-0007；新分支退化为 `local-sha` 可达提交） |
 | `FR-031` | 多提交聚合报告 | P0 | 3.3 | 每个 Finding 带来源 commit SHA | 已实现 |
 | `FR-032` | FailClosed 行为 | P0 | 3.2 / 3.3 | 任何异常默认阻断，不默认放行 | 已实现：Git / 检测器 / 超时 / 配置异常 → 10 / 11 / 12 / 13 |
-| `FR-040` | 白名单登记 `gitguard allowlist add/remove/list` | P1 | 3.4 | 必填 reason；写入 SQLite | 未实现 CLI；v0.1 仅支持配置文件 `allowlist.entries` |
-| `FR-041` | 白名单匹配粒度：规则 / 路径 / 指纹 | P1 | 3.4 | 三种匹配均可独立启用 | 部分实现：配置文件三粒度匹配可用，CLI / SQLite 管理未实现 |
+| `FR-040` | 白名单登记 `gitguard allowlist add/remove/list` | P1 | 3.4 | 必填 reason；写入 SQLite | 已实现（GGD-0030：CLI + SQLite 持久化 + `AllowlistChanged` 审计） |
+| `FR-041` | 白名单匹配粒度：规则 / 路径 / 指纹 | P1 | 3.4 | 三种匹配均可独立启用 | 已实现（GGD-0030：配置文件与 SQLite 条目合并参与匹配） |
 | `FR-042` | 已忽略项仍在终端汇总 | P1 | 3.4 | 每次扫描输出 `ignored N / blocked M / warned K` | 已实现：汇总行含「白名单忽略 N」 |
 | `FR-050` | 绕过事件审计 | P1 | 3.5 | 识别 `--no-verify` 与 `GITGUARD_SKIP=1`，记录为独立事件 | 已实现（GGD-0013：`post-commit` + 父提交 / 暂存树预测） |
-| `FR-060` | 全量扫描 `gitguard scan --all` | P1 | 3.6 | 支持 `--since` / `--max-files` 分段 | 未实现（v0.2） |
+| `FR-060` | 全量扫描 `gitguard scan --all` | P1 | 3.6 | 支持 `--since` / `--max-files` 分段 | 已实现（GGD-0031：HEAD 全量树 + 历史提交 + 截断续扫） |
 | `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 | 未实现（v0.2） |
 | `FR-070` | 配置：`.gitguard.yml` 项目级 | P0 | 全部 | 支持规则开关、严重度覆写、exclude 路径 | 已实现（`GGD-0019`：`exclude.paths` 匹配仓库相对路径、`exclude.files` 匹配任意深度文件名） |
 | `FR-071` | 配置：用户级 `~/.config/gitguard/config.yml` | P1 | 全部 | 项目级覆盖用户级 | 已实现（GGD-0009） |
@@ -170,3 +170,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.5 | 2026-10-21 | GGD-0020：§6 勾选 NFR-P-001~004 基准验收，并标注实测达标情况（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标） |
 | 0.1.6 | 2026-10-21 | GGD-0021：§6 勾选 Husky / lefthook / pre-commit 真实框架兼容矩阵验收（TC-COMPAT-01~04，CI `hook-compat`） |
 | 0.1.7 | 2026-10-22 | GGD-0030：§3.4 白名单落地状态更新为 CLI + SQLite 已实现（`allowlist add/remove/list`、`AllowlistChanged` 审计、双来源合并）；§6 勾选白名单验收项；§7 v0.1 / v0.2 范围同步 |
+| 0.1.8 | 2026-10-22 | GGD-0031：§3.6 / §4 FR-060 标记已实现（HEAD 全量树、`--include-history`、`--since` 续扫、`--max-files` 提交边界截断与 `next_since_sha`）；§4 状态列更名为「实现状态」并同步 FR-040 / FR-041 的 GGD-0030 落地状态 |

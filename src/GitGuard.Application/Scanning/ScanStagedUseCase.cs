@@ -43,5 +43,8 @@ public sealed class ScanStagedUseCase
     /// <param name="cancellationToken">调用方取消令牌；外部取消原样上抛（CLI 映射退出码 12）。</param>
     /// <returns>扫描结果（含 ScanRun 聚合、逐条策略判定、跳过文件清单、审计写失败标记与规则耗时摘要）。</returns>
     public Task<ScanOutcome> ExecuteAsync(CancellationToken cancellationToken = default) =>
-        _executor.RunAsync(ScanType.PreCommit, _ => UnifiedDiffParser.Parse(_gitAccess.GetStagedDiff()), cancellationToken);
+        _executor.RunAsync(
+            ScanType.PreCommit,
+            _ => new ScanInput(UnifiedDiffParser.Parse(_gitAccess.GetStagedDiff())),
+            cancellationToken);
 }

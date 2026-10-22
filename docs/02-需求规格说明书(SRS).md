@@ -128,8 +128,15 @@
 
 - **描述**：扫描当前 HEAD 下的所有被跟踪文件；可选扫描历史提交。
 - **输入**：`gitguard scan --all [--since <commit>] [--include-history] [--max-files <N>]`。
-- **处理规则**：默认只扫描 HEAD；加 `--include-history` 时按 `git log` 顺序枚举提交，支持中断续扫（下次从上次 `commit SHA` 继续）。
-- **v0.1 实现状态**：未实现（v0.2）。CLI 未注册 `--all` / `--since` / `--max-files`，当前按未识别选项返回用法错误（退出码 7）；`scan` 仅支持 `--staged` 与 `--push`。
+- **处理规则**：
+  - 默认以空树与 HEAD 的差异（`git diff <empty-tree> HEAD -U0`）读取 HEAD 全部被跟踪文件，不读取工作区（DR-04）；空仓库（无提交）按 Clean（0 文件）处理，不调用 `rev-list`。
+  - `--include-history` 按 `git rev-list` 由新到旧枚举 HEAD 之前的提交，批量取回提交差异并扫描；HEAD 完整快照已由全量树差异覆盖，不重复扫描。Finding 的 `commit_sha` 指向泄漏提交。
+  - `--since <commit>`：从该提交的父提交继续向更早历史扫描（不含该提交本身），并隐含历史模式；用于按报告中的 `next_since_sha` 续扫。
+  - `--max-files <N>`：历史提交的文件数软上限，按提交边界生效（当前提交可整批超过上限）；截断时报告 `truncated=true`、`next_since_sha=<最后完成的提交>` 与剩余提交数。`--since` / `--max-files` 同样隐含历史模式。
+  - 历史选项仅能与 `--all` 组合；`--staged` / `--push` / `--all` 三选一，违反返回用法错误（退出码 7）。
+- **实现**：`GitGuard.Application.Scanning.ScanAllUseCase`（`GGD-0031`）；差异源为 `IGitAccess.GetFullTreeDiff` / `ListCommitShas` / `GetCommitDiffs`。
+- **v0.2 实现状态**：已实现（`GGD-0031`）；基线文件（FR-061）仍待 `GGD-0032`。
+- **关联测试用例**：`TC-FR-060-01~04`（`ScanAllUseCaseTests` / `GitAccessFullScanTests` / `CliScanAllTests`）
 
 ### 2.12 `FR-070` 配置文件
 
@@ -276,7 +283,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-041` | 3.4 | `模块设计/Policy.md` | `AllowlistMatcherTests` / `PolicyEvaluatorTests` / `GitGuardConfigLoaderTests` / `CliAllowlistCommandTests`（SQLite 条目参与扫描放行） | 已实现（配置文件与 SQLite 条目合并参与策略判定） |
 | `FR-042` | 3.4 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `CliScanCommandTests`（汇总行） | 已实现（配置文件白名单） |
 | `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
-| `FR-060` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
+| `FR-060` | 3.6 | `模块设计/Cli.md` | `TC-FR-060-01~04`（`ScanAllUseCaseTests` / `GitAccessFullScanTests` / `CliScanAllTests`） | 已实现（`GGD-0031`） |
 | `FR-061` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
 | `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~05`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
@@ -309,4 +316,5 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.11 | 2026-10-21 | GGD-0021：§5.2 NFR-A-001 标记已覆盖（Husky / lefthook / pre-commit 真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat`） |
 | 0.1.12 | 2026-10-22 | GGD-0027：§5.2 NFR-A-002 改为部分覆盖（CI 收敛为 Windows 单平台，macOS / Ubuntu 矩阵暂缓 `GGD-0028`）；NFR-A-001 的 CI 作业范围同步为 Windows；§5.3 NFR-S-001 标注 Linux `strace` 作业暂缓，编译期封禁仍生效 |
 | 0.1.13 | 2026-10-22 | GGD-0030：§2.9 FR-040 标记已实现（`allowlist add/remove/list`、SQLite 持久化 + `AllowlistChanged` 审计事件、配置文件与 SQLite 条目合并参与扫描）；§8 追溯矩阵 FR-040 / FR-041 更新测试类与实现状态 |
-| 0.1.14 | 2026-10-22 | GGD-0031：`GGD-0028` 取消，NFR-A-001 / A-002 / S-001 的跨平台 CI 与 Linux `strace` 描述改为「不再计划」；v0.1 性能与真实仓库验收由用户亲自执行 |
+| 0.1.14 | 2026-10-22 | `GGD-0028` 取消，NFR-A-001 / A-002 / S-001 的跨平台 CI 与 Linux `strace` 描述改为「不再计划」；v0.1 性能与真实仓库验收由用户亲自执行 |
+| 0.1.15 | 2026-10-22 | GGD-0031：§2.11 FR-060 按实现重写（空树 HEAD 快照、历史枚举与提交归属、`--since` 不含起点语义、`--max-files` 提交边界软上限与 `next_since_sha` 续扫、空仓库 Clean）；§8 追溯矩阵 FR-060 更新测试类并标记已实现 |

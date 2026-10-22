@@ -8,8 +8,9 @@ using GitGuard.Core;
 namespace GitGuard.Cli.Commands;
 
 /// <summary>
-/// <c>gitguard scan</c>（<c>06-API接口设计</c> §5.4）：交付 <c>--staged</c>（FR-020）与 <c>--push</c>（FR-030 推送范围）
-/// 两个入口，二者必居其一；<c>--all</c> / <c>--since</c> / <c>--max-files</c>（历史扫描）属 v0.2。
+/// <c>gitguard scan</c>（<c>06-API接口设计</c> §5.4）：交付 <c>--staged</c>（FR-020）、<c>--push</c>（FR-030 推送范围）
+/// 与 <c>--all</c>（FR-060 全量扫描）三个入口，三选一；<c>--include-history</c> / <c>--since</c> / <c>--max-files</c>
+/// 仅用于 <c>--all</c> 的历史扫描（后两者同时隐含历史模式）。
 /// 隐藏选项 <c>--record-pending</c> 仅供 Hook 分发脚本使用：扫描通过（或按 <c>GITGUARD_SKIP=1</c> 跳过）后
 /// 记录待提交预测，供 post-commit 绕过检测比对（FR-050）。
 /// </summary>
@@ -31,6 +32,22 @@ internal static class ScanCommand
         {
             Description = runtime.Text.Get(CliTextKey.ScanPushDescription),
         };
+        var allOption = new Option<bool>("--all")
+        {
+            Description = runtime.Text.Get(CliTextKey.ScanAllDescription),
+        };
+        var includeHistoryOption = new Option<bool>("--include-history")
+        {
+            Description = runtime.Text.Get(CliTextKey.ScanIncludeHistoryDescription),
+        };
+        var sinceOption = new Option<string?>("--since")
+        {
+            Description = runtime.Text.Get(CliTextKey.ScanSinceDescription),
+        };
+        var maxFilesOption = new Option<int?>("--max-files")
+        {
+            Description = runtime.Text.Get(CliTextKey.ScanMaxFilesDescription),
+        };
         var recordPendingOption = new Option<bool>("--record-pending")
         {
             Description = runtime.Text.Get(CliTextKey.ScanRecordPendingDescription),
@@ -40,10 +57,24 @@ internal static class ScanCommand
         var command = new Command("scan", runtime.Text.Get(CliTextKey.ScanDescription));
         command.Options.Add(stagedOption);
         command.Options.Add(pushOption);
+        command.Options.Add(allOption);
+        command.Options.Add(includeHistoryOption);
+        command.Options.Add(sinceOption);
+        command.Options.Add(maxFilesOption);
         command.Options.Add(recordPendingOption);
 
         Func<ParseResult, CancellationToken, Task<int>> action = (parseResult, cancellationToken) =>
-            ExecuteAsync(runtime, parseResult, stagedOption, pushOption, recordPendingOption, cancellationToken);
+            ExecuteAsync(
+                runtime,
+                parseResult,
+                stagedOption,
+                pushOption,
+                allOption,
+                includeHistoryOption,
+                sinceOption,
+                maxFilesOption,
+                recordPendingOption,
+                cancellationToken);
         command.SetAction(action);
         return command;
     }
@@ -107,15 +138,40 @@ internal static class ScanCommand
         ParseResult parseResult,
         Option<bool> stagedOption,
         Option<bool> pushOption,
+        Option<bool> allOption,
+        Option<bool> includeHistoryOption,
+        Option<string?> sinceOption,
+        Option<int?> maxFilesOption,
         Option<bool> recordPendingOption,
         CancellationToken cancellationToken)
     {
         bool staged = parseResult.GetValue(stagedOption);
         bool push = parseResult.GetValue(pushOption);
+        bool all = parseResult.GetValue(allOption);
+        bool includeHistory = parseResult.GetValue(includeHistoryOption);
+        string? since = parseResult.GetValue(sinceOption);
+        int? maxFiles = parseResult.GetValue(maxFilesOption);
         bool recordPending = parseResult.GetValue(recordPendingOption);
-        if (staged == push)
+
+        int scopeCount = (staged ? 1 : 0) + (push ? 1 : 0) + (all ? 1 : 0);
+        if (scopeCount != 1)
         {
             return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanScopeRequired));
+        }
+
+        if (!all && (includeHistory || since is not null || maxFiles is not null))
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanHistoryRequiresAll));
+        }
+
+        if (maxFiles is <= 0)
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanMaxFilesInvalid));
+        }
+
+        if (since is not null && (string.IsNullOrWhiteSpace(since) || since.StartsWith('-')))
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanSinceInvalid));
         }
 
         if (recordPending && !staged)
@@ -153,10 +209,20 @@ internal static class ScanCommand
         {
             outcome = await runtime.Session.CreateStagedScan(collectRuleTimings).ExecuteAsync(cancellationToken).ConfigureAwait(false);
         }
-        else
+        else if (push)
         {
             string pushStdin = await runtime.Host.Input.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
             outcome = await runtime.Session.CreatePushScan(collectRuleTimings).ExecuteAsync(pushStdin, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            var allOptions = new ScanAllOptions
+            {
+                IncludeHistory = includeHistory,
+                Since = since,
+                MaxFiles = maxFiles,
+            };
+            outcome = await runtime.Session.CreateFullScan(collectRuleTimings).ExecuteAsync(allOptions, cancellationToken).ConfigureAwait(false);
         }
 
         // FR-050：扫描通过才记录预测；被阻断 / 失败时清理旧标记，避免残留标记掩盖后续真实绕过
@@ -171,9 +237,10 @@ internal static class ScanCommand
         }
 
         runtime.Writer.WriteScan(outcome, runtime.Session.RuleCount, warnings);
+        string scanEvent = staged ? "Scan.Staged" : push ? "Scan.Push" : "Scan.All";
         runtime.Logger.Log(
             CliLogLevel.Information,
-            staged ? "Scan.Staged" : "Scan.Push",
+            scanEvent,
             runtime.Text.Get(CliTextKey.LogScanCompleted),
             new LogFields
             {

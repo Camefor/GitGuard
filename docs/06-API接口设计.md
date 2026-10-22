@@ -67,8 +67,9 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 }
 ```
 
-- `scan_type`：`PreCommit`（`--staged`）/ `PrePush`（`--push`）。
+- `scan_type`：`PreCommit`（`--staged`）/ `PrePush`（`--push`）/ `Manual`（`--all`）。
 - `duration_ms`：无法计时时为 `null`。
+- `full_scan`：仅 `--all` 输出的可选对象 `{ include_history, commits_scanned, remaining_commits, truncated, next_since_sha }`。`commits_scanned` 不含 HEAD（HEAD 由全量树扫描覆盖）；`remaining_commits` 为因 `--max-files` 截断而剩余的提交数；`next_since_sha` 仅在 `truncated = true` 时非空，可直接传给下一次 `--all --since` 续扫。暂存区 / 推送扫描不输出该字段。
 - `skipped_files[]`：`{ path, reason: Binary|TooLarge, commit_sha }`（`commit_sha` 可为 `null`）。
 - `audit_write_failed`：审计落库降级标记（扫描结果仍有效，退出码不变）。
 - `warnings[]`：配置加载链的宽松解析警告（含未知键、顺延开关）。
@@ -98,7 +99,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 
 - `fingerprint`：64 位小写十六进制（HMAC-SHA256，无 `sha256:` 前缀）。
 - `action`：`Block` / `Warn` / `Allow` / `AllowedByAllowlist`（白名单命中）。
-- `commit_sha`：`--push` 扫描时为命中提交 SHA，其他扫描为 `null`。
+- `commit_sha`：`--push` 与 `--all --include-history` / `--since` 扫描时为命中提交 SHA；HEAD 全量树与暂存区扫描为 `null`。
 
 ### 4.4 错误输出（JSON）
 
@@ -400,11 +401,15 @@ gitguard install --format json
 - **子选项**：
   - `--staged`：扫描暂存区（Hook 内部调用；用户也可手动调用）。
   - `--push`：扫描推送范围；从 stdin 读取 `<local-ref> <local-sha> <remote-ref> <remote-sha>` 行（Git 调用约定）。
+  - `--all`：全量扫描 HEAD 下全部被跟踪文件（以空树与 HEAD 的差异读取，不读取工作区）；空仓库按 Clean 处理。
+  - `--include-history`：与 `--all` 同用，额外从 HEAD 向更早提交扫描历史差异；Finding 携带所属提交 `commit_sha`。
+  - `--since <commit>`：与 `--all` 同用，从该提交的父提交继续向更早历史扫描（不含该提交本身），并隐含历史模式；通常传入上次报告的 `next_since_sha`。
+  - `--max-files <N>`：与 `--all` 同用，历史文件数软上限（按提交边界生效，`N` 必须为正数）；隐含历史模式，截断时报告 `truncated` / `next_since_sha` / `remaining_commits`。
   - `--record-pending`（隐藏）：Hook 模式专用，只能与 `--staged` 同用（否则退出码 7）。扫描通过后记录待提交预测（父提交 + 暂存树）供 `post-commit` 比对；扫描阻断 / 失败时清理旧标记。标记写入失败仅产生警告，不阻断提交。
 - **`GITGUARD_SKIP=1`**：仅在 `--record-pending` 模式识别——跳过扫描、写入 `skipped` 标记、退出码 0（终端提示本次提交将登记为绕过事件）；手动 `scan --staged` 忽略该变量。
-- **MVP 范围**：`--staged` / `--push` 二者必选且互斥（缺失或同时给出 → 退出码 7）；`--all` / `--since` / `--max-files` 属 v0.2（见 `17-开发RoadMap`），本版本未注册。
+- **范围校验**：`--staged` / `--push` / `--all` 三选一（缺失或同时给出 → 退出码 7）；历史选项仅能与 `--all` 组合，否则退出码 7；`--max-files` 非正数或 `--since` 为空、以 `-` 开头 → 退出码 7。
 - **输入**：Git 仓库 + 可选 stdin（`--push`）。
-- **输出**：扫描报告（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.2 / §4.3）。
+- **输出**：扫描报告（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.2 / §4.3）；`--all` 的文本报告展示历史扫描进度与续扫提示，JSON 额外携带 `full_scan` 对象。
 - **退出码**：0 Clean/Warned；1 Blocked；2 非 Git 仓库；7 参数非法；10 Git 错误；11 检测器异常；12 超时；13 配置错误。
 - **关联 FR**：`FR-020, FR-030, FR-050, FR-060`。
 
@@ -537,3 +542,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.4 | 2026-10-21 | GGD-0013：新增 §4.7 `gitguard.bypass.v1` 契约（分页顺延为 §4.8）；§5.1/§5.2 `--hook` 取值补 `post-commit`；§5.4 新增隐藏选项 `--record-pending` 与 `GITGUARD_SKIP=1`（仅 Hook 模式）语义；新增 §5.9 隐藏命令 `hook post-commit`（全局选项 / 帮助顺延为 §5.10 / §5.11） |
 | 0.1.5 | 2026-10-21 | GGD-0022：§4.8 落地 `audit list` 分页（上限 1000，`started_at DESC, rowid DESC`）；新增 §4.9 审计列表 / 导出 JSON Schema（`gitguard.audit.list.v1` / `gitguard.audit.export.v1` / `gitguard.audit.export.summary.v1`）与 CSV 转义 / 公式注入防护契约；§5.6 重写 `audit list` / `export` 选项、输出分流与退出码（7 / 14 / 31），`view` 保持 v0.2 预留；§6 退出码 31 转为已使用 |
 | 0.1.6 | 2026-10-22 | GGD-0030：§5.5 落地 `allowlist add` / `remove` / `list`（条件校验、分页、无仓库要求、SQLite 条目参与扫描合并、退出码 7 / 14 / 20 / 21）；新增 §4.10 白名单 JSON Schema（`gitguard.allowlist.add.v1` / `gitguard.allowlist.remove.v1` / `gitguard.allowlist.list.v1`）；§6 退出码 20 / 21 转为已使用 |
+| 0.1.7 | 2026-10-22 | GGD-0031：§4.2 新增 `--all` 的 `full_scan` 对象契约（`include_history` / `commits_scanned` / `remaining_commits` / `truncated` / `next_since_sha`）与 `scan_type = Manual`；§4.3 补充历史扫描 `commit_sha` 语义；§5.4 注册 `--all` / `--include-history` / `--since` / `--max-files` 并固化三选一与历史选项组合校验 |
