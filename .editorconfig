@@ -133,6 +133,10 @@ dotnet_diagnostic.RCS1194.severity = none
 [src/GitGuard.Core/ConfigurationException.cs]
 dotnet_diagnostic.RCS1194.severity = none
 
+# AllowlistException 同 GitException：设计上强制携带 ErrorCode（ALLOWLIST_VALIDATION_FAILED / ALLOWLIST_NOT_FOUND → 退出码 20 / 21）。
+[src/GitGuard.Core/AllowlistException.cs]
+dotnet_diagnostic.RCS1194.severity = none
+
 # ===== 测试项目 =====
 [tests/**/*.cs]
 # 测试方法命名遵循《16-测试方案》§3：<Method>_<Scenario>_<Expectation>，允许下划线

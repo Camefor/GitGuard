@@ -298,6 +298,65 @@ CSV 契约：
 
 写入采用同目录临时文件 + 原子替换：目标已存在时覆盖；路径不可写 / 为目录 / IO 失败 → 退出码 31，且不残留临时文件。
 
+### 4.10 白名单管理输出（JSON）
+
+`gitguard allowlist add --format json` 输出 `gitguard.allowlist.add.v1`（stdout 单行紧凑）：
+
+```json
+{
+  "schema": "gitguard.allowlist.add.v1",
+  "entry": {
+    "id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33",
+    "rule_id": "GGD/SECRET/AWS-AKID",
+    "path_pattern": "config/**",
+    "fingerprint": null,
+    "reason": "已知误报登记",
+    "created_at": "2026-10-22T08:00:00.000Z",
+    "created_by": "rushe",
+    "expires_at": null
+  }
+}
+```
+
+`gitguard allowlist remove --format json` 输出 `gitguard.allowlist.remove.v1`：
+
+```json
+{
+  "schema": "gitguard.allowlist.remove.v1",
+  "id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33",
+  "removed": true
+}
+```
+
+`gitguard allowlist list --format json` 输出 `gitguard.allowlist.list.v1`：
+
+```json
+{
+  "schema": "gitguard.allowlist.list.v1",
+  "total": 2,
+  "limit": 20,
+  "offset": 0,
+  "count": 2,
+  "entries": [
+    {
+      "id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33",
+      "rule_id": "GGD/SECRET/AWS-AKID",
+      "path_pattern": "config/**",
+      "fingerprint": null,
+      "reason": "已知误报登记",
+      "created_at": "2026-10-22T08:00:00.000Z",
+      "created_by": "rushe",
+      "expires_at": null
+    }
+  ]
+}
+```
+
+- `rule_id` / `path_pattern` / `fingerprint` 未声明的条件为 `null`；`fingerprint` 为 64 位小写十六进制 HMAC 指纹。
+- `created_at` / `expires_at` 为 UTC ISO 8601（毫秒 + `Z`）；CLI `add` 当前不支持过期时间，`expires_at` 恒为 `null`（持久化层仍支持读回已有过期条目）。
+- `total` 为全表条目数；`count` 为当前页条数（可为 0）；排序固定为 `created_at DESC, rowid DESC`。
+- 管理命令只读写本地审计库，不产生 `ScanRun`；`add` / `remove` 在同一事务内写 `AllowlistChanged` 审计事件（`category = Allowlist`，载荷 `EntryId` / `Action` / `RuleId` / `PathPattern` / `Fingerprint` / `Reason`）。
+
 ## 5. 命令清单
 
 > MVP 阶段固化以下命令集；新增命令需同步更新本文件、`模块设计/Cli.md`、`AGENT-GUIDE` 任务台账。
@@ -353,10 +412,19 @@ gitguard install --format json
 
 - **子命令**：
   - `add --rule <id> [--path <glob>] [--fingerprint <hash>] --reason "<text>"`
+    - 三个条件（rule / path / fingerprint）至少提供一个，可任意组合；所有声明的条件必须同时匹配才放行。
+    - `--reason` 必填，trim 后 5~256 字符；`--fingerprint` 为 64 位十六进制（大小写不敏感，落库统一小写）。
+    - 条目 `id` 由 UUIDv7 生成，`created_at` 取注入时钟（UTC），`created_by` 取当前 OS 用户名。
   - `remove --id <guid>`
-  - `list [--format text|json] [--limit N] [--offset M]`
-- **约束**：`add` 时三个条件（rule/path/fingerprint）至少一个；`--reason` 必填 ≥ 5 字符。
-- **退出码**：0 成功；20 校验失败；21 条目不存在。
+    - `--id` 缺失或不是合法 GUID → 退出码 7；条目不存在 → 退出码 21。
+  - `list [--limit N] [--offset M]`
+    - `--limit` 1~1000（默认 20），`--offset` ≥ 0（默认 0）；取值越界 → 退出码 7。
+    - 排序固定为 `created_at DESC, rowid DESC`。
+- **输入**：本地审计库（含 `allowlist` 表）；命令**不要求**当前目录是 Git 仓库。
+- **输出**：文本摘要 → stderr；`--format json` 时 → stdout（Schema 见 §4.10）。管理命令只写 `AllowlistChanged` 审计事件，不产生 `ScanRun`。
+- **扫描合并**：`scan --staged` / `scan --push` 同时应用 `.gitguard.yml` 的 `allowlist.entries` 与 SQLite 条目（FR-041）；审计库读取失败按 FailClosed 映射退出码 14，不得静默忽略白名单。
+- **退出码**：0 成功；7 用法错误；14 审计库打开 / 读写失败；20 白名单参数校验失败；21 条目不存在。
+- **幂等**：`add` 非幂等（每次创建新条目）；`remove` 对已删除条目返回 21；`list` 只读。
 - **关联 FR**：`FR-040, FR-041`。
 
 ### 5.6 `gitguard audit` — 本地审计查看与导出
@@ -441,7 +509,7 @@ gitguard install --format json
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
-> 退出码 20 / 21 / 30 / 40 仍为 v0.2 的 `allowlist` / `audit view` / `rules` 命令预留（`ExitCodes` 已定义常量），对应命令未注册。退出码 31 已由 `audit export` 实际使用（`AUDIT_EXPORT_FAILED`）。
+> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 / 40 仍为 v0.2 的 `audit view` / `rules` 命令预留（`ExitCodes` 已定义常量），对应命令未注册。退出码 31 已由 `audit export` 实际使用（`AUDIT_EXPORT_FAILED`）。
 
 ## 7. 限流与配额
 
@@ -468,3 +536,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.3 | 2026-10-18 | GGD-0012 文档回填：§4.7 `audit list` 分页标注为 v0.2 规划（`GGD-0022`）；§6 标注退出码 20 / 21 / 30 / 31 / 40 为 v0.2 命令预留，v0.1 不会实际返回 |
 | 0.1.4 | 2026-10-21 | GGD-0013：新增 §4.7 `gitguard.bypass.v1` 契约（分页顺延为 §4.8）；§5.1/§5.2 `--hook` 取值补 `post-commit`；§5.4 新增隐藏选项 `--record-pending` 与 `GITGUARD_SKIP=1`（仅 Hook 模式）语义；新增 §5.9 隐藏命令 `hook post-commit`（全局选项 / 帮助顺延为 §5.10 / §5.11） |
 | 0.1.5 | 2026-10-21 | GGD-0022：§4.8 落地 `audit list` 分页（上限 1000，`started_at DESC, rowid DESC`）；新增 §4.9 审计列表 / 导出 JSON Schema（`gitguard.audit.list.v1` / `gitguard.audit.export.v1` / `gitguard.audit.export.summary.v1`）与 CSV 转义 / 公式注入防护契约；§5.6 重写 `audit list` / `export` 选项、输出分流与退出码（7 / 14 / 31），`view` 保持 v0.2 预留；§6 退出码 31 转为已使用 |
+| 0.1.6 | 2026-10-22 | GGD-0030：§5.5 落地 `allowlist add` / `remove` / `list`（条件校验、分页、无仓库要求、SQLite 条目参与扫描合并、退出码 7 / 14 / 20 / 21）；新增 §4.10 白名单 JSON Schema（`gitguard.allowlist.add.v1` / `gitguard.allowlist.remove.v1` / `gitguard.allowlist.list.v1`）；§6 退出码 20 / 21 转为已使用 |

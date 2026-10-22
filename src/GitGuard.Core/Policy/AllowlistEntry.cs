@@ -76,6 +76,64 @@ public sealed class AllowlistEntry : IEquatable<AllowlistEntry>
         string createdBy,
         DateTimeOffset? expiresAt = null)
     {
+        string trimmedReason = ValidateAndNormalize(ruleId, pathPattern, fingerprint, reason, createdAt, createdBy, expiresAt);
+        return new AllowlistEntry(Guid.CreateVersion7(), ruleId, pathPattern, fingerprint, trimmedReason, createdAt, createdBy, expiresAt);
+    }
+
+    /// <summary>
+    /// 从持久化状态重建白名单条目（保留原始身份标识与登记时间，<c>GGD-0030</c>）。
+    /// </summary>
+    /// <param name="id">条目身份标识（UUIDv7）。</param>
+    /// <param name="ruleId">可选：规则 ID 匹配条件。</param>
+    /// <param name="pathPattern">可选：文件路径 glob 匹配条件。</param>
+    /// <param name="fingerprint">可选：指纹匹配条件。</param>
+    /// <param name="reason">登记原因（5 ~ 256 字符）。</param>
+    /// <param name="createdAt">登记时间（UTC）。</param>
+    /// <param name="createdBy">登记人。</param>
+    /// <param name="expiresAt">可选：过期时间（UTC）。</param>
+    /// <returns>通过全部不变式校验的白名单条目。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reason"/> 或 <paramref name="createdBy"/> 为 <see langword="null"/>。</exception>
+    /// <exception cref="InvariantViolationException">身份标识为空或任一领域不变式被违反时抛出。</exception>
+    public static AllowlistEntry Restore(
+        Guid id,
+        string? ruleId,
+        string? pathPattern,
+        Fingerprint? fingerprint,
+        string reason,
+        DateTimeOffset createdAt,
+        string createdBy,
+        DateTimeOffset? expiresAt)
+    {
+        DomainGuard.Require(id != Guid.Empty, "05-数据库设计 §4.3", "AllowlistEntry.Id 不能为空");
+        string trimmedReason = ValidateAndNormalize(ruleId, pathPattern, fingerprint, reason, createdAt, createdBy, expiresAt);
+        return new AllowlistEntry(id, ruleId, pathPattern, fingerprint, trimmedReason, createdAt, createdBy, expiresAt);
+    }
+
+    /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>
+    /// <param name="other">另一白名单条目。</param>
+    /// <returns>身份标识相同返回 <see langword="true"/>。</returns>
+    public bool Equals(AllowlistEntry? other) =>
+        other is not null && (ReferenceEquals(this, other) || Id == other.Id);
+
+    /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>
+    /// <param name="obj">比较对象。</param>
+    /// <returns>为同一身份的 <see cref="AllowlistEntry"/> 时返回 <see langword="true"/>。</returns>
+    public override bool Equals(object? obj) => Equals(obj as AllowlistEntry);
+
+    /// <summary>返回身份标识的哈希值。</summary>
+    /// <returns><see cref="Id"/> 的哈希值。</returns>
+    public override int GetHashCode() => Id.GetHashCode();
+
+    /// <summary>校验白名单条目不变式并返回去除首尾空白的登记原因。</summary>
+    private static string ValidateAndNormalize(
+        string? ruleId,
+        string? pathPattern,
+        Fingerprint? fingerprint,
+        string reason,
+        DateTimeOffset createdAt,
+        string createdBy,
+        DateTimeOffset? expiresAt)
+    {
         ArgumentNullException.ThrowIfNull(reason);
         ArgumentNullException.ThrowIfNull(createdBy);
 
@@ -109,21 +167,6 @@ public sealed class AllowlistEntry : IEquatable<AllowlistEntry>
             DomainGuard.Require(expiry > createdAt, "DDD §3.3", "ExpiresAt 必须晚于 CreatedAt");
         }
 
-        return new AllowlistEntry(Guid.CreateVersion7(), ruleId, pathPattern, fingerprint, trimmedReason, createdAt, createdBy, expiresAt);
+        return trimmedReason;
     }
-
-    /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>
-    /// <param name="other">另一白名单条目。</param>
-    /// <returns>身份标识相同返回 <see langword="true"/>。</returns>
-    public bool Equals(AllowlistEntry? other) =>
-        other is not null && (ReferenceEquals(this, other) || Id == other.Id);
-
-    /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>
-    /// <param name="obj">比较对象。</param>
-    /// <returns>为同一身份的 <see cref="AllowlistEntry"/> 时返回 <see langword="true"/>。</returns>
-    public override bool Equals(object? obj) => Equals(obj as AllowlistEntry);
-
-    /// <summary>返回身份标识的哈希值。</summary>
-    /// <returns><see cref="Id"/> 的哈希值。</returns>
-    public override int GetHashCode() => Id.GetHashCode();
 }

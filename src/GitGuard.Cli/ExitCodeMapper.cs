@@ -34,6 +34,9 @@ public static class ExitCodeMapper
             HookException hook when hook.ErrorCode == HookException.UNKNOWN_HOOK_PRESENT => ExitCodes.UNKNOWN_HOOK_PRESENT,
             HookException hook when hook.ErrorCode == HookException.INSTALL_IN_PROGRESS => ExitCodes.INSTALL_IN_PROGRESS,
             HookException => ExitCodes.UNKNOWN_ERROR,
+            AllowlistException allowlist when allowlist.ErrorCode == AllowlistException.ALLOWLIST_VALIDATION_FAILED
+                => ExitCodes.ALLOWLIST_VALIDATION_FAILED,
+            AllowlistException => ExitCodes.ALLOWLIST_NOT_FOUND,
             ConfigurationException => ExitCodes.CONFIG_INVALID,
             DetectionException => ExitCodes.DETECTOR_FAILED,
             SqliteException => ExitCodes.AUDIT_STORE_FAILED,
@@ -55,6 +58,7 @@ public static class ExitCodeMapper
         {
             GitException git => git.ErrorCode,
             HookException hook => hook.ErrorCode,
+            AllowlistException allowlist => allowlist.ErrorCode,
             ConfigurationException configuration => configuration.ErrorCode,
             DetectionException detection => detection.ErrorCode,
             SqliteException => SqliteException.AUDIT_STORE_FAILED,

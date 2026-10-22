@@ -107,8 +107,8 @@
 - **输入**：`gitguard allowlist add --rule <id>`、`--path <glob>`、`--fingerprint <hash>` 任一或组合；`--reason` 必填。
 - **输出**：写入 `Allowlist` 表。
 - **处理规则**：匹配时按「rule + path + fingerprint」三者取交集；缺省项视为通配。
-- **v0.1 实现状态**：匹配引擎（`AllowlistMatcher`）与策略放行已实现，白名单来源为 `.gitguard.yml` 的 `allowlist.entries`（`reason` 必填并做长度校验；SQLite `allowlist` 表已建但无管理 API）；`gitguard allowlist add/remove/list` CLI 未注册，随 v0.2 交付。
-- **关联测试用例**：配置解析见 `GitGuardConfigLoaderTests`；匹配 / 放行见 `AllowlistMatcherTests` / `PolicyEvaluatorTests`；CLI 用例随 v0.2 补充。
+- **v0.1 实现状态**：已实现（`GGD-0030`）。匹配引擎（`AllowlistMatcher`）与策略放行可用；白名单来源为 `.gitguard.yml` 的 `allowlist.entries` 与 SQLite `allowlist` 表（`gitguard allowlist add/remove/list` 管理，`add` / `remove` 同事务写 `AllowlistChanged` 审计事件）；扫描策略合并两个来源（`FR-041`），审计库读取失败按 FailClosed 映射退出码 14。
+- **关联测试用例**：配置解析见 `GitGuardConfigLoaderTests`；匹配 / 放行见 `AllowlistMatcherTests` / `PolicyEvaluatorTests`；CLI / SQLite 见 `CliAllowlistCommandTests` / `SqliteAuditStoreAllowlistTests` / `AllowlistUseCaseTests` / `AllowlistEntryTests`；退出码映射见 `ExitCodeMapperTests`。
 
 ### 2.10 `FR-050` 绕过事件审计
 
@@ -272,8 +272,8 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-030` | 3.3 | `模块设计/Hook.md` | `TC-FR-030-01~02`（`ScanEndToEndTests` / `ScanPushUseCaseTests` / `PushUpdateTests`） | 已实现 |
 | `FR-031` | 3.3 | `04-DDD` §4 | `TC-FR-030-01`（断言 Finding 携带 `commit_sha`） | 已实现 |
 | `FR-032` | 3.2 / 3.3 | `10-异常处理设计` | `TC-DR-03-01~04`（`GitAccessCommitTests` / `ScanEndToEndTests` / `CliScanCommandTests` / E2E S7） | 已实现（10 / 11 / 12 / 13） |
-| `FR-040` | 3.4 | `模块设计/Policy.md` | `GitGuardConfigLoaderTests` / `AllowlistEntryTests`；CLI 无 | CLI 未实现；配置文件 `allowlist.entries` 可用 |
-| `FR-041` | 3.4 | `模块设计/Policy.md` | `AllowlistMatcherTests` / `PolicyEvaluatorTests` / `GitGuardConfigLoaderTests` | 部分实现（配置文件三粒度；CLI / SQLite 管理未实现） |
+| `FR-040` | 3.4 | `模块设计/Policy.md` | `AllowlistEntryTests` / `AllowlistUseCaseTests` / `SqliteAuditStoreAllowlistTests` / `CliAllowlistCommandTests` / `ExitCodeMapperTests` | 已实现（配置文件 + SQLite 管理，退出码 20 / 21） |
+| `FR-041` | 3.4 | `模块设计/Policy.md` | `AllowlistMatcherTests` / `PolicyEvaluatorTests` / `GitGuardConfigLoaderTests` / `CliAllowlistCommandTests`（SQLite 条目参与扫描放行） | 已实现（配置文件与 SQLite 条目合并参与策略判定） |
 | `FR-042` | 3.4 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `CliScanCommandTests`（汇总行） | 已实现（配置文件白名单） |
 | `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
@@ -308,3 +308,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.10 | 2026-10-21 | GGD-0022：§4 审计查询 / 导出接口标记已实现（`audit list` 分页 / 筛选，`audit export` 仅脱敏字段；`audit view` 仍为 v0.2） |
 | 0.1.11 | 2026-10-21 | GGD-0021：§5.2 NFR-A-001 标记已覆盖（Husky / lefthook / pre-commit 真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat`） |
 | 0.1.12 | 2026-10-22 | GGD-0027：§5.2 NFR-A-002 改为部分覆盖（CI 收敛为 Windows 单平台，macOS / Ubuntu 矩阵暂缓 `GGD-0028`）；NFR-A-001 的 CI 作业范围同步为 Windows；§5.3 NFR-S-001 标注 Linux `strace` 作业暂缓，编译期封禁仍生效 |
+| 0.1.13 | 2026-10-22 | GGD-0030：§2.9 FR-040 标记已实现（`allowlist add/remove/list`、SQLite 持久化 + `AllowlistChanged` 审计事件、配置文件与 SQLite 条目合并参与扫描）；§8 追溯矩阵 FR-040 / FR-041 更新测试类与实现状态 |

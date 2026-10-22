@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 using GitGuard.Core.Abstractions;
+using GitGuard.Core.Domain;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
 using GitGuard.Infrastructure.FileSystem;
@@ -16,7 +17,7 @@ namespace GitGuard.Infrastructure.Sqlite;
 /// 构造期执行一次 schema 迁移（<see cref="SchemaMigrator"/>）与文件加固：Unix 0700/0600（08-权限设计 §5.1）、
 /// Windows ACL 收紧（08 §5.2）、符号链接路径拒绝（08-权限设计 §9）。
 /// </summary>
-public sealed class SqliteAuditStore : IAuditStore
+public sealed class SqliteAuditStore : IAuditStore, IAllowlistStore
 {
     private const int SQLITE_BUSY_ERROR_CODE = 5;
     private const int SQLITE_LOCKED_ERROR_CODE = 6;
@@ -246,6 +247,70 @@ public sealed class SqliteAuditStore : IAuditStore
             BuildFailClosedPayload(exitCode, errorCode, messageHash));
     }
 
+    /// <inheritdoc />
+    public void AddAllowlistEntry(AllowlistEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        ExecuteWithBusyRetry("写入白名单条目", connection =>
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            InsertAllowlistEntry(connection, transaction, entry);
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "Allowlist",
+                "AllowlistChanged",
+                BuildAllowlistChangedPayload(entry, "Add"),
+                entry.CreatedAt);
+            transaction.Commit();
+        });
+    }
+
+    /// <inheritdoc />
+    public bool RemoveAllowlistEntry(Guid id)
+    {
+        return ExecuteWithBusyRetry("删除白名单条目", connection =>
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            AllowlistEntry? entry = SelectAllowlistEntry(connection, transaction, id);
+            if (entry is null)
+            {
+                transaction.Rollback();
+                return false;
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "DELETE FROM allowlist WHERE id = $id;";
+                command.Parameters.AddWithValue("$id", id.ToString());
+                command.ExecuteNonQuery();
+            }
+
+            InsertAuditEvent(
+                connection,
+                transaction,
+                "Allowlist",
+                "AllowlistChanged",
+                BuildAllowlistChangedPayload(entry, "Remove"),
+                DateTimeOffset.UtcNow);
+            transaction.Commit();
+            return true;
+        });
+    }
+
+    /// <inheritdoc />
+    public AllowlistPage QueryAllowlistEntries(AllowlistQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return ExecuteWithBusyRetry("查询白名单条目", connection => SelectAllowlistPage(connection, query));
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<AllowlistEntry> ListAllAllowlistEntries() =>
+        ExecuteWithBusyRetry("读取白名单条目", SelectAllAllowlistEntries);
+
     private static TimeSpan[] ResolveBusyRetryDelays(IReadOnlyList<TimeSpan>? delays)
     {
         if (delays is null)
@@ -399,6 +464,54 @@ public sealed class SqliteAuditStore : IAuditStore
         command.Parameters.AddWithValue("$version", installation.Version);
         command.Parameters.AddWithValue("$backup_path", (object?)installation.OriginalHookBackupPath ?? DBNull.Value);
         command.ExecuteNonQuery();
+    }
+
+    private static void InsertAllowlistEntry(SqliteConnection connection, SqliteTransaction transaction, AllowlistEntry entry)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "INSERT INTO allowlist (id, rule_id, path_pattern, fingerprint, reason, created_at, created_by, expires_at) " +
+            "VALUES ($id, $rule_id, $path_pattern, $fingerprint, $reason, $created_at, $created_by, $expires_at);";
+        command.Parameters.AddWithValue("$id", entry.Id.ToString());
+        command.Parameters.AddWithValue("$rule_id", (object?)entry.RuleId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$path_pattern", (object?)entry.PathPattern ?? DBNull.Value);
+        command.Parameters.AddWithValue("$fingerprint", (object?)entry.Fingerprint?.Hex ?? DBNull.Value);
+        command.Parameters.AddWithValue("$reason", entry.Reason);
+        command.Parameters.AddWithValue("$created_at", entry.CreatedAt.ToUnixTimeMilliseconds());
+        command.Parameters.AddWithValue("$created_by", entry.CreatedBy);
+        command.Parameters.AddWithValue("$expires_at", (object?)entry.ExpiresAt?.ToUnixTimeMilliseconds() ?? DBNull.Value);
+        command.ExecuteNonQuery();
+    }
+
+    private static string BuildAllowlistChangedPayload(AllowlistEntry entry, string action)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("EntryId", entry.Id.ToString());
+            writer.WriteString("Action", action);
+            WriteOptionalString(writer, "RuleId", entry.RuleId);
+            WriteOptionalString(writer, "PathPattern", entry.PathPattern);
+            WriteOptionalString(writer, "Fingerprint", entry.Fingerprint?.Hex);
+            writer.WriteString("Reason", entry.Reason);
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static void WriteOptionalString(Utf8JsonWriter writer, string propertyName, string? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNull(propertyName);
+        }
+        else
+        {
+            writer.WriteString(propertyName, value);
+        }
     }
 
     private static string BuildHookInstalledPayload(HookInstallation installation)
@@ -679,6 +792,86 @@ public sealed class SqliteAuditStore : IAuditStore
         }
 
         return runs;
+    }
+
+    private static AllowlistEntry? SelectAllowlistEntry(SqliteConnection connection, SqliteTransaction transaction, Guid id)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "SELECT id, rule_id, path_pattern, fingerprint, reason, created_at, created_by, expires_at " +
+            "FROM allowlist WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id.ToString());
+
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadAllowlistEntry(reader) : null;
+    }
+
+    private static AllowlistPage SelectAllowlistPage(SqliteConnection connection, AllowlistQuery query)
+    {
+        int totalCount;
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT COUNT(*) FROM allowlist;";
+            totalCount = checked((int)(long)(command.ExecuteScalar() ?? 0L));
+        }
+
+        var entries = new List<AllowlistEntry>(query.Limit);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                "SELECT id, rule_id, path_pattern, fingerprint, reason, created_at, created_by, expires_at " +
+                "FROM allowlist ORDER BY created_at DESC, rowid DESC LIMIT $limit OFFSET $offset;";
+            command.Parameters.AddWithValue("$limit", query.Limit);
+            command.Parameters.AddWithValue("$offset", query.Offset);
+
+            using SqliteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                entries.Add(ReadAllowlistEntry(reader));
+            }
+        }
+
+        return new AllowlistPage(entries, totalCount);
+    }
+
+    private static List<AllowlistEntry> SelectAllAllowlistEntries(SqliteConnection connection)
+    {
+        var entries = new List<AllowlistEntry>();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT id, rule_id, path_pattern, fingerprint, reason, created_at, created_by, expires_at " +
+            "FROM allowlist ORDER BY created_at DESC, rowid DESC;";
+
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(ReadAllowlistEntry(reader));
+        }
+
+        return entries;
+    }
+
+    private static AllowlistEntry ReadAllowlistEntry(SqliteDataReader reader)
+    {
+        // 行数据可能因人工修改或旧版本迁移而损坏：统一转为审计存储异常，由调用方按 FailClosed 处理
+        try
+        {
+            var id = Guid.Parse(reader.GetString(0));
+            string? ruleId = reader.IsDBNull(1) ? null : reader.GetString(1);
+            string? pathPattern = reader.IsDBNull(2) ? null : reader.GetString(2);
+            Fingerprint? fingerprint = reader.IsDBNull(3) ? null : Fingerprint.FromHex(reader.GetString(3));
+            string reason = reader.GetString(4);
+            var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(5));
+            string createdBy = reader.GetString(6);
+            DateTimeOffset? expiresAt = reader.IsDBNull(7) ? null : DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(7));
+
+            return AllowlistEntry.Restore(id, ruleId, pathPattern, fingerprint, reason, createdAt, createdBy, expiresAt);
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException or InvariantViolationException)
+        {
+            throw new GitGuardSqliteException("白名单条目数据损坏。", ex);
+        }
     }
 
     private void EnsureDatabaseDirectory()

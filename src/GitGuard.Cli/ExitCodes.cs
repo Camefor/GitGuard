@@ -45,10 +45,10 @@ public static class ExitCodes
     /// <summary>FailClosed：审计存储失败（打开 / 迁移 / 读写失败，GGD-0009 新增）。</summary>
     public const int AUDIT_STORE_FAILED = 14;
 
-    /// <summary>参数错误：白名单参数校验失败（v0.2 预留，<c>gitguard allowlist add</c>）。</summary>
+    /// <summary>参数错误：白名单参数校验失败（<c>gitguard allowlist add</c>）。</summary>
     public const int ALLOWLIST_VALIDATION_FAILED = 20;
 
-    /// <summary>参数错误：白名单条目不存在（v0.2 预留）。</summary>
+    /// <summary>参数错误：白名单条目不存在（<c>gitguard allowlist remove</c>）。</summary>
     public const int ALLOWLIST_NOT_FOUND = 21;
 
     /// <summary>查询错误：run_id 不存在（v0.2 预留，<c>gitguard audit</c>）。</summary>

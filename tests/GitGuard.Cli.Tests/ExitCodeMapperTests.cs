@@ -36,6 +36,17 @@ public sealed class ExitCodeMapperTests
     }
 
     [Fact]
+    public void Map_AllowlistException_ClassifiesValidationAndNotFound()
+    {
+        ExitCodeMapper.Map(new AllowlistException(AllowlistException.ALLOWLIST_VALIDATION_FAILED, "参数非法"))
+            .Should().Be(ExitCodes.ALLOWLIST_VALIDATION_FAILED);
+        ExitCodeMapper.Map(new AllowlistException(AllowlistException.ALLOWLIST_NOT_FOUND, "条目不存在"))
+            .Should().Be(ExitCodes.ALLOWLIST_NOT_FOUND);
+        ExitCodeMapper.Map(new AllowlistException("SOMETHING_NEW", "未登记"))
+            .Should().Be(ExitCodes.ALLOWLIST_NOT_FOUND);
+    }
+
+    [Fact]
     public void Map_OtherRegisteredExceptions_FollowExitCodeTable()
     {
         ExitCodeMapper.Map(new ConfigurationException("坏 YAML")).Should().Be(ExitCodes.CONFIG_INVALID);
@@ -53,6 +64,8 @@ public sealed class ExitCodeMapperTests
             .Should().Be(GitException.NOT_A_GIT_REPOSITORY);
         ExitCodeMapper.ErrorCodeOf(new HookException(HookException.WRITE_PERMISSION_DENIED, "只读"))
             .Should().Be(HookException.WRITE_PERMISSION_DENIED);
+        ExitCodeMapper.ErrorCodeOf(new AllowlistException(AllowlistException.ALLOWLIST_VALIDATION_FAILED, "参数非法"))
+            .Should().Be(AllowlistException.ALLOWLIST_VALIDATION_FAILED);
         ExitCodeMapper.ErrorCodeOf(new ConfigurationException("坏 YAML"))
             .Should().Be(ConfigurationException.CONFIG_INVALID);
         ExitCodeMapper.ErrorCodeOf(new DetectionException("检测器异常"))

@@ -4,8 +4,8 @@
 
 | 版本 | 主题 | 目标用户 | 关键功能 | 退出条件 |
 | --- | --- | --- | --- | --- |
-| v0.1 MVP | CLI + Hook 分发 + 四类检测器 | 开发者（单人） | FR-010 ~ FR-032、FR-050、FR-070、FR-071（白名单仅配置文件级；FR-040~042 CLI / FR-060~061 属 v0.2） | §12 `16-测试方案.md` 的 8 条必过场景全部通过 |
-| v0.2 | 规则升级 + 白名单 + Gitleaks 适配 | 开发者 + 小团队 | FR-040 ~ FR-061、FR-080、FR-090 | 真实项目接入，首周误报率 ≤ 10% |
+| v0.1 MVP | CLI + Hook 分发 + 四类检测器 | 开发者（单人） | FR-010 ~ FR-032、FR-040、FR-041、FR-050、FR-070、FR-071（FR-042 配置文件级；白名单 CLI 于 `GGD-0030` 提前落地；FR-060~061 属 v0.2） | §12 `16-测试方案.md` 的 8 条必过场景全部通过 |
+| v0.2 | 规则升级 + 全量扫描 + Gitleaks 适配 | 开发者 + 小团队 | FR-042 增强、FR-060 ~ FR-061、FR-080、FR-090 | 真实项目接入，首周误报率 ≤ 10% |
 | v0.3 | Avalonia 桌面端 | 偏好图形化的用户 | FR-100 | 桌面端覆盖所有 CLI 核心能力 |
 | v1.0（候选）| 规则库沉淀 + 文档稳定 | 公开发布 | - | 规则库 ≥ 60 条，稳定运行 3 个月，无 P0 Bug |
 
@@ -17,7 +17,7 @@
 - **目标**：在本机 CLI 层形成完整的 commit/push 拦截闭环，`16-测试方案.md` §12 的 8 条场景全通过。
 - **交付物**：
   - `GitGuard.sln` 项目骨架（Core / Detection / Application / Infrastructure / Cli / tests）。
-  - `gitguard install / uninstall / status / scan / audit list / audit export / version` 命令集。
+  - `gitguard install / uninstall / status / scan / audit list / audit export / allowlist add / allowlist remove / allowlist list / version` 命令集。
   - 四类检测器（Secret / Privacy / LocalPath / Url）内置规则共 21 条（Secret 8 / Privacy 5 / LocalPath 4 / Url 4）；「各 ≥ 10 条」目标顺延到 v0.2 规则升级。
   - SQLite 审计 Schema v1；迁移器可用。
   - CI Windows 单平台构建矩阵（macOS / Ubuntu 暂缓，`GGD-0028`）；Native AOT 发行物。
@@ -34,9 +34,9 @@
 ### 2.2 阶段 2：规则升级（v0.2）
 
 - **周期**：2027-01-05 ~ 2027-03-15（约 10 周）
-- **目标**：引入白名单、全量扫描、GitleaksAdapter；可以让一个 10 人团队平稳使用。
+- **目标**：完善白名单治理、引入全量扫描与 GitleaksAdapter；可以让一个 10 人团队平稳使用。
 - **交付物**：
-  - `gitguard allowlist` / `gitguard scan --all` / `gitguard rules`。
+  - `gitguard scan --all` / `gitguard rules`（`gitguard allowlist` 已于 `GGD-0030` 提前落地）。
   - `GitleaksAdapter` 实现（ADR-0003 落地）。
   - 规则分级与项目自定义正则。
   - 误报治理指南文档。
@@ -130,3 +130,4 @@ flowchart LR
 | 0.1.5 | 2026-10-21 | GGD-0022：§2.1 交付物补 `audit list` / `audit export`（审计查询与脱敏导出提前落地） |
 | 0.1.6 | 2026-10-21 | GGD-0021：§6 R-02 标记已缓解（Husky / lefthook / pre-commit 真实安装矩阵 + CI `hook-compat`） |
 | 0.1.7 | 2026-10-22 | GGD-0027：CI 收敛为 Windows 单平台（macOS / Ubuntu 矩阵与 Linux DR-01 作业暂缓 `GGD-0028`），§6 R-02 应对措施与状态同步 |
+| 0.1.8 | 2026-10-22 | GGD-0030：FR-040 / FR-041 白名单 CLI 与 SQLite 管理提前落地，§1 v0.1 / v0.2 范围与 §2.1 / §2.2 交付物同步调整 |

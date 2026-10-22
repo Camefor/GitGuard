@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using GitGuard.Application.Allowlist;
 using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
@@ -37,7 +38,7 @@ public sealed class GitGuardSession
 
     private readonly Lazy<GitGuardConfig> _config;
     private readonly Lazy<IGitAccess> _gitAccess;
-    private readonly Lazy<IAuditStore> _auditStore;
+    private readonly Lazy<SqliteAuditStore> _auditStore;
     private readonly Lazy<FingerprintSaltLoadResult> _salt;
     private readonly Lazy<DetectorSet> _detectors;
     private readonly Lazy<ImmutableArray<string>> _warnings;
@@ -72,7 +73,7 @@ public sealed class GitGuardSession
 
         _config = new Lazy<GitGuardConfig>(LoadConfig);
         _gitAccess = new Lazy<IGitAccess>(CreateGitAccess);
-        _auditStore = new Lazy<IAuditStore>(CreateAuditStore);
+        _auditStore = new Lazy<SqliteAuditStore>(CreateAuditStore);
         _salt = new Lazy<FingerprintSaltLoadResult>(CreateSalt);
         _detectors = new Lazy<DetectorSet>(CreateDetectors);
         _warnings = new Lazy<ImmutableArray<string>>(CollectWarnings);
@@ -102,6 +103,9 @@ public sealed class GitGuardSession
 
     /// <summary>审计存储；首次访问时打开（或创建并迁移）<c>audit.db</c>。</summary>
     public IAuditStore AuditStore => _auditStore.Value;
+
+    /// <summary>白名单存储（与审计数据共享本地数据库）；首次访问时打开（或创建并迁移）<c>audit.db</c>。</summary>
+    public IAllowlistStore AllowlistStore => _auditStore.Value;
 
     /// <summary>
     /// 本次配置下参与评估的启用规则总数（扫描报告 <c>summary.rules_evaluated</c> 的来源）；
@@ -274,14 +278,26 @@ public sealed class GitGuardSession
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
     public AuditExportUseCase CreateAuditExport() => new AuditExportUseCase(AuditStore, _clock);
 
+    /// <summary>装配白名单新增用例（仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的新增用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public AllowlistAddUseCase CreateAllowlistAdd() => new AllowlistAddUseCase(AllowlistStore, _clock);
+
+    /// <summary>装配白名单删除用例（仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的删除用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public AllowlistRemoveUseCase CreateAllowlistRemove() => new AllowlistRemoveUseCase(AllowlistStore);
+
+    /// <summary>装配白名单列表用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的列表用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public AllowlistListUseCase CreateAllowlistList() => new AllowlistListUseCase(AllowlistStore);
+
     /// <summary>装配状态查询用例（只读：不触发审计打开与检测器装配）。</summary>
     /// <returns>已接线的状态用例（配置加载链来自 <see cref="Config"/>）。</returns>
     /// <exception cref="ConfigurationException">配置无效（解析失败 / 违反硬下限）。</exception>
     /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
     public StatusUseCase CreateStatus() => new StatusUseCase(GitAccess, Config, Version);
-
-    private static ScanPolicy BuildScanPolicy(GitGuardConfig config) =>
-        new ScanPolicy(config.Policy, config.Allowlist, config.ExcludePaths, config.ExcludeFiles);
 
     private static void RecordPermissionFixes(IAuditStore store, IEnumerable<FilePermissionFix> fixes)
     {
@@ -289,6 +305,14 @@ public sealed class GitGuardSession
         {
             store.SaveFilePermissionFixedEvent(fix.FilePath, fix.PreviousMode, fix.NewMode);
         }
+    }
+
+    private ScanPolicy BuildScanPolicy(GitGuardConfig config)
+    {
+        // FR-041：配置文件条目与 SQLite 持久化条目合并后参与策略判定；
+        // 审计库读取失败按 FailClosed 传播（SqliteException → 退出码 14），不得静默忽略白名单
+        var entries = config.Allowlist.AddRange(AllowlistStore.ListAllAllowlistEntries());
+        return new ScanPolicy(config.Policy, entries, config.ExcludePaths, config.ExcludeFiles);
     }
 
     private GitGuardConfig LoadConfig() =>

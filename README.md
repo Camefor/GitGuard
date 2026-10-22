@@ -4,7 +4,7 @@
 
 面向开发者的本地 Git 敏感信息防泄漏工具：在 `git commit` 与 `git push` 前通过 Hook 拦截 Token、密钥、密码、手机号、本地路径、内网 URL 等敏感信息。所有扫描与审计均在本机完成，不上传任何数据。
 
-## 当前状态（v0.1，2026-10-21）
+## 当前状态（v0.1，2026-10-22）
 
 **可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。
 
@@ -13,7 +13,7 @@
 | 范围 | 完成度 | 说明 |
 | --- | --- | --- |
 | P0 核心功能（11 条） | 约 95% | 10 条完整实现；终端报告缺少逐规则「建议」文案（其余字段齐全） |
-| 全部 FR（21 条） | 约 67% | 13 条完整 + 2 条部分 + 6 条未实现（完整计 1、部分计 0.5） |
+| 全部 FR（21 条） | 约 74% | 15 条完整 + 1 条部分 + 5 条未实现（完整计 1、部分计 0.5） |
 
 已可用：
 
@@ -21,15 +21,15 @@
 - `gitguard scan --staged`：暂存区扫描（严格基于 `git diff --cached`）
 - `gitguard scan --push`：推送范围扫描（覆盖范围内全部提交，一次批量取差异，Finding 带来源 commit SHA）
 - `gitguard audit list` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）与脱敏 JSON / CSV 导出
+- `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
 - 21 条内置规则：Secret 8 / Privacy 5 / LocalPath 4 / Url 4
-- 文本 / JSON 报告、严重度策略、配置文件白名单、`exclude` 路径排除
+- 文本 / JSON 报告、严重度策略、配置文件 + SQLite 白名单、`exclude` 路径排除
 - `--no-verify` 与 `GITGUARD_SKIP=1` 绕过检测及 SQLite 审计落库
 - 中英文输出、Native AOT 单文件发布
 
 尚未实现（不影响核心试用）：
 
 - `scan --all` 全量扫描与基线文件（v0.2）
-- `allowlist` 的 CLI / SQLite 管理（目前通过 `.gitguard.yml` 配置）
 - `audit view <run-id>` 单次运行明细（v0.2）
 - 自定义正则规则、GitleaksAdapter（v0.2）
 - Avalonia 桌面端（v0.3）
@@ -214,7 +214,23 @@ gitguard audit export --output ~/gitguard-audit.csv --format csv
 - `audit export` 后面的 `--format` 表示**导出文件格式**（`json` 默认 / `csv`）；若要让导出摘要以 JSON 输出，把全局 `--format json` 放在 `audit` 之前。
 - `--result` 只接受 `Clean` / `Warned` / `Blocked` / `Failed`；非法参数退出码 7，导出写入失败退出码 31。
 
-### 6. 卸载
+### 6. 白名单管理
+
+`allowlist` 管理本机审计库中的 SQLite 白名单条目，不要求当前目录是 Git 仓库：
+
+```bash
+gitguard allowlist add --rule GGD/SECRET/AWS-AKID --reason "已知误报登记"
+gitguard allowlist add --path "docs/examples/**" --reason "示例目录放行"
+gitguard allowlist add --fingerprint <64位HMAC指纹> --reason "已确认非真实凭据"
+gitguard allowlist list --limit 20 --offset 0
+gitguard allowlist remove --id <条目 GUID>
+```
+
+- `add` 的 `--rule` / `--path` / `--fingerprint` 至少提供一个，可组合；`--reason` 必填且至少 5 字符。
+- 条目写入本地 SQLite 并记录 `AllowlistChanged` 审计事件；后续 `scan --staged` / `scan --push` 会同时应用配置文件的 `allowlist.entries` 与 SQLite 条目。
+- 校验失败退出码 20，条目不存在退出码 21；可加全局 `--format json` 获取机器可读结果。
+
+### 7. 卸载
 
 ```bash
 gitguard uninstall    # 移除 GitGuard Hook 并还原被包裹的原 Hook
@@ -287,7 +303,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1044 用例（1035 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1076 用例（1067 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)

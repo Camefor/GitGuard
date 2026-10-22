@@ -34,6 +34,17 @@ internal enum CliTextKey
     AuditListResultDescription,
     AuditExportOutputDescription,
     AuditExportFormatOptionDescription,
+    AllowlistDescription,
+    AllowlistAddDescription,
+    AllowlistRemoveDescription,
+    AllowlistListDescription,
+    AllowlistRuleOptionDescription,
+    AllowlistPathOptionDescription,
+    AllowlistFingerprintOptionDescription,
+    AllowlistReasonOptionDescription,
+    AllowlistIdOptionDescription,
+    AllowlistListLimitDescription,
+    AllowlistListOffsetDescription,
 
     // 通用标签与分隔符
     LabelRepo,
@@ -63,6 +74,12 @@ internal enum CliTextKey
     LabelFormat,
     LabelRunCount,
     LabelFindingCount,
+    LabelId,
+    LabelRule,
+    LabelPath,
+    LabelFingerprint,
+    LabelCreatedAt,
+    LabelCreatedBy,
     ValueSeparator,
 
     // 用法错误
@@ -78,6 +95,10 @@ internal enum CliTextKey
     AuditSinceInvalid,
     AuditResultInvalid,
     AuditOutputRequired,
+    AllowlistIdRequired,
+    AllowlistIdInvalid,
+    AllowlistLimitInvalid,
+    AllowlistOffsetInvalid,
     ErrorJoinSeparator,
 
     // 扫描报告
@@ -103,6 +124,17 @@ internal enum CliTextKey
     AuditListPageEmpty,
     AuditListLine,
     AuditExportHeader,
+
+    // 白名单管理
+    AllowlistAddHeader,
+    AllowlistRemoveHeader,
+    AllowlistListHeader,
+    AllowlistListSummary,
+    AllowlistListEmpty,
+    AllowlistListPageEmpty,
+    AllowlistListLine,
+    AllowlistConditionItem,
+    AllowlistConditionSeparator,
 
     // 绕过检测
     BypassDetected,
@@ -157,6 +189,9 @@ internal enum CliTextKey
     LogBypassChecked,
     LogAuditListed,
     LogAuditExported,
+    LogAllowlistAdded,
+    LogAllowlistRemoved,
+    LogAllowlistListed,
     LogCrashLogWritten,
     LogFileWriteFailed,
     LogFailClosedAuditWriteFailed,

@@ -35,7 +35,8 @@
 | 用户覆写 | 允许改映射，但 `Critical → Allow` 禁止（启动期拒绝） |
 | 禁用内置规则 | `enabled: false` 或类别 `enabled: false` 允许，但记录 `PolicyOverride` 审计（`<rule_id>`，`To = Allow`） |
 | 降级审计 | 严重度映射低于默认值（如 `high: warn`）记 `SEVERITY/<Severity>` 降级；仅记录实际降级，同进程只写一次；未知 `disabled_rules` ID 只告警、不写覆盖 |
-| 白名单匹配 | 对单条 Finding，命中任一 AllowlistEntry 即视作 ignored（但仍记录到报告） |
+| 白名单匹配 | 对单条 Finding，命中任一 AllowlistEntry 即视作 ignored（但仍记录到报告）；声明的 rule / path / fingerprint 条件全部匹配，过期条目忽略 |
+| 白名单来源 | `.gitguard.yml` 的 `allowlist.entries` 与 SQLite `allowlist` 表合并参与判定（`GitGuardSession.BuildScanPolicy`，GGD-0030）；SQLite 读取失败按 FailClosed 传播（退出码 14） |
 | 排除匹配 | `exclude.paths` 以仓库相对路径匹配，`exclude.files` 以文件名在任意深度匹配；命中文件不进入扫描、不产生 Finding，也不计入 `skipped_files` |
 | 配置文件合并 | 项目级覆盖用户级；深度合并 map，列表则替换 |
 | Schema 版本 | `.gitguard.yml` 必须有 `version: 1`；未知版本 FailClosed |
@@ -177,6 +178,7 @@ allowlist:
 - [x] 默认映射正确性（`GitGuardConfigLoaderTests.Load_NoConfigFiles_UsesBuiltinDefaults`，TC-FR-070-02）。
 - [x] Critical → Allow 被拒绝（启动期退出码 13）。
 - [x] 白名单三条件（规则 / 路径 / 指纹）单独与组合匹配（`AllowlistMatcherTests` + 加载器条目用例）。
+- [x] SQLite 白名单管理（GGD-0030）：`allowlist add/remove/list` 持久化与退出码 20 / 21、`AllowlistChanged` 审计事件、配置与 SQLite 条目合并后扫描放行（`CliAllowlistCommandTests` / `SqliteAuditStoreAllowlistTests` / `AllowlistUseCaseTests`）。
 - [x] 配置合并：项目覆盖用户（标量覆盖、列表整体替换，TC-FR-070-01）。
 - [x] 未知字段：警告但不阻断（宽松解析；含未知顶层键与未知段落内键）。
 - [x] 未知 `version` 值：阻断（TC-FR-070-04）。
@@ -199,3 +201,4 @@ allowlist:
 | 0.1.4 | 2026-10-21 | GGD-0019：`exclude` 接线——`GitGuardConfigLoader` 映射 `exclude.paths` / `exclude.files`（trim、空项 FailClosed），`ScanPolicy.IsExcluded` 基于 `GlobMatcher` 判定，`ScanExecutor` 在二进制 / 体积检查前静默丢弃命中文件（无 Finding、不计 `files_scanned`、不登记 `skipped_files`）；项目级按字段覆盖用户级。§3 新增排除规则，§7 补充排除语义，§9 增补 TC-FR-070-05，§10 移除顺延项 |
 | 0.1.5 | 2026-10-22 | GGD-0015：§2.2 / §3 落地 `PolicyOverride` 审计——严重度降级使用 `SEVERITY/<Severity>` 合成 ID、禁用规则记 `To = Allow`、同进程去重、未知 ID 不写事件；§9 增补降级审计用例 |
 | 0.1.6 | 2026-10-22 | GGD-0016：§7 `logging.file.path` 缺省值改为跟随 `UserDataPaths.LogFilePath`，与平台数据目录一致 |
+| 0.1.7 | 2026-10-22 | GGD-0030：§3 新增白名单来源规则（配置文件与 SQLite 条目合并、读取失败 FailClosed）；§9 增补 SQLite 白名单管理测试项 |

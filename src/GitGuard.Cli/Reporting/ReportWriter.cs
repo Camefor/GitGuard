@@ -28,6 +28,9 @@ internal sealed class ReportWriter
     private const string BYPASS_SCHEMA = "gitguard.bypass.v1";
     private const string AUDIT_LIST_SCHEMA = "gitguard.audit.list.v1";
     private const string AUDIT_EXPORT_SUMMARY_SCHEMA = "gitguard.audit.export.summary.v1";
+    private const string ALLOWLIST_ADD_SCHEMA = "gitguard.allowlist.add.v1";
+    private const string ALLOWLIST_REMOVE_SCHEMA = "gitguard.allowlist.remove.v1";
+    private const string ALLOWLIST_LIST_SCHEMA = "gitguard.allowlist.list.v1";
 
     private readonly TextWriter _output;
     private readonly TextWriter _error;
@@ -351,6 +354,99 @@ internal sealed class ReportWriter
         WriteIndented(_text.Get(CliTextKey.LabelFindingCount), report.FindingCount.ToString(CultureInfo.InvariantCulture));
     }
 
+    /// <summary>渲染白名单新增结果（文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="entry">已持久化的白名单条目。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="entry"/> 为 <see langword="null"/>。</exception>
+    internal void WriteAllowlistAdd(AllowlistEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (_json)
+        {
+            WriteAllowlistAddJson(entry);
+            return;
+        }
+
+        WriteColored("✔ ", ConsoleColor.Green);
+        _error.WriteLine(_text.Get(CliTextKey.AllowlistAddHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelId), entry.Id.ToString());
+        if (entry.RuleId is { } ruleId)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelRule), ruleId);
+        }
+
+        if (entry.PathPattern is { } pathPattern)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelPath), pathPattern);
+        }
+
+        if (entry.Fingerprint is { } fingerprint)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelFingerprint), fingerprint.Hex);
+        }
+
+        WriteIndented(_text.Get(CliTextKey.LabelReason), entry.Reason);
+        WriteIndented(_text.Get(CliTextKey.LabelCreatedAt), FormatAuditTimestamp(entry.CreatedAt));
+        WriteIndented(_text.Get(CliTextKey.LabelCreatedBy), entry.CreatedBy);
+    }
+
+    /// <summary>渲染白名单删除结果（文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="id">已删除条目的身份标识。</param>
+    internal void WriteAllowlistRemove(Guid id)
+    {
+        if (_json)
+        {
+            WriteAllowlistRemoveJson(id);
+            return;
+        }
+
+        WriteColored("✔ ", ConsoleColor.Green);
+        _error.WriteLine(_text.Get(CliTextKey.AllowlistRemoveHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelId), id.ToString());
+    }
+
+    /// <summary>渲染白名单列表（<c>06-API接口设计</c> §5.5；文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="query">本次查询条件（输出分页信息）。</param>
+    /// <param name="page">查询结果。</param>
+    /// <exception cref="ArgumentNullException">任一参数为 <see langword="null"/>。</exception>
+    internal void WriteAllowlistList(AllowlistQuery query, AllowlistPage page)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(page);
+
+        if (_json)
+        {
+            WriteAllowlistListJson(query, page);
+            return;
+        }
+
+        _error.WriteLine(_text.Get(CliTextKey.AllowlistListHeader));
+        if (page.Entries.IsEmpty)
+        {
+            string emptyMessage = page.TotalCount == 0
+                ? _text.Get(CliTextKey.AllowlistListEmpty)
+                : _text.Format(CliTextKey.AllowlistListPageEmpty, page.TotalCount);
+            WriteIndented(null, emptyMessage);
+            return;
+        }
+
+        int first = query.Offset + 1;
+        int last = query.Offset + page.Entries.Length;
+        _error.WriteLine(_text.Format(CliTextKey.AllowlistListSummary, page.TotalCount, first, last));
+        foreach (AllowlistEntry entry in page.Entries)
+        {
+            WriteIndented(
+                null,
+                _text.Format(
+                    CliTextKey.AllowlistListLine,
+                    entry.Id,
+                    BuildAllowlistConditions(entry),
+                    entry.Reason,
+                    FormatAuditTimestamp(entry.CreatedAt),
+                    entry.CreatedBy));
+        }
+    }
+
     /// <summary>渲染错误报告（文本 → stderr；JSON → stdout）。</summary>
     /// <param name="exitCode">退出码。</param>
     /// <param name="errorCode">错误码（<c>10-异常处理设计</c> §4 登记值）。</param>
@@ -479,6 +575,28 @@ internal sealed class ReportWriter
 
     private static string FormatAuditTimestamp(DateTimeOffset value) =>
         value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
+
+    private static void WriteAllowlistEntryJson(Utf8JsonWriter writer, AllowlistEntry entry)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("id", entry.Id.ToString());
+        writer.WriteString("rule_id", entry.RuleId);
+        writer.WriteString("path_pattern", entry.PathPattern);
+        writer.WriteString("fingerprint", entry.Fingerprint?.Hex);
+        writer.WriteString("reason", entry.Reason);
+        writer.WriteString("created_at", FormatAuditTimestamp(entry.CreatedAt));
+        writer.WriteString("created_by", entry.CreatedBy);
+        if (entry.ExpiresAt is { } expiresAt)
+        {
+            writer.WriteString("expires_at", FormatAuditTimestamp(expiresAt));
+        }
+        else
+        {
+            writer.WriteNull("expires_at");
+        }
+
+        writer.WriteEndObject();
+    }
 
     private static void WriteFindingJson(
         Utf8JsonWriter writer,
@@ -883,6 +1001,81 @@ internal sealed class ReportWriter
                 writer.WriteNumber("exit_code", run.ExitCode);
                 writer.WriteNumber("findings_count", run.FindingCount);
                 writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private string BuildAllowlistConditions(AllowlistEntry entry)
+    {
+        var conditions = new List<string>(3);
+        if (entry.RuleId is { } ruleId)
+        {
+            conditions.Add(_text.Format(CliTextKey.AllowlistConditionItem, _text.Get(CliTextKey.LabelRule), ruleId));
+        }
+
+        if (entry.PathPattern is { } pathPattern)
+        {
+            conditions.Add(_text.Format(CliTextKey.AllowlistConditionItem, _text.Get(CliTextKey.LabelPath), pathPattern));
+        }
+
+        if (entry.Fingerprint is { } fingerprint)
+        {
+            conditions.Add(_text.Format(CliTextKey.AllowlistConditionItem, _text.Get(CliTextKey.LabelFingerprint), fingerprint.Hex));
+        }
+
+        return string.Join(_text.Get(CliTextKey.AllowlistConditionSeparator), conditions);
+    }
+
+    private void WriteAllowlistAddJson(AllowlistEntry entry)
+    {
+        var buffer = new ArrayBufferWriter<byte>(512);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", ALLOWLIST_ADD_SCHEMA);
+            writer.WritePropertyName("entry");
+            WriteAllowlistEntryJson(writer, entry);
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteAllowlistRemoveJson(Guid id)
+    {
+        var buffer = new ArrayBufferWriter<byte>(256);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", ALLOWLIST_REMOVE_SCHEMA);
+            writer.WriteString("id", id.ToString());
+            writer.WriteBoolean("removed", true);
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteAllowlistListJson(AllowlistQuery query, AllowlistPage page)
+    {
+        var buffer = new ArrayBufferWriter<byte>(1024);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", ALLOWLIST_LIST_SCHEMA);
+            writer.WriteNumber("total", page.TotalCount);
+            writer.WriteNumber("limit", query.Limit);
+            writer.WriteNumber("offset", query.Offset);
+            writer.WriteNumber("count", page.Entries.Length);
+            writer.WriteStartArray("entries");
+            foreach (AllowlistEntry entry in page.Entries)
+            {
+                WriteAllowlistEntryJson(writer, entry);
             }
 
             writer.WriteEndArray();

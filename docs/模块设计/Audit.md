@@ -16,7 +16,7 @@
 | --- | --- |
 | `ScanStagedUseCase` / `ScanPushUseCase` / `ScanManualUseCase` | `ScanRun` + `Findings[]` |
 | `InstallHookUseCase` / `UninstallHookUseCase` | `HookInstallation` + `HookInstalled` / `HookUninstalled` 事件（卸载附 `RestoredLegacyHook`） |
-| `AllowlistUseCase` | `AllowlistEntry` 变更 |
+| `AllowlistAddUseCase` / `AllowlistRemoveUseCase` | `AllowlistEntry` 变更（新增 / 删除） |
 | `BypassDetectionService` | `ScanRun`（`ScanType.Bypass`）+ `BypassDetected` 事件（载荷含 `Reason`） |
 | `GitGuardSession` | `PolicyOverride`（配置降级）、`FilePermissionFixed`（启动期权限修复）、`FailClosed`（退出码 ≥ 10） |
 
@@ -35,6 +35,7 @@
 | 全写事务 | ScanRun + Findings 必须单事务提交；避免孤儿记录 |
 | Hook 写事务 | `hook_installations` upsert 与 `HookInstalled` / `HookUninstalled` 事件同事务提交（`SaveHookInstallation` / `SaveHookUninstallation`，GGD-0008）；`occurred_at` 安装取 `InstalledAt`、卸载取当前时刻 |
 | 绕过写事务 | `SaveBypassEvent(run, reason, commitSha)`：`scan_runs`（Bypass / Clean / 退出码 0 / 无 Finding）+ `BypassDetected` 事件同事务提交，`occurred_at` 取 `run.StartedAt`（GGD-0013）；写入失败不吞异常，CLI 映射退出码 14 |
+| 白名单写事务 | `AddAllowlistEntry` / `RemoveAllowlistEntry`：`allowlist` 行变更 + `AllowlistChanged` 事件同事务提交（`category = Allowlist`，载荷 `EntryId` / `Action` / `RuleId` / `PathPattern` / `Fingerprint` / `Reason`，GGD-0030）；删除不存在的 ID 返回 `false` 且不写事件；读取损坏行抛 `SqliteException`（CLI 退出码 14） |
 | 脱敏强制 | `Finding.snippet_masked` 构造函数拒绝原文；写入 SQLite 前 CHECK 约束兜底 |
 | 保留期清理 | 启动期后台任务清理 180 天前数据；可通过 `audit.retention_days` 覆写 |
 | 导出脱敏 | `audit export` 只写 `snippet_masked` / HMAC 指纹，不恢复原文；JSON / CSV 两种格式共用同一脱敏字段集 |
@@ -199,6 +200,7 @@ flowchart LR
 
 - [x] Hook 安装 / 卸载状态行与事件同事务落库（GGD-0008：`SqliteAuditStoreHookTests` 直读校验 + `HookEndToEndTests` 真实库端到端）。
 - [x] 绕过事件行与 `BypassDetected` 同事务落库；`NoVerify` / `GitGuardSkip` 载荷字段与非法输入拒绝（GGD-0013：`SqliteAuditStoreBypassTests` + E2E S8 直读）。
+- [x] 白名单行与 `AllowlistChanged` 同事务落库，Add / Remove 载荷字段、分页排序与损坏行 FailClosed（GGD-0030：`SqliteAuditStoreAllowlistTests`）。
 - [ ] 金丝雀 Token 不入库（DR-02）。
 - [ ] `BUSY` 重试逻辑：3 次指数退避；仍失败则发 `AuditWriteFailed`。
 - [ ] 清理阈值生效。
@@ -227,3 +229,4 @@ flowchart LR
 | 0.1.5 | 2026-10-21 | GGD-0013：§2.1 输入改为 `Bypass` 运行 + `BypassDetected` 事件；§3 新增绕过写事务规则；§6.3 新增写入流程（无 Finding、duration/summary 为 NULL、载荷含 Reason；原 Hook / 清理流程顺延为 §6.2 / §6.4）；§9 勾选绕过事件落库测试 |
 | 0.1.6 | 2026-10-21 | GGD-0022：§2.2 落地 `audit list/export`（`view` 保持 v0.2）；§3 新增导出原子性、CSV 防护与查询分页规则；§6.4 新增查询 / 导出流程（原清理流程顺延为 §6.5）；§9 勾选分页筛选、导出脱敏与退出码 31 测试；§10 导出格式更新为 JSON / CSV |
 | 0.1.7 | 2026-10-22 | GGD-0015：§2.1 输入补组合根三类安全事件；§3 新增独立事件事务、权限加固与 FailClosed 留痕规则；§6.5 新增安全事件 / 启动期加固流程（原清理顺延为 §6.6）；§9 勾选事件落库、Unix/Windows 权限修复与 V002 迁移测试 |
+| 0.1.8 | 2026-10-22 | GGD-0030：§2.1 输入改为白名单新增 / 删除用例；§3 新增白名单写事务规则（行与 `AllowlistChanged` 同事务、载荷字段、删除不存在不写事件、损坏行 FailClosed）；§9 勾选白名单持久化测试 |

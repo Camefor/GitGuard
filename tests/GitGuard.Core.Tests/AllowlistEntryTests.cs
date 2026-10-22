@@ -176,6 +176,64 @@ public sealed class AllowlistEntryTests
     }
 
     [Fact]
+    public void Restore_PreservesIdentityAndFields()
+    {
+        var id = Guid.CreateVersion7();
+        var expiresAt = TestData.SampleUtcNow.AddDays(1);
+
+        var entry = AllowlistEntry.Restore(
+            id,
+            "GGD/SECRET/AWS-AKID",
+            "src/**",
+            TestData.SampleFingerprint,
+            "  持久化恢复条目  ",
+            TestData.SampleUtcNow,
+            "tester",
+            expiresAt);
+
+        entry.Id.Should().Be(id);
+        entry.RuleId.Should().Be("GGD/SECRET/AWS-AKID");
+        entry.PathPattern.Should().Be("src/**");
+        entry.Fingerprint.Should().Be(TestData.SampleFingerprint);
+        entry.Reason.Should().Be("持久化恢复条目");
+        entry.CreatedAt.Should().Be(TestData.SampleUtcNow);
+        entry.CreatedBy.Should().Be("tester");
+        entry.ExpiresAt.Should().Be(expiresAt);
+    }
+
+    [Fact]
+    public void Restore_EmptyId_Throws()
+    {
+        Action act = () => AllowlistEntry.Restore(
+            Guid.Empty,
+            "GGD/SECRET/AWS-AKID",
+            null,
+            null,
+            "空身份标识",
+            TestData.SampleUtcNow,
+            "tester",
+            null);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*Id*");
+    }
+
+    [Fact]
+    public void Restore_InvalidConditions_Throws()
+    {
+        Action act = () => AllowlistEntry.Restore(
+            Guid.CreateVersion7(),
+            null,
+            null,
+            null,
+            "缺少匹配条件",
+            TestData.SampleUtcNow,
+            "tester",
+            null);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*DDD §3.3*");
+    }
+
+    [Fact]
     public void Equality_SameConditionsDifferentInstances_DistinctIdentity()
     {
         var first = AllowlistEntry.Create("GGD/SECRET/AWS-AKID", null, null, "相同条件登记", TestData.SampleUtcNow, "tester");
