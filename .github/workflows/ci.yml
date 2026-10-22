@@ -1,7 +1,7 @@
 name: CI
 
 # 流水线阶段（16-测试方案 §11）：restore → build → unit → integration → scenario。
-# 当前仅 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 安全作业暂缓，恢复任务见 GGD-0028。
+# 当前仅 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 安全作业不再计划（GGD-0028 已取消）。
 
 on:
   push:

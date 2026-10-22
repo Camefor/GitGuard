@@ -310,8 +310,8 @@ dotnet test GitGuard.sln
 
 ## 已知限制
 
-- Hook 兼容性：Husky v9 / lefthook v2 / pre-commit 4.x 的安装包裹、真实提交链式执行、阻断语义与卸载还原已在真实安装仓库中验证（`TC-COMPAT-01~04`）；CI `hook-compat` 作业当前仅覆盖 Windows，macOS / Ubuntu 矩阵暂缓（`GGD-0028`）。
-- CI 当前仅运行 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 `strace` 作业暂缓（`GGD-0028`）。
+- Hook 兼容性：Husky v9 / lefthook v2 / pre-commit 4.x 的安装包裹、真实提交链式执行、阻断语义与卸载还原已在真实安装仓库中验证（`TC-COMPAT-01~04`）；CI `hook-compat` 作业当前仅覆盖 Windows（跨平台矩阵不再计划，`GGD-0028` 已取消）。
+- CI 当前仅运行 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 `strace` 作业不再计划（`GGD-0028` 已取消）。
 - Windows 下审计库目前依赖用户目录默认 ACL，显式收紧计划中。
 - Git 2.9.3 / 2.40.1 / 最新稳定版已由 CI `git-compat` 矩阵覆盖；更老版本未验证。
 - `scan --staged` 只扫描暂存区，不读取未暂存内容；全量历史扫描尚未实现。

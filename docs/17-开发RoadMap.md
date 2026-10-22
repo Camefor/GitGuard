@@ -20,7 +20,7 @@
   - `gitguard install / uninstall / status / scan / audit list / audit export / allowlist add / allowlist remove / allowlist list / version` 命令集。
   - 四类检测器（Secret / Privacy / LocalPath / Url）内置规则共 21 条（Secret 8 / Privacy 5 / LocalPath 4 / Url 4）；「各 ≥ 10 条」目标顺延到 v0.2 规则升级。
   - SQLite 审计 Schema v1；迁移器可用。
-  - CI Windows 单平台构建矩阵（macOS / Ubuntu 暂缓，`GGD-0028`）；Native AOT 发行物。
+  - CI Windows 单平台构建矩阵（跨平台矩阵不再计划，`GGD-0028` 已取消）；Native AOT 发行物。
   - 文档：00 ~ 18、模块设计、ADR-0001 ~ 0004 全部到位。
 - **依赖**：无前置阶段。
 - **风险**：
@@ -28,12 +28,12 @@
   - Native AOT 下某些反射依赖包不可用 → 启动期用 trim-safe 包，必要时自写序列化。
 - **退出条件**：
   - [x] 8 条 MVP 必过场景全部通过（S1~S8）。
-  - [ ] NFR-P-001 ~ 003 达标（P-002 / P-003 已达标：P-003 经 `GGD-0023` 批量取差异复测 P95 669.78 ms；P-001 实测 P95 200.44 ms，仍受宿主进程创建基线约 170 ms 影响，需正常宿主复测）。
-  - [ ] 开发者（本人）在 2 个真实仓库中启用 ≥ 2 周，无数据丢失、无误伤。
+  - [-] NFR-P-001 ~ 003 达标（P-002 / P-003 已达标：P-003 经 `GGD-0023` 批量取差异复测 P95 669.78 ms；P-001 实测 P95 200.44 ms，仍受宿主进程创建基线约 170 ms 影响）。**由用户亲自验收，不需要 Agent 执行。**
+  - [-] 开发者（本人）在 2 个真实仓库中启用 ≥ 2 周，无数据丢失、无误伤。**由用户亲自验收，不需要 Agent 执行。**
 
 ### 2.2 阶段 2：规则升级（v0.2）
 
-- **周期**：2027-01-05 ~ 2027-03-15（约 10 周）
+- **周期**：2026-10-22 提前启动 ~ 2027-03-15（约 20 周，原计划 10 周）
 - **目标**：完善白名单治理、引入全量扫描与 GitleaksAdapter；可以让一个 10 人团队平稳使用。
 - **交付物**：
   - `gitguard scan --all` / `gitguard rules`（`gitguard allowlist` 已于 `GGD-0030` 提前落地）。
@@ -82,8 +82,15 @@
 | 1 | `GGD-0010` | 完成 8 条 MVP 必过场景的 E2E 测试 Fixture | P0 | 5d |
 | 1 | `GGD-0011` | GitHub Actions 多平台构建 + Native AOT 产物 | P0 | 2d |
 | 1 | `GGD-0012` | 文档回填：对比实现与 PRD / SRS 差异 | P0 | 2d |
+| 2 | `GGD-0031` | FR-060 全量扫描 `gitguard scan --all`（HEAD / 历史 / 续扫） | P1 | 5d |
+| 2 | `GGD-0032` | FR-061 基线文件生成与消费 | P1 | 3d |
+| 2 | `GGD-0033` | 内置规则扩充至 ≥40 条 | P1 | 4d |
+| 2 | `GGD-0034` | FR-080 自定义正则规则与 `gitguard rules` | P2 | 4d |
+| 2 | `GGD-0035` | FR-090 GitleaksAdapter | P2 | 3d |
+| 2 | `GGD-0036` | `gitguard audit view <run-id>` | P2 | 2d |
+| 2 | `GGD-0037` | 误报治理指南与 v0.2 验收支撑 | P2 | 1d |
 
-阶段 2、3 任务待 MVP 完成后再拆解登记。
+阶段 3 任务待 v0.2 完成后再拆解登记。
 
 ## 4. 里程碑
 
@@ -113,7 +120,7 @@ flowchart LR
 | # | 风险 | 影响 | 概率 | 应对 | Owner | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-01 | Native AOT 下 YAML / SQLite 依赖反射兼容性问题 | 高 | 中 | 启动期用 trim-safe 包；CI 冒烟验证 | 项目负责人 | 缓解中（trim-safe 已落地；`release.yml` 原生平台冒烟已接线） |
-| R-02 | Husky / lefthook / pre-commit 的 Hook 格式差异导致兼容失败 | 高 | 中 | 真实 Fixture + CI `hook-compat`（Windows） | 项目负责人 | 已缓解（`GGD-0021`：三框架真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat` 作业；期间发现并修复 Husky `$0` 推导导致备份不执行的问题；macOS / Ubuntu 矩阵暂缓 `GGD-0028`） |
+| R-02 | Husky / lefthook / pre-commit 的 Hook 格式差异导致兼容失败 | 高 | 中 | 真实 Fixture + CI `hook-compat`（Windows） | 项目负责人 | 已缓解（`GGD-0021`：三框架真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat` 作业；期间发现并修复 Husky `$0` 推导导致备份不执行的问题；跨平台矩阵不再计划，`GGD-0028` 已取消） |
 | R-03 | 中国手机号检测误报率过高 | 中 | 高 | 结合上下文关键字（如 `phone`, `mobile`, `tel`） | 项目负责人 | Open |
 | R-04 | 用户习惯 `--no-verify` 导致 Hook 价值被架空 | 中 | 高 | 文档宣讲 + 服务端扫描是互补 | 项目负责人 | Open |
 | R-05 | 单人维护进度延迟 | 中 | 中 | 文档优先，范围克制；MVP 不追求覆盖所有规则 | 项目负责人 | Open |
@@ -131,3 +138,4 @@ flowchart LR
 | 0.1.6 | 2026-10-21 | GGD-0021：§6 R-02 标记已缓解（Husky / lefthook / pre-commit 真实安装矩阵 + CI `hook-compat`） |
 | 0.1.7 | 2026-10-22 | GGD-0027：CI 收敛为 Windows 单平台（macOS / Ubuntu 矩阵与 Linux DR-01 作业暂缓 `GGD-0028`），§6 R-02 应对措施与状态同步 |
 | 0.1.8 | 2026-10-22 | GGD-0030：FR-040 / FR-041 白名单 CLI 与 SQLite 管理提前落地，§1 v0.1 / v0.2 范围与 §2.1 / §2.2 交付物同步调整 |
+| 0.1.9 | 2026-10-22 | GGD-0031：取消 `GGD-0028`（Windows 单平台为最终 CI 范围）；v0.1 验收项标记为用户亲自执行；提前启动 v0.2 并登记 `GGD-0031` ~ `GGD-0037` 任务分解 |

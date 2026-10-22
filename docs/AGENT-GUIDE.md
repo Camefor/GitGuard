@@ -130,13 +130,13 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| 当前任务 ID | `-` |
-| 当前状态 | `IDLE` |
-| 当前目标 | 无（等待用户指派） |
+| 当前任务 ID | `GGD-0031` |
+| 当前状态 | `IN_PROGRESS` |
+| 当前目标 | 实现 FR-060 全量扫描：`gitguard scan --all [--since] [--include-history] [--max-files]` |
 | 最后完成动作 | `GGD-0030` 已完成：白名单 CLI 与 SQLite 管理（FR-040 / FR-041），构建 0 警告 0 错误，全量测试 1067 通过 + 9 跳过 + 0 失败 |
-| 下一步动作 | 从 §8.1 待办任务中领取（当前仅剩 `GGD-0028`）或等待用户新指令 |
-| 涉及文件 | 无 |
-| 验证结果 | `dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet test GitGuard.sln -c Release` 1076 用例（1067 通过 + 9 平台跳过 + 0 失败） |
+| 下一步动作 | 读取 FR-060 基线（SRS / PRD / CLI 契约 / 现有扫描管线），设计 `ScanAllUseCase` 与 CLI 选项 |
+| 涉及文件 | `docs/AGENT-GUIDE.md`、`docs/17-开发RoadMap.md`、`src/GitGuard.Application/`、`src/GitGuard.Cli/`、`src/GitGuard.Core/`、`src/GitGuard.Infrastructure/`、`tests/` |
+| 验证结果 | 上一任务：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet test GitGuard.sln -c Release` 1076 用例（1067 通过 + 9 平台跳过 + 0 失败） |
 | 阻塞/待确认 | 无 |
 | 最后更新 | 2026-10-22 |
 
@@ -148,7 +148,13 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | `GGD-0028` | `P2` | `TODO` | 恢复 macOS / Ubuntu CI 与 Linux DR-01 安全作业：重新加入 `build-test` / `hook-compat` 平台矩阵，恢复 `strace -e trace=network` 网络隔离验证，并补齐跨平台测试夹具（macOS 临时路径符号链接解析、Unix 脚本可执行位） | 来源：GGD-0027 暂缓决策 / 验收：三平台 CI 绿灯 + DR-01 作业通过 |
+| [ ] | `GGD-0031` | `P1` | `IN_PROGRESS` | FR-060 全量扫描：`gitguard scan --all [--since <commit>] [--include-history] [--max-files <N>]`；默认扫描 HEAD 全部被跟踪文件，历史模式按 `git log` 枚举提交并支持中断续扫；复用检测 / 策略 / 报告 / 审计链路 | 来源：SRS §2.11 / PRD 场景 3.6 / RoadMap §2.2；验收：`TC-FR-060-*` 通过，HEAD 全量扫描与历史扫描 E2E 通过 |
+| [ ] | `GGD-0032` | `P1` | `TODO` | FR-061 基线文件：按指纹生成 / 消费基线，支持 `scan --all --baseline` 生成与默认消费；基线内命中不阻断，指纹内容变化触发警告 | 来源：SRS §2.11 / PRD FR-061 / RoadMap §2.2；验收：基线生成、消费、变更失效单测与 E2E 通过 |
+| [ ] | `GGD-0033` | `P1` | `TODO` | 内置规则扩充至 ≥40 条（v0.2 退出条件，当前 21 条）：补充 Secret / Privacy / LocalPath / Url 规则与正反例夹具，更新规则文档与测试 | 来源：RoadMap §2.2 退出条件；验收：规则总数 ≥40，全部规则夹具测试通过 |
+| [ ] | `GGD-0034` | `P2` | `TODO` | FR-080 自定义正则规则与 `gitguard rules`：支持项目配置命名、严重度、上下文过滤与 `Regex.MatchTimeout` 兜底；`rules` 命令列出内置 / 自定义规则 | 来源：SRS §2.13 / RoadMap §2.2；验收：自定义规则加载、ReDoS 超时、`rules` 输出与退出码测试通过 |
+| [ ] | `GGD-0035` | `P2` | `TODO` | FR-090 GitleaksAdapter：实现 `IDetector`，探测 `gitleaks` 可执行文件，调用 `gitleaks detect --no-git` 并将 JSON 映射为 `GLK/` Finding；缺失时降级不阻断 | 来源：SRS §2.13 / ADR-0003 / RoadMap §2.2；验收：适配器映射、缺失降级、`use_gitleaks` 配置测试通过 |
+| [ ] | `GGD-0036` | `P2` | `TODO` | `gitguard audit view <run-id>`：查询单次运行摘要与 Finding 明细，支持文本 / JSON 输出与未找到退出码 | 来源：README v0.2 未实现清单 / RoadMap §2.2；验收：CLI 契约与 SQLite 查询测试通过 |
+| [ ] | `GGD-0037` | `P2` | `TODO` | 误报治理指南与 v0.2 验收支撑：记录规则分级、白名单治理、误报率统计方法与真实项目试用模板；汇总规则数量 / 基准数据 | 来源：RoadMap §2.2 交付物与退出条件；验收：文档评审通过，数据可由现有命令复现 |
 
 ### 8.2 暂停/阻塞任务恢复详情
 
@@ -193,6 +199,7 @@
 | ID | 任务 | 取消日期 | 取消原因 |
 | --- | --- | --- | --- |
 | `GGD-0026` | CI 多平台修复（macOS 符号链接 / Linux 可执行位） | 2026-10-22 | 用户决定不再维护 macOS / Ubuntu 测试与 CI，改为 Windows 单平台；对应提交 `314c809` 已由 `GGD-0027` 撤销 |
+| `GGD-0028` | 恢复 macOS / Ubuntu CI 与 Linux DR-01 安全作业 | 2026-10-22 | 用户决定取消：不再维护跨平台 CI 矩阵，Linux `strace` 作业不再恢复；Windows 单平台为最终 CI 范围（决策来源：用户 2026-10-22 指令） |
 
 ## 11. 会话记录
 

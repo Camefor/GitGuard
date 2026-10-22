@@ -280,7 +280,7 @@ flowchart LR
 | --- | --- | --- |
 | 性能 | Native AOT；按文件/Hunk 流式扫描；规则正则编译缓存；大文件早停跳过 | NFR-P-001 ~ 004 |
 | 安全 | 严禁明文落日志；Logging Sink 内置掩码；SQLite 字段 Schema 不含原文列 | NFR-S-001 ~ 004 |
-| 可用性 | 跨平台单源；CI 当前为 Windows 单平台（macOS / Ubuntu 矩阵暂缓，`GGD-0028`）；Hook 分发器单元/集成测试覆盖 | NFR-A-001, 002 |
+| 可用性 | 跨平台单源；CI 当前为 Windows 单平台（跨平台矩阵不再计划，`GGD-0028` 已取消）；Hook 分发器单元/集成测试覆盖 | NFR-A-001, 002 |
 | 可维护性 | 模块化单体 + Analyzer 边界检查；规则在配置声明；文档 SSOT | NFR-M-001, 002 |
 | 可演化性 | `IDetector` 适配器插槽；Avalonia 复用 `Application` | - |
 
@@ -318,3 +318,4 @@ flowchart LR
 | 0.1.1 | 2026-10-16 | GGD-0009：§5.1 结构树与实现对齐——Application 补 `Configuration/`（配置加载）与 `Composition/`（`GitGuardSession` 组合根，承接「Cli 不得引用 Infrastructure」的装配职责）；Cli 补 `Commands/` / `Reporting/` / `Logging/` 子目录；tests 补 `GitGuard.Cli.Tests/` |
 | 0.1.2 | 2026-10-21 | GGD-0020：§5.1 结构树更新 benchmarks 实际内容（自研 harness + startup / run 脚本），移除未落地的 `scripts/` 占位（AOT 发布由 `.github/workflows/release.yml` 承担） |
 | 0.1.3 | 2026-10-21 | GGD-0023：§7.2 推送扫描时序图改为一次批量 `git log --no-walk=unsorted --stdin` 取回全部提交差异，再逐提交解析与检测 |
+| 0.1.4 | 2026-10-22 | GGD-0031：§13 质量属性表跨平台 CI 表述改为「不再计划（`GGD-0028` 已取消）」 |
