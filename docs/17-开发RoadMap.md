@@ -36,7 +36,7 @@
 - **周期**：2026-10-22 提前启动 ~ 2027-03-15（约 20 周，原计划 10 周）
 - **目标**：完善白名单治理、引入全量扫描与 GitleaksAdapter；可以让一个 10 人团队平稳使用。
 - **交付物**：
-  - `gitguard scan --all`（已于 `GGD-0031` 落地） / `gitguard rules`（`gitguard allowlist` 已于 `GGD-0030` 提前落地）。
+  - `gitguard scan --all`（已于 `GGD-0031` 落地）与基线文件（FR-061，已于 `GGD-0032` 落地） / `gitguard rules`（`gitguard allowlist` 已于 `GGD-0030` 提前落地）。
   - `GitleaksAdapter` 实现（ADR-0003 落地）。
   - 规则分级与项目自定义正则。
   - 误报治理指南文档。
@@ -140,3 +140,4 @@ flowchart LR
 | 0.1.8 | 2026-10-22 | GGD-0030：FR-040 / FR-041 白名单 CLI 与 SQLite 管理提前落地，§1 v0.1 / v0.2 范围与 §2.1 / §2.2 交付物同步调整 |
 | 0.1.9 | 2026-10-22 | GGD-0031：取消 `GGD-0028`（Windows 单平台为最终 CI 范围）；v0.1 验收项标记为用户亲自执行；提前启动 v0.2 并登记 `GGD-0031` ~ `GGD-0037` 任务分解 |
 | 0.1.10 | 2026-10-22 | GGD-0031：FR-060 全量扫描落地（HEAD 空树差异快照 / `--include-history` 历史扫描 / `--since` 续扫 / `--max-files` 提交边界软截断 + `next_since_sha`）；§2.2 交付物同步；新增 36 项测试（Application 16 / Infrastructure 8 / CLI 12），全量 1112 项通过 |
+| 0.1.11 | 2026-10-22 | GGD-0032：FR-061 基线文件落地（`gitguard.baseline.v1` / `--baseline` 生成 / 默认消费 / `AllowedByBaseline` / 13、31 错误码）；§2.2 交付物同步；新增 20 项测试，全量 1132 项通过（1123 通过 + 9 跳过） |

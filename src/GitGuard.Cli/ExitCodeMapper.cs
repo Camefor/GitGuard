@@ -37,6 +37,9 @@ public static class ExitCodeMapper
             AllowlistException allowlist when allowlist.ErrorCode == AllowlistException.ALLOWLIST_VALIDATION_FAILED
                 => ExitCodes.ALLOWLIST_VALIDATION_FAILED,
             AllowlistException => ExitCodes.ALLOWLIST_NOT_FOUND,
+            BaselineException baseline when baseline.ErrorCode == BaselineException.BASELINE_WRITE_FAILED
+                => ExitCodes.AUDIT_EXPORT_FAILED,
+            BaselineException => ExitCodes.CONFIG_INVALID,
             ConfigurationException => ExitCodes.CONFIG_INVALID,
             DetectionException => ExitCodes.DETECTOR_FAILED,
             SqliteException => ExitCodes.AUDIT_STORE_FAILED,
@@ -59,6 +62,7 @@ public static class ExitCodeMapper
             GitException git => git.ErrorCode,
             HookException hook => hook.ErrorCode,
             AllowlistException allowlist => allowlist.ErrorCode,
+            BaselineException baseline => baseline.ErrorCode,
             ConfigurationException configuration => configuration.ErrorCode,
             DetectionException detection => detection.ErrorCode,
             SqliteException => SqliteException.AUDIT_STORE_FAILED,

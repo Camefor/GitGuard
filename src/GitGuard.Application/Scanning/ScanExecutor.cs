@@ -80,11 +80,13 @@ internal sealed class ScanExecutor
     /// <param name="scanType">扫描类型（PreCommit / PrePush / Manual 等）。</param>
     /// <param name="acquireInput">差异获取委托：返回按提交归属的逐文件解析结果与用例级摘要；git 失败抛 <see cref="GitException"/>。</param>
     /// <param name="cancellationToken">调用方取消令牌；外部取消原样上抛（CLI 映射退出码 12），超时则内部转 FailClosed。</param>
+    /// <param name="baseline">基线上下文（FR-061）；<see langword="null"/> 表示未涉及基线。</param>
     /// <returns>扫描结果（成功与 FailClosed 均返回；不抛 GitException / DetectionException）。</returns>
     internal async Task<ScanOutcome> RunAsync(
         ScanType scanType,
         Func<CancellationToken, ScanInput> acquireInput,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BaselineContext? baseline = null)
     {
         ArgumentNullException.ThrowIfNull(acquireInput);
 
@@ -131,7 +133,8 @@ internal sealed class ScanExecutor
                 findings,
                 skippedFiles,
                 SnapshotTimings(timingCollector),
-                input.Summary);
+                input.Summary,
+                baseline);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -205,7 +208,10 @@ internal sealed class ScanExecutor
         }
     }
 
-    /// <summary>成功路径收尾：策略判定 → 结果与退出码聚合（任一 Block → Blocked(1)）→ ScanRun 聚合与落库。</summary>
+    /// <summary>
+    /// 成功路径收尾：策略判定 → 基线放行（FR-061，按指纹命中且不被白名单优先）→
+    /// 结果与退出码聚合（任一 Block → Blocked(1)）→ ScanRun 聚合与落库。
+    /// </summary>
     private ScanOutcome Complete(
         ScanType scanType,
         DateTimeOffset startedAt,
@@ -214,9 +220,34 @@ internal sealed class ScanExecutor
         List<Finding> findings,
         IReadOnlyList<SkippedFile> skippedFiles,
         ImmutableArray<RuleTiming> ruleTimings,
-        FullScanSummary? fullScanSummary)
+        FullScanSummary? fullScanSummary,
+        BaselineContext? baseline)
     {
         var decisions = PolicyEvaluator.Evaluate(findings, _policy.Mapping, _clock.UtcNow, _policy.Allowlist);
+        if (baseline is { Fingerprints.Count: > 0 })
+        {
+            var builder = decisions.ToBuilder();
+            foreach (Finding finding in findings)
+            {
+                // 白名单优先：同时命中白名单与基线时保留白名单判定，避免语义重复
+                if (builder.TryGetValue(finding, out PolicyDecision? current) &&
+                    !current.IgnoredByAllowlist &&
+                    baseline.Fingerprints.Contains(finding.Fingerprint.Hex))
+                {
+                    builder[finding] = new PolicyDecision(
+                        PolicyAction.Allow,
+                        ignoredByAllowlist: false,
+                        finding.Severity,
+                        ignoredByBaseline: true);
+                }
+            }
+
+            decisions = builder.ToImmutable();
+        }
+
+        int baselineSuppressed = baseline is null
+            ? 0
+            : decisions.Values.Count(static decision => decision.IgnoredByBaseline);
 
         bool blocked = decisions.Values.Any(static decision => decision.Action == PolicyAction.Block);
         ScanResult result = blocked
@@ -227,7 +258,18 @@ internal sealed class ScanExecutor
         var run = ScanRun.Create(_gitAccess.GetRepositoryRoot(), scanType, startedAt, durationMs, result, exitCode, findings);
         bool auditWriteFailed = !TryPersistAudit(run, decisions);
 
-        return new ScanOutcome(run, decisions, filesScanned, skippedFiles, auditWriteFailed, ruleTimings, fullScanSummary);
+        BaselineSummary? baselineSummary = baseline is null
+            ? null
+            : new BaselineSummary(baseline.Path, baseline.Generated, baseline.Entries, baselineSuppressed);
+        return new ScanOutcome(
+            run,
+            decisions,
+            filesScanned,
+            skippedFiles,
+            auditWriteFailed,
+            ruleTimings,
+            fullScanSummary,
+            baselineSummary);
     }
 
     /// <summary>FailClosed 路径收尾：以 Failed + 指定退出码（10 / 11 / 12）落库并返回（不携带 Findings）。</summary>

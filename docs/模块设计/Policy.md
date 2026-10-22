@@ -23,7 +23,7 @@
 
 | 消费方 | 内容 |
 | --- | --- |
-| Application UseCase | `PolicyDecision { Action, IgnoredByAllowlist, Severity }` |
+| Application UseCase | `PolicyDecision { Action, IgnoredByAllowlist, IgnoredByBaseline, Severity }` |
 | CLI 层 | 最终退出码 |
 | Audit | `PolicyOverride` 事件（配置相对默认策略发生降级；GGD-0015） |
 
@@ -37,6 +37,7 @@
 | 降级审计 | 严重度映射低于默认值（如 `high: warn`）记 `SEVERITY/<Severity>` 降级；仅记录实际降级，同进程只写一次；未知 `disabled_rules` ID 只告警、不写覆盖 |
 | 白名单匹配 | 对单条 Finding，命中任一 AllowlistEntry 即视作 ignored（但仍记录到报告）；声明的 rule / path / fingerprint 条件全部匹配，过期条目忽略 |
 | 白名单来源 | `.gitguard.yml` 的 `allowlist.entries` 与 SQLite `allowlist` 表合并参与判定（`GitGuardSession.BuildScanPolicy`，GGD-0030）；SQLite 读取失败按 FailClosed 传播（退出码 14） |
+| 基线覆盖 | `scan --all` 消费 `.gitguard-baseline.json` 时，`ScanExecutor` 在策略评估后按指纹把未命中白名单的 Finding 覆盖为 `Allow + IgnoredByBaseline`；白名单优先（GGD-0032） |
 | 排除匹配 | `exclude.paths` 以仓库相对路径匹配，`exclude.files` 以文件名在任意深度匹配；命中文件不进入扫描、不产生 Finding，也不计入 `skipped_files` |
 | 配置文件合并 | 项目级覆盖用户级；深度合并 map，列表则替换 |
 | Schema 版本 | `.gitguard.yml` 必须有 `version: 1`；未知版本 FailClosed |
@@ -73,7 +74,9 @@ flowchart LR
     Findings[Findings] --> ForEach[对每一条]
     ForEach --> Allowlist{命中 Allowlist?}
     Allowlist -- 是 --> Ignored[Allow + IgnoredByAllowlist]
-    Allowlist -- 否 --> Map{Severity → Action}
+    Allowlist -- 否 --> Baseline{命中基线?}
+    Baseline -- 是 --> BaselineIgnored[Allow + IgnoredByBaseline]
+    Baseline -- 否 --> Map{Severity → Action}
     Map --> Block[Block / Warn]
     Block --> Aggregate[汇总：任一 Block → 退出码 1]
 ```
@@ -202,3 +205,4 @@ allowlist:
 | 0.1.5 | 2026-10-22 | GGD-0015：§2.2 / §3 落地 `PolicyOverride` 审计——严重度降级使用 `SEVERITY/<Severity>` 合成 ID、禁用规则记 `To = Allow`、同进程去重、未知 ID 不写事件；§9 增补降级审计用例 |
 | 0.1.6 | 2026-10-22 | GGD-0016：§7 `logging.file.path` 缺省值改为跟随 `UserDataPaths.LogFilePath`，与平台数据目录一致 |
 | 0.1.7 | 2026-10-22 | GGD-0030：§3 新增白名单来源规则（配置文件与 SQLite 条目合并、读取失败 FailClosed）；§9 增补 SQLite 白名单管理测试项 |
+| 0.1.8 | 2026-10-22 | GGD-0032：§2.2 / §3 / §6.1 补基线覆盖（`ScanExecutor` 按指纹覆盖为 `Allow + IgnoredByBaseline`，白名单优先）与 `PolicyDecision.IgnoredByBaseline` 字段 |

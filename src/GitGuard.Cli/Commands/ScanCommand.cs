@@ -48,6 +48,10 @@ internal static class ScanCommand
         {
             Description = runtime.Text.Get(CliTextKey.ScanMaxFilesDescription),
         };
+        var baselineOption = new Option<string?>("--baseline")
+        {
+            Description = runtime.Text.Get(CliTextKey.ScanBaselineDescription),
+        };
         var recordPendingOption = new Option<bool>("--record-pending")
         {
             Description = runtime.Text.Get(CliTextKey.ScanRecordPendingDescription),
@@ -61,6 +65,7 @@ internal static class ScanCommand
         command.Options.Add(includeHistoryOption);
         command.Options.Add(sinceOption);
         command.Options.Add(maxFilesOption);
+        command.Options.Add(baselineOption);
         command.Options.Add(recordPendingOption);
 
         Func<ParseResult, CancellationToken, Task<int>> action = (parseResult, cancellationToken) =>
@@ -73,6 +78,7 @@ internal static class ScanCommand
                 includeHistoryOption,
                 sinceOption,
                 maxFilesOption,
+                baselineOption,
                 recordPendingOption,
                 cancellationToken);
         command.SetAction(action);
@@ -142,6 +148,7 @@ internal static class ScanCommand
         Option<bool> includeHistoryOption,
         Option<string?> sinceOption,
         Option<int?> maxFilesOption,
+        Option<string?> baselineOption,
         Option<bool> recordPendingOption,
         CancellationToken cancellationToken)
     {
@@ -151,6 +158,7 @@ internal static class ScanCommand
         bool includeHistory = parseResult.GetValue(includeHistoryOption);
         string? since = parseResult.GetValue(sinceOption);
         int? maxFiles = parseResult.GetValue(maxFilesOption);
+        string? baseline = parseResult.GetValue(baselineOption);
         bool recordPending = parseResult.GetValue(recordPendingOption);
 
         int scopeCount = (staged ? 1 : 0) + (push ? 1 : 0) + (all ? 1 : 0);
@@ -164,6 +172,11 @@ internal static class ScanCommand
             return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanHistoryRequiresAll));
         }
 
+        if (!all && baseline is not null)
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanBaselineRequiresAll));
+        }
+
         if (maxFiles is <= 0)
         {
             return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanMaxFilesInvalid));
@@ -172,6 +185,11 @@ internal static class ScanCommand
         if (since is not null && (string.IsNullOrWhiteSpace(since) || since.StartsWith('-')))
         {
             return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanSinceInvalid));
+        }
+
+        if (baseline is not null && (string.IsNullOrWhiteSpace(baseline) || baseline.StartsWith('-')))
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.ScanBaselineInvalid));
         }
 
         if (recordPending && !staged)
@@ -221,6 +239,7 @@ internal static class ScanCommand
                 IncludeHistory = includeHistory,
                 Since = since,
                 MaxFiles = maxFiles,
+                BaselinePath = baseline,
             };
             outcome = await runtime.Session.CreateFullScan(collectRuleTimings).ExecuteAsync(allOptions, cancellationToken).ConfigureAwait(false);
         }

@@ -85,12 +85,12 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **主流程**：
   1. 执行 `gitguard scan --all`。
   2. 扫描当前 HEAD 的所有文件 + 历史提交差异（可选）。
-  3. 输出完整报告，可通过 `--baseline <path>` 写入基线文件。
-  4. 后续扫描自动排除基线中的已知指纹（但仍在报告中标出「历史噪声」）。
+  3. 输出完整报告，可通过 `--baseline <path>` 写入基线文件（本次命中仍按原策略处理）。
+  4. 后续 `scan --all` 自动消费仓库根 `.gitguard-baseline.json`：已登记指纹不再阻断，但仍在报告中标出「历史噪声」。
 - **成功指标**：老仓库接入零摩擦；基线清晰可维护。
-- **失败分支**：仓库过大导致超时 → 支持 `--since <commit>` / `--max-files` 分段。
+- **失败分支**：仓库过大导致超时 → 支持 `--since <commit>` / `--max-files` 分段；基线损坏 → 退出码 13（FailClosed）。
 - **对应功能需求**：`FR-060, FR-061`
-- **v0.2 落地状态**：FR-060 已实现（`GGD-0031`）：默认扫描 HEAD 全部被跟踪文件；`--include-history` 扫描历史提交差异；`--since` 从指定提交的父提交续扫；`--max-files` 按提交边界截断并输出 `next_since_sha`。FR-061 基线文件仍待 `GGD-0032`。
+- **v0.2 落地状态**：FR-060 已实现（`GGD-0031`）：默认扫描 HEAD 全部被跟踪文件；`--include-history` 扫描历史提交差异；`--since` 从指定提交的父提交续扫；`--max-files` 按提交边界截断并输出 `next_since_sha`。FR-061 已实现（`GGD-0032`）：`--baseline` 生成 `gitguard.baseline.v1` 文件、默认路径自动消费、`AllowedByBaseline` 动作与 `ignored_by_baseline` 汇总；基线指纹含每用户本地盐，不可跨机器移植。
 
 ## 4. 功能优先级
 
@@ -111,7 +111,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | `FR-042` | 已忽略项仍在终端汇总 | P1 | 3.4 | 每次扫描输出 `ignored N / blocked M / warned K` | 已实现：汇总行含「白名单忽略 N」 |
 | `FR-050` | 绕过事件审计 | P1 | 3.5 | 识别 `--no-verify` 与 `GITGUARD_SKIP=1`，记录为独立事件 | 已实现（GGD-0013：`post-commit` + 父提交 / 暂存树预测） |
 | `FR-060` | 全量扫描 `gitguard scan --all` | P1 | 3.6 | 支持 `--since` / `--max-files` 分段 | 已实现（GGD-0031：HEAD 全量树 + 历史提交 + 截断续扫） |
-| `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 | 未实现（v0.2） |
+| `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 | 已实现（GGD-0032：`--baseline` 生成、默认自动消费、`AllowedByBaseline` 放行、13 / 31 错误码） |
 | `FR-070` | 配置：`.gitguard.yml` 项目级 | P0 | 全部 | 支持规则开关、严重度覆写、exclude 路径 | 已实现（`GGD-0019`：`exclude.paths` 匹配仓库相对路径、`exclude.files` 匹配任意深度文件名） |
 | `FR-071` | 配置：用户级 `~/.config/gitguard/config.yml` | P1 | 全部 | 项目级覆盖用户级 | 已实现（GGD-0009） |
 | `FR-080` | 自定义正则规则 | P2 | 3.2 | 支持命名、严重度、上下文过滤 | 未实现（v0.2） |
@@ -171,3 +171,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.6 | 2026-10-21 | GGD-0021：§6 勾选 Husky / lefthook / pre-commit 真实框架兼容矩阵验收（TC-COMPAT-01~04，CI `hook-compat`） |
 | 0.1.7 | 2026-10-22 | GGD-0030：§3.4 白名单落地状态更新为 CLI + SQLite 已实现（`allowlist add/remove/list`、`AllowlistChanged` 审计、双来源合并）；§6 勾选白名单验收项；§7 v0.1 / v0.2 范围同步 |
 | 0.1.8 | 2026-10-22 | GGD-0031：§3.6 / §4 FR-060 标记已实现（HEAD 全量树、`--include-history`、`--since` 续扫、`--max-files` 提交边界截断与 `next_since_sha`）；§4 状态列更名为「实现状态」并同步 FR-040 / FR-041 的 GGD-0030 落地状态 |
+| 0.1.9 | 2026-10-22 | GGD-0032：§3.6 主流程更新为生成当次不抑制、后续默认自动消费；§4 FR-061 标记已实现（基线 schema、`AllowedByBaseline`、13 / 31 错误码、本地盐不可移植） |

@@ -606,7 +606,9 @@ internal sealed class ReportWriter
         string action = "Allow";
         if (decisions.TryGetValue(finding, out PolicyDecision? decision))
         {
-            action = decision.IgnoredByAllowlist ? "AllowedByAllowlist" : decision.Action.ToString();
+            action = decision.IgnoredByAllowlist
+                ? "AllowedByAllowlist"
+                : decision.IgnoredByBaseline ? "AllowedByBaseline" : decision.Action.ToString();
         }
 
         writer.WriteStartObject();
@@ -708,6 +710,19 @@ internal sealed class ReportWriter
             }
         }
 
+        // FR-061：基线生成 / 消费摘要；消费模式下历史噪声数量来自策略判定
+        if (outcome.BaselineSummary is { } baseline)
+        {
+            string baselineText = baseline.Generated
+                ? _text.Format(CliTextKey.ScanBaselineGenerated, baseline.Path, baseline.Entries)
+                : _text.Format(
+                    CliTextKey.ScanBaselineConsumed,
+                    baseline.Path,
+                    baseline.Entries,
+                    baseline.SuppressedFindings);
+            WriteIndented(_text.Get(CliTextKey.LabelBaseline), baselineText);
+        }
+
         if (outcome.Result == ScanResult.Failed)
         {
             WriteIndented(_text.Get(CliTextKey.LabelHint), FailureHint(outcome.ExitCode, _text));
@@ -719,7 +734,9 @@ internal sealed class ReportWriter
             foreach (Finding finding in outcome.Findings)
             {
                 string action = outcome.Decisions.TryGetValue(finding, out PolicyDecision? decision)
-                    ? decision.IgnoredByAllowlist ? _text.Get(CliTextKey.FindingAllowlisted) : decision.Action.ToString()
+                    ? decision.IgnoredByAllowlist
+                        ? _text.Get(CliTextKey.FindingAllowlisted)
+                        : decision.IgnoredByBaseline ? _text.Get(CliTextKey.FindingBaseline) : decision.Action.ToString()
                     : "Allow";
                 string location = string.Create(
                     CultureInfo.InvariantCulture,
@@ -773,11 +790,16 @@ internal sealed class ReportWriter
         int blocked = 0;
         int warned = 0;
         int ignored = 0;
+        int ignoredByBaseline = 0;
         foreach (PolicyDecision decision in outcome.Decisions.Values)
         {
             if (decision.IgnoredByAllowlist)
             {
                 ignored++;
+            }
+            else if (decision.IgnoredByBaseline)
+            {
+                ignoredByBaseline++;
             }
             else if (decision.Action == PolicyAction.Block)
             {
@@ -822,6 +844,7 @@ internal sealed class ReportWriter
             writer.WriteNumber("blocked", blocked);
             writer.WriteNumber("warned", warned);
             writer.WriteNumber("ignored_by_allowlist", ignored);
+            writer.WriteNumber("ignored_by_baseline", ignoredByBaseline);
             writer.WriteEndObject();
 
             // FR-060：仅 --all 携带 full_scan；暂存区 / 推送扫描保持既有契约不变
@@ -833,6 +856,17 @@ internal sealed class ReportWriter
                 writer.WriteNumber("remaining_commits", fullScan.RemainingCommits);
                 writer.WriteBoolean("truncated", fullScan.Truncated);
                 writer.WriteString("next_since_sha", fullScan.NextSinceSha);
+                writer.WriteEndObject();
+            }
+
+            // FR-061：仅涉及基线时输出 baseline 对象（暂存区 / 推送扫描不受影响）
+            if (outcome.BaselineSummary is { } baseline)
+            {
+                writer.WriteStartObject("baseline");
+                writer.WriteString("path", baseline.Path);
+                writer.WriteBoolean("generated", baseline.Generated);
+                writer.WriteNumber("entries", baseline.Entries);
+                writer.WriteNumber("suppressed_findings", baseline.SuppressedFindings);
                 writer.WriteEndObject();
             }
 

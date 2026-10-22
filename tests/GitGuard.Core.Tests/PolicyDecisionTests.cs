@@ -26,6 +26,16 @@ public sealed class PolicyDecisionTests
         decision.IgnoredByAllowlist.Should().BeTrue();
     }
 
+    [Fact]
+    public void Ctor_AllowedByBaseline_Accepted()
+    {
+        var decision = new PolicyDecision(PolicyAction.Allow, false, Severity.High, ignoredByBaseline: true);
+
+        decision.Action.Should().Be(PolicyAction.Allow);
+        decision.IgnoredByAllowlist.Should().BeFalse();
+        decision.IgnoredByBaseline.Should().BeTrue();
+    }
+
     [Theory]
     [InlineData(PolicyAction.Warn)]
     [InlineData(PolicyAction.Block)]
@@ -34,6 +44,22 @@ public sealed class PolicyDecisionTests
         Action act = () => CreateDecision(action, true, Severity.Medium);
 
         act.Should().Throw<InvariantViolationException>().WithMessage("*FR-040*");
+    }
+
+    [Fact]
+    public void Ctor_BaselineIgnoredWithNonAllowAction_Throws()
+    {
+        Action act = () => _ = new PolicyDecision(PolicyAction.Block, false, Severity.Medium, ignoredByBaseline: true);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*FR-061*");
+    }
+
+    [Fact]
+    public void Ctor_IgnoredByAllowlistAndBaseline_Throws()
+    {
+        Action act = () => _ = new PolicyDecision(PolicyAction.Allow, true, Severity.Medium, ignoredByBaseline: true);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*FR-061*");
     }
 
     [Fact]

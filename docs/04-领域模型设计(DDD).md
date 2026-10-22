@@ -90,7 +90,7 @@ flowchart LR
 | `RulePattern` | `Regex, string[]? ContextKeywords, string[]? FilePathGlobs, string[]? Validators` | 编译后 Regex | `Regex.MatchTimeout = 200ms`；禁止灾难性回溯；`Validators` 仅允许支撑检测器登记的名称（`shannon-entropy` / `luhn` / `cn-id-checksum`），未知名称在检测器构造期拒绝（FailClosed） |
 | `ScanResult` | `Clean / Warned / Blocked / Failed` | 枚举 | `Failed ⇒ ExitCode ≥ 10` |
 | `PolicyAction` | `Allow / Warn / Block` | 枚举 | `Critical` 不允许映射为 `Allow`（硬下限，FR-022） |
-| `PolicyDecision` | `Action, IgnoredByAllowlist, Severity` | record | `IgnoredByAllowlist ⇒ Action = Allow`（FR-040） |
+| `PolicyDecision` | `Action, IgnoredByAllowlist, IgnoredByBaseline, Severity` | record | `IgnoredByAllowlist ⇒ Action = Allow`（FR-040）；`IgnoredByBaseline ⇒ Action = Allow`（FR-061）；两个忽略标记互斥且允许清单优先 |
 | `PolicyOverride` | `RuleId, From, To` | record | `RuleId` 非空；`From` / `To` 为已定义枚举；`To < From`（仅记录实际降级；合成 ID 为 `SEVERITY/<Severity>`，GGD-0015） |
 | `RuleSource` | `Builtin / User / Gitleaks` | 枚举 | 记录规则来源，用于审计 |
 
@@ -234,3 +234,4 @@ flowchart LR
 | 0.1.5 | 2026-10-16 | 与 GGD-0008 实现同步：§3.4 修正重装语义为 upsert（`Replaced` 预留无写入方）、补备份文件名 / 路径 / UTC 约束；§6 `HookScriptBuilder` 更正为仅渲染 POSIX sh 分发脚本（撤销 PowerShell 变体），注明落地于 Application 层 |
 | 0.1.6 | 2026-10-21 | 与 GGD-0013 实现同步：§5 `BypassDetected` 载荷补 `Reason` 并区分 `GitGuardSkip` / `NoVerify`；§6 新增 `PendingScanRecorder` / `BypassDetectionService`；§7.6 展开 DR-06 预测身份、标记文件语义、判定矩阵与落库形态；§8 术语表补 `PendingScan` / `BypassReason` / `IPendingScanStore` 等 |
 | 0.1.7 | 2026-10-22 | 与 GGD-0015 实现同步：§4.2 新增 `PolicyOverride` 值对象及降级不变式；§5 补 `PolicyOverride` / `FilePermissionFixed` / `FailClosed` 三个领域事件与写入来源；§8 术语表补 `PolicyOverride` |
+| 0.1.8 | 2026-10-22 | 与 GGD-0032 实现同步：§4.2 `PolicyDecision` 增加 `IgnoredByBaseline`，补基线忽略不变式与白名单优先级 |

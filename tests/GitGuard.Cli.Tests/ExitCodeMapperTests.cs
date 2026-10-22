@@ -47,6 +47,15 @@ public sealed class ExitCodeMapperTests
     }
 
     [Fact]
+    public void Map_BaselineException_ClassifiesInvalidAndWriteFailures()
+    {
+        ExitCodeMapper.Map(new BaselineException(BaselineException.BASELINE_INVALID, "基线文件损坏"))
+            .Should().Be(ExitCodes.CONFIG_INVALID);
+        ExitCodeMapper.Map(new BaselineException(BaselineException.BASELINE_WRITE_FAILED, "基线写入失败"))
+            .Should().Be(ExitCodes.AUDIT_EXPORT_FAILED);
+    }
+
+    [Fact]
     public void Map_OtherRegisteredExceptions_FollowExitCodeTable()
     {
         ExitCodeMapper.Map(new ConfigurationException("坏 YAML")).Should().Be(ExitCodes.CONFIG_INVALID);
@@ -66,6 +75,8 @@ public sealed class ExitCodeMapperTests
             .Should().Be(HookException.WRITE_PERMISSION_DENIED);
         ExitCodeMapper.ErrorCodeOf(new AllowlistException(AllowlistException.ALLOWLIST_VALIDATION_FAILED, "参数非法"))
             .Should().Be(AllowlistException.ALLOWLIST_VALIDATION_FAILED);
+        ExitCodeMapper.ErrorCodeOf(new BaselineException(BaselineException.BASELINE_WRITE_FAILED, "基线写入失败"))
+            .Should().Be(BaselineException.BASELINE_WRITE_FAILED);
         ExitCodeMapper.ErrorCodeOf(new ConfigurationException("坏 YAML"))
             .Should().Be(ConfigurationException.CONFIG_INVALID);
         ExitCodeMapper.ErrorCodeOf(new DetectionException("检测器异常"))

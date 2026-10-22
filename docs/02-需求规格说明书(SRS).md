@@ -135,8 +135,25 @@
   - `--max-files <N>`：历史提交的文件数软上限，按提交边界生效（当前提交可整批超过上限）；截断时报告 `truncated=true`、`next_since_sha=<最后完成的提交>` 与剩余提交数。`--since` / `--max-files` 同样隐含历史模式。
   - 历史选项仅能与 `--all` 组合；`--staged` / `--push` / `--all` 三选一，违反返回用法错误（退出码 7）。
 - **实现**：`GitGuard.Application.Scanning.ScanAllUseCase`（`GGD-0031`）；差异源为 `IGitAccess.GetFullTreeDiff` / `ListCommitShas` / `GetCommitDiffs`。
-- **v0.2 实现状态**：已实现（`GGD-0031`）；基线文件（FR-061）仍待 `GGD-0032`。
+- **v0.2 实现状态**：已实现（`GGD-0031`）。
 - **关联测试用例**：`TC-FR-060-01~04`（`ScanAllUseCaseTests` / `GitAccessFullScanTests` / `CliScanAllTests`）
+
+### 2.11.1 `FR-061` 基线文件
+
+- **描述**：把首次全量扫描确认的历史噪声指纹写入基线文件；后续全量扫描自动消费基线，对已登记指纹不再阻断，只保留为可追溯记录。
+- **输入**：`gitguard scan --all --baseline <path>`（生成基线）。`--baseline` 仅能与 `--all` 组合，路径为空或以 `-` 开头返回用法错误（退出码 7）。
+- **文件格式**：JSON，`schema = "gitguard.baseline.v1"`；默认路径为仓库根目录 `.gitguard-baseline.json`；`entries` 每项含 `fingerprint`（64 位小写十六进制）、`rule_id`、`file_path`、`severity`。指纹按字典序排序、重复指纹去重，保证生成结果确定。
+- **处理规则**：
+  - **生成**：`--baseline` 指定路径时，扫描完成后写入当前全部命中的指纹；本次命中的 Finding 仍按原策略阻断，不在生成当次抑制。
+  - **消费**：未指定 `--baseline` 的全量扫描（`scan --all` / 带历史参数）在默认文件存在时自动加载；自定义路径仅用于生成，后续运行只自动消费默认文件。
+  - **判定**：命中指纹在基线内 → 策略动作覆盖为 `Allow` 且 `IgnoredByBaseline = true`，报告 / 审计动作记为 `AllowedByBaseline`；允许清单优先，已由允许清单放行的命中不再标记为基线放行。
+  - **结果**：被抑制的 Finding 仍保留在报告与审计中（可追溯）；仅含基线抑制项时结果 `Warned`、退出码 0；存在其他阻断项时仍为 `Blocked`、退出码 1。
+  - **读取失败**：基线文件损坏、schema 不符或条目非法 → `BaselineException(BASELINE_INVALID)`，退出码 13（FailClosed，不静默忽略基线）。
+  - **写入失败**：基线路径不可写 → `BaselineException(BASELINE_WRITE_FAILED)`，退出码 31。
+  - **可移植性限制**：指纹为使用每用户本地盐的 HMAC-SHA256，基线文件不能跨机器 / 用户复用；换机后需重新生成。
+- **实现**：`GitGuard.Application.Scanning.BaselineFile` / `ScanAllUseCase`（`GGD-0032`）。
+- **v0.2 实现状态**：已实现（`GGD-0032`）。
+- **关联测试用例**：`TC-FR-061-01~05`（`BaselineUseCaseTests` / `CliScanBaselineTests` / `ExitCodeMapperTests`）
 
 ### 2.12 `FR-070` 配置文件
 
@@ -284,7 +301,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-042` | 3.4 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `CliScanCommandTests`（汇总行） | 已实现（配置文件白名单） |
 | `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | `TC-FR-060-01~04`（`ScanAllUseCaseTests` / `GitAccessFullScanTests` / `CliScanAllTests`） | 已实现（`GGD-0031`） |
-| `FR-061` | 3.6 | `模块设计/Cli.md` | 无 | 未实现（v0.2） |
+| `FR-061` | 3.6 | `模块设计/Cli.md` | `TC-FR-061-01~05`（`BaselineUseCaseTests` / `CliScanBaselineTests` / `ExitCodeMapperTests`） | 已实现（`GGD-0032`） |
 | `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~05`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` | 无 | 未实现（v0.2） |
@@ -318,3 +335,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.13 | 2026-10-22 | GGD-0030：§2.9 FR-040 标记已实现（`allowlist add/remove/list`、SQLite 持久化 + `AllowlistChanged` 审计事件、配置文件与 SQLite 条目合并参与扫描）；§8 追溯矩阵 FR-040 / FR-041 更新测试类与实现状态 |
 | 0.1.14 | 2026-10-22 | `GGD-0028` 取消，NFR-A-001 / A-002 / S-001 的跨平台 CI 与 Linux `strace` 描述改为「不再计划」；v0.1 性能与真实仓库验收由用户亲自执行 |
 | 0.1.15 | 2026-10-22 | GGD-0031：§2.11 FR-060 按实现重写（空树 HEAD 快照、历史枚举与提交归属、`--since` 不含起点语义、`--max-files` 提交边界软上限与 `next_since_sha` 续扫、空仓库 Clean）；§8 追溯矩阵 FR-060 更新测试类并标记已实现 |
+| 0.1.16 | 2026-10-22 | GGD-0032：新增 §2.11.1 FR-061 基线文件（schema / 默认路径、生成不抑制当次命中、默认自动消费、`AllowedByBaseline` 动作与 `Warned` 结果、允许清单优先级、13 / 31 错误码、本地盐不可移植限制）；§8 追溯矩阵 FR-061 更新测试类并标记已实现 |

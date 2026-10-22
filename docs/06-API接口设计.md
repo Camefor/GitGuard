@@ -59,7 +59,8 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
     "rules_evaluated": 17,
     "blocked": 0,
     "warned": 0,
-    "ignored_by_allowlist": 0
+    "ignored_by_allowlist": 0,
+    "ignored_by_baseline": 0
   },
   "skipped_files": [],
   "audit_write_failed": false,
@@ -70,6 +71,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 - `scan_type`：`PreCommit`（`--staged`）/ `PrePush`（`--push`）/ `Manual`（`--all`）。
 - `duration_ms`：无法计时时为 `null`。
 - `full_scan`：仅 `--all` 输出的可选对象 `{ include_history, commits_scanned, remaining_commits, truncated, next_since_sha }`。`commits_scanned` 不含 HEAD（HEAD 由全量树扫描覆盖）；`remaining_commits` 为因 `--max-files` 截断而剩余的提交数；`next_since_sha` 仅在 `truncated = true` 时非空，可直接传给下一次 `--all --since` 续扫。暂存区 / 推送扫描不输出该字段。
+- `baseline`：仅 `--all` 且涉及基线时输出的可选对象 `{ path, generated, entries, suppressed_findings }`（`GGD-0032`）。`generated = true` 表示本次通过 `--baseline` 生成文件（当次命中不抑制，`suppressed_findings = 0`）；`generated = false` 表示消费默认 `.gitguard-baseline.json`，此时 `suppressed_findings` 为被基线放行的命中数。`entries` 为基线条目数（按指纹去重）。
 - `skipped_files[]`：`{ path, reason: Binary|TooLarge, commit_sha }`（`commit_sha` 可为 `null`）。
 - `audit_write_failed`：审计落库降级标记（扫描结果仍有效，退出码不变）。
 - `warnings[]`：配置加载链的宽松解析警告（含未知键、顺延开关）。
@@ -98,7 +100,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 ```
 
 - `fingerprint`：64 位小写十六进制（HMAC-SHA256，无 `sha256:` 前缀）。
-- `action`：`Block` / `Warn` / `Allow` / `AllowedByAllowlist`（白名单命中）。
+- `action`：`Block` / `Warn` / `Allow` / `AllowedByAllowlist`（白名单命中）/ `AllowedByBaseline`（基线命中，`GGD-0032`）。白名单优先于基线：同时命中时输出 `AllowedByAllowlist`。
 - `commit_sha`：`--push` 与 `--all --include-history` / `--since` 扫描时为命中提交 SHA；HEAD 全量树与暂存区扫描为 `null`。
 
 ### 4.4 错误输出（JSON）
@@ -405,13 +407,14 @@ gitguard install --format json
   - `--include-history`：与 `--all` 同用，额外从 HEAD 向更早提交扫描历史差异；Finding 携带所属提交 `commit_sha`。
   - `--since <commit>`：与 `--all` 同用，从该提交的父提交继续向更早历史扫描（不含该提交本身），并隐含历史模式；通常传入上次报告的 `next_since_sha`。
   - `--max-files <N>`：与 `--all` 同用，历史文件数软上限（按提交边界生效，`N` 必须为正数）；隐含历史模式，截断时报告 `truncated` / `next_since_sha` / `remaining_commits`。
+  - `--baseline <path>`：与 `--all` 同用，扫描完成后把当前全部命中的指纹写入指定路径（`GGD-0032`）。生成当次命中的 Finding 仍按原策略阻断；后续未指定 `--baseline` 的全量扫描自动消费仓库根默认 `.gitguard-baseline.json`。`--staged` / `--push` 组合、路径为空或以 `-` 开头 → 退出码 7。
   - `--record-pending`（隐藏）：Hook 模式专用，只能与 `--staged` 同用（否则退出码 7）。扫描通过后记录待提交预测（父提交 + 暂存树）供 `post-commit` 比对；扫描阻断 / 失败时清理旧标记。标记写入失败仅产生警告，不阻断提交。
 - **`GITGUARD_SKIP=1`**：仅在 `--record-pending` 模式识别——跳过扫描、写入 `skipped` 标记、退出码 0（终端提示本次提交将登记为绕过事件）；手动 `scan --staged` 忽略该变量。
-- **范围校验**：`--staged` / `--push` / `--all` 三选一（缺失或同时给出 → 退出码 7）；历史选项仅能与 `--all` 组合，否则退出码 7；`--max-files` 非正数或 `--since` 为空、以 `-` 开头 → 退出码 7。
+- **范围校验**：`--staged` / `--push` / `--all` 三选一（缺失或同时给出 → 退出码 7）；历史选项与 `--baseline` 仅能与 `--all` 组合，否则退出码 7；`--max-files` 非正数或 `--since` / `--baseline` 为空、以 `-` 开头 → 退出码 7。
 - **输入**：Git 仓库 + 可选 stdin（`--push`）。
-- **输出**：扫描报告（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.2 / §4.3）；`--all` 的文本报告展示历史扫描进度与续扫提示，JSON 额外携带 `full_scan` 对象。
-- **退出码**：0 Clean/Warned；1 Blocked；2 非 Git 仓库；7 参数非法；10 Git 错误；11 检测器异常；12 超时；13 配置错误。
-- **关联 FR**：`FR-020, FR-030, FR-050, FR-060`。
+- **输出**：扫描报告（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.2 / §4.3）；`--all` 的文本报告展示历史扫描进度与续扫提示，JSON 额外携带 `full_scan` 对象；涉及基线时额外输出 `baseline` 对象，文本报告展示生成 / 消费状态与历史噪声条数。
+- **退出码**：0 Clean/Warned（含仅基线抑制）；1 Blocked；2 非 Git 仓库；7 参数非法；10 Git 错误；11 检测器异常；12 超时；13 配置错误 / 基线文件损坏或非法；14 审计库异常；31 基线写入失败。
+- **关联 FR**：`FR-020, FR-030, FR-050, FR-060, FR-061`。
 
 ### 5.5 `gitguard allowlist` — 白名单管理
 
@@ -505,16 +508,16 @@ gitguard install --format json
 | 10 | FailClosed | Git 命令失败 | 查看 `--verbose` 日志排查 Git 环境 |
 | 11 | FailClosed | 检测器异常 | 查看日志；配置可暂时禁用疑似规则 |
 | 12 | FailClosed | 扫描超时 | 调整 `.gitguard.yml` 中 `scan.timeout_ms` |
-| 13 | FailClosed | 配置文件解析失败 | 检查 YAML 语法与 `version` 字段 |
+| 13 | FailClosed | 配置文件解析失败，或基线文件读取 / 解析失败（`BASELINE_INVALID`） | 检查 YAML 语法与 `version` 字段；修复或重新生成基线文件 |
 | 14 | FailClosed | 审计库打开 / 迁移 / 读写失败（扫描内落库失败不适用：降级为 `audit_write_failed`，退出码不变） | 检查用户数据目录权限与磁盘空间 |
 | 20 | 参数 | 白名单参数校验失败 | 补齐 `--reason` 等参数 |
 | 21 | 参数 | 白名单条目不存在 | 用 `allowlist list` 确认 ID |
 | 30 | 查询 | run_id 不存在 | 用 `audit list` 列出有效 run_id |
-| 31 | 查询 | 审计导出失败 | 检查输出路径与权限 |
+| 31 | 查询 | 审计导出失败，或基线文件写入失败（`BASELINE_WRITE_FAILED`） | 检查输出路径与权限 |
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
-> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 / 40 仍为 v0.2 的 `audit view` / `rules` 命令预留（`ExitCodes` 已定义常量），对应命令未注册。退出码 31 已由 `audit export` 实际使用（`AUDIT_EXPORT_FAILED`）。
+> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 / 40 仍为 v0.2 的 `audit view` / `rules` 命令预留（`ExitCodes` 已定义常量），对应命令未注册。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。
 
 ## 7. 限流与配额
 
@@ -543,3 +546,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.5 | 2026-10-21 | GGD-0022：§4.8 落地 `audit list` 分页（上限 1000，`started_at DESC, rowid DESC`）；新增 §4.9 审计列表 / 导出 JSON Schema（`gitguard.audit.list.v1` / `gitguard.audit.export.v1` / `gitguard.audit.export.summary.v1`）与 CSV 转义 / 公式注入防护契约；§5.6 重写 `audit list` / `export` 选项、输出分流与退出码（7 / 14 / 31），`view` 保持 v0.2 预留；§6 退出码 31 转为已使用 |
 | 0.1.6 | 2026-10-22 | GGD-0030：§5.5 落地 `allowlist add` / `remove` / `list`（条件校验、分页、无仓库要求、SQLite 条目参与扫描合并、退出码 7 / 14 / 20 / 21）；新增 §4.10 白名单 JSON Schema（`gitguard.allowlist.add.v1` / `gitguard.allowlist.remove.v1` / `gitguard.allowlist.list.v1`）；§6 退出码 20 / 21 转为已使用 |
 | 0.1.7 | 2026-10-22 | GGD-0031：§4.2 新增 `--all` 的 `full_scan` 对象契约（`include_history` / `commits_scanned` / `remaining_commits` / `truncated` / `next_since_sha`）与 `scan_type = Manual`；§4.3 补充历史扫描 `commit_sha` 语义；§5.4 注册 `--all` / `--include-history` / `--since` / `--max-files` 并固化三选一与历史选项组合校验 |
+| 0.1.8 | 2026-10-22 | GGD-0032：§4.2 新增 `summary.ignored_by_baseline` 与可选 `baseline` 对象（`path` / `generated` / `entries` / `suppressed_findings`）；§4.3 动作枚举新增 `AllowedByBaseline` 并声明白名单优先级；§5.4 注册 `--baseline <path>` 及组合 / 路径校验，补充基线相关退出码 13 / 31；§6 退出码 13 / 31 场景扩展 |

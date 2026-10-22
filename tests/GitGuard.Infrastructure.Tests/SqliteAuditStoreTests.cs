@@ -151,19 +151,28 @@ public sealed class SqliteAuditStoreTests
     }
 
     [Fact]
-    public void SaveScanRun_Decisions_PersistActionNameOrAllowlistMarker()
+    public void SaveScanRun_Decisions_PersistActionNameOrIgnoreMarker()
     {
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
         var store = new SqliteAuditStore(dbPath);
         var blocked = CreateFinding(ruleId: "GGD/SECRET/AWS-AKID");
         var ignored = CreateFinding(ruleId: "GGD/SECRET/GITHUB-PAT");
+        var baselineIgnored = CreateFinding(ruleId: "GGD/SECRET/PRIVATE-KEY");
         var warned = CreateFinding(ruleId: "GGD/SECRET/SLACK-TOKEN");
-        var run = ScanRun.Create(directory.Root, ScanType.PreCommit, _sampleStartedAt, 12, ScanResult.Blocked, 1, new[] { blocked, ignored, warned });
+        var run = ScanRun.Create(
+            directory.Root,
+            ScanType.PreCommit,
+            _sampleStartedAt,
+            12,
+            ScanResult.Blocked,
+            1,
+            new[] { blocked, ignored, baselineIgnored, warned });
         var decisions = new Dictionary<Finding, PolicyDecision>
         {
             [blocked] = new PolicyDecision(PolicyAction.Block, false, Severity.Critical),
             [ignored] = new PolicyDecision(PolicyAction.Allow, true, Severity.Critical),
+            [baselineIgnored] = new PolicyDecision(PolicyAction.Allow, false, Severity.Critical, ignoredByBaseline: true),
             [warned] = new PolicyDecision(PolicyAction.Warn, false, Severity.Critical),
         };
 
@@ -171,7 +180,7 @@ public sealed class SqliteAuditStoreTests
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadStringColumn(connection, "SELECT action FROM findings ORDER BY rowid;")
-            .Should().Equal("Block", "AllowedByAllowlist", "Warn");
+            .Should().Equal("Block", "AllowedByAllowlist", "AllowedByBaseline", "Warn");
     }
 
     [Fact]

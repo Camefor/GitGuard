@@ -19,6 +19,7 @@ public sealed class ScanOutcome
     /// <param name="auditWriteFailed">审计写失败降级标记（Audit.md §4）。</param>
     /// <param name="ruleTimings">规则级耗时摘要（NFR-M-002）；<see langword="null"/> 表示本次扫描未启用采集。</param>
     /// <param name="fullScanSummary">全量扫描（FR-060）摘要；非全量扫描为 <see langword="null"/>。</param>
+    /// <param name="baselineSummary">基线（FR-061）摘要；未涉及基线时为 <see langword="null"/>。</param>
     /// <exception cref="ArgumentNullException">任一引用参数为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="filesScanned"/> 为负。</exception>
     public ScanOutcome(
@@ -28,7 +29,8 @@ public sealed class ScanOutcome
         IReadOnlyList<SkippedFile> skippedFiles,
         bool auditWriteFailed,
         IReadOnlyList<RuleTiming>? ruleTimings = null,
-        FullScanSummary? fullScanSummary = null)
+        FullScanSummary? fullScanSummary = null,
+        BaselineSummary? baselineSummary = null)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(decisions);
@@ -42,6 +44,7 @@ public sealed class ScanOutcome
         AuditWriteFailed = auditWriteFailed;
         RuleTimings = ruleTimings is null ? ImmutableArray<RuleTiming>.Empty : ruleTimings.ToImmutableArray();
         FullScanSummary = fullScanSummary;
+        BaselineSummary = baselineSummary;
     }
 
     /// <summary>扫描运行聚合（<c>Id</c> 即报告中的 <c>run_id</c>）。</summary>
@@ -73,4 +76,7 @@ public sealed class ScanOutcome
 
     /// <summary>全量扫描（FR-060）摘要；暂存区 / 推送扫描为 <see langword="null"/>。</summary>
     public FullScanSummary? FullScanSummary { get; }
+
+    /// <summary>基线（FR-061）摘要；未生成 / 未加载基线时为 <see langword="null"/>。</summary>
+    public BaselineSummary? BaselineSummary { get; }
 }

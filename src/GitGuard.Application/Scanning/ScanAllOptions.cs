@@ -18,4 +18,10 @@ public sealed record ScanAllOptions
 
     /// <summary>历史扫描的文件数软上限（按提交边界生效）；<see langword="null"/> 表示不限制。</summary>
     public int? MaxFiles { get; init; }
+
+    /// <summary>
+    /// 基线生成路径（<c>--baseline</c>）；<see langword="null"/> 表示不生成。
+    /// 生成模式只写入基线，不抑制本次命中；未指定时若仓库根存在默认基线文件则自动消费。
+    /// </summary>
+    public string? BaselinePath { get; init; }
 }

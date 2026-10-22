@@ -16,7 +16,8 @@ public interface IAuditStore
     /// <param name="run">扫描运行聚合（含 <see cref="ScanRun.Findings"/>）。</param>
     /// <param name="findingDecisions">
     /// 每条 Finding 的策略判定，用于写入 <c>findings.action</c> 列
-    /// （<see cref="PolicyDecision.IgnoredByAllowlist"/> 为 <see langword="true"/> 记 <c>AllowedByAllowlist</c>，否则记动作名）。
+    /// （<see cref="PolicyDecision.IgnoredByAllowlist"/> 为 <see langword="true"/> 记 <c>AllowedByAllowlist</c>；
+    /// <see cref="PolicyDecision.IgnoredByBaseline"/> 为 <see langword="true"/> 记 <c>AllowedByBaseline</c>；否则记动作名）。
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="run"/> 或 <paramref name="findingDecisions"/> 为 <see langword="null"/>。</exception>
     /// <exception cref="ArgumentException">存在未提供策略判定的 Finding。</exception>

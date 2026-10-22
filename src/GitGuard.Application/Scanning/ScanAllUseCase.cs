@@ -1,4 +1,5 @@
-﻿using GitGuard.Core.Abstractions;
+﻿using GitGuard.Core;
+using GitGuard.Core.Abstractions;
 using GitGuard.Core.Model;
 
 namespace GitGuard.Application.Scanning;
@@ -45,22 +46,47 @@ public sealed class ScanAllUseCase
             gitAccess, detectors, auditStore, clock, settings ?? ScanSettings.Default, policy, collectRuleTimings);
     }
 
-    /// <summary>执行全量扫描。</summary>
+    /// <summary>
+    /// 执行全量扫描。指定 <see cref="ScanAllOptions.BaselinePath"/> 时在扫描结束后写入基线（本次命中不抑制）；
+    /// 未指定时若仓库根存在默认基线文件 <c>.gitguard-baseline.json</c>，按指纹自动放行既有命中（FR-061）。
+    /// </summary>
     /// <param name="options">全量扫描选项；<see cref="ScanAllOptions.Since"/> 非空或 <see cref="ScanAllOptions.MaxFiles"/> 非空时自动启用历史模式。</param>
     /// <param name="cancellationToken">调用方取消令牌；外部取消原样上抛（CLI 映射退出码 12）。</param>
-    /// <returns>扫描结果（含 ScanRun 聚合、历史扫描摘要与规则耗时）。</returns>
+    /// <returns>扫描结果（含 ScanRun 聚合、历史扫描摘要、基线摘要与规则耗时）。</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> 为 <see langword="null"/>。</exception>
-    /// <exception cref="ArgumentException"><see cref="ScanAllOptions.Since"/> 为空、全空白或以 <c>-</c> 开头。</exception>
+    /// <exception cref="ArgumentException"><see cref="ScanAllOptions.Since"/> 或 <see cref="ScanAllOptions.BaselinePath"/> 为空、全空白或以 <c>-</c> 开头。</exception>
     /// <exception cref="ArgumentOutOfRangeException"><see cref="ScanAllOptions.MaxFiles"/> 不为正数。</exception>
-    public Task<ScanOutcome> ExecuteAsync(ScanAllOptions options, CancellationToken cancellationToken = default)
+    /// <exception cref="BaselineException">基线文件读取 / 解析失败（退出码 13）或写入失败（退出码 31）。</exception>
+    public async Task<ScanOutcome> ExecuteAsync(ScanAllOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
         ValidateOptions(options);
 
-        return _executor.RunAsync(ScanType.Manual, _ => AcquireInput(options), cancellationToken);
+        BaselineContext? baseline = CreateBaselineContext(options);
+        ScanOutcome outcome = await _executor
+            .RunAsync(ScanType.Manual, _ => AcquireInput(options), cancellationToken, baseline)
+            .ConfigureAwait(false);
+
+        // 生成模式：仅成功完成的扫描写基线；失败扫描不应把不完整结果固化为已知噪声
+        if (options.BaselinePath is not null && outcome.Result != ScanResult.Failed)
+        {
+            string path = ResolveBaselinePath(options.BaselinePath);
+            int entries = BaselineFile.Save(path, outcome.Findings);
+            return new ScanOutcome(
+                outcome.Run,
+                outcome.Decisions,
+                outcome.FilesScanned,
+                outcome.SkippedFiles,
+                outcome.AuditWriteFailed,
+                outcome.RuleTimings,
+                outcome.FullScanSummary,
+                new BaselineSummary(path, generated: true, entries, suppressedFindings: 0));
+        }
+
+        return outcome;
     }
 
-    /// <summary>校验选项：历史起点必须是合法修订标识，文件数上限必须为正数。</summary>
+    /// <summary>校验选项：历史起点 / 基线路径必须是合法值，文件数上限必须为正数。</summary>
     private static void ValidateOptions(ScanAllOptions options)
     {
         if (options.Since is { } since)
@@ -80,6 +106,60 @@ public sealed class ScanAllUseCase
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxFiles, nameof(options));
         }
+
+        if (options.BaselinePath is { } baselinePath)
+        {
+            if (string.IsNullOrWhiteSpace(baselinePath))
+            {
+                throw new ArgumentException("--baseline 不能为空或全空白。", nameof(options));
+            }
+
+            if (baselinePath.StartsWith('-'))
+            {
+                throw new ArgumentException("--baseline 不得以 '-' 开头。", nameof(options));
+            }
+        }
+    }
+
+    /// <summary>把命令行传入的基线路径解析为绝对路径；非法路径映射为基线写入失败（退出码 31）。</summary>
+    private static string ResolveBaselinePath(string path)
+    {
+        try
+        {
+            return Path.GetFullPath(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new BaselineException(
+                BaselineException.BASELINE_WRITE_FAILED,
+                $"基线文件路径非法：{path}（{ex.Message}）",
+                ex);
+        }
+    }
+
+    /// <summary>
+    /// 构造基线上下文：显式 <c>--baseline</c> 为生成模式；否则加载仓库根默认基线文件（若存在）作为消费模式。
+    /// </summary>
+    private BaselineContext? CreateBaselineContext(ScanAllOptions options)
+    {
+        if (options.BaselinePath is not null)
+        {
+            string generationPath = ResolveBaselinePath(options.BaselinePath);
+            return new BaselineContext(
+                generationPath,
+                generated: true,
+                entries: 0,
+                fingerprints: new HashSet<string>(StringComparer.Ordinal));
+        }
+
+        string defaultPath = BaselineFile.ResolveDefaultPath(_gitAccess.GetRepositoryRoot());
+        if (!File.Exists(defaultPath))
+        {
+            return null;
+        }
+
+        IReadOnlySet<string> fingerprints = BaselineFile.Load(defaultPath);
+        return new BaselineContext(defaultPath, generated: false, fingerprints.Count, fingerprints);
     }
 
     /// <summary>

@@ -402,7 +402,9 @@ public sealed class SqliteAuditStore : IAuditStore, IAllowlistStore
     }
 
     private static string ResolveFindingAction(PolicyDecision decision) =>
-        decision.IgnoredByAllowlist ? "AllowedByAllowlist" : decision.Action.ToString();
+        decision.IgnoredByAllowlist
+            ? "AllowedByAllowlist"
+            : decision.IgnoredByBaseline ? "AllowedByBaseline" : decision.Action.ToString();
 
     private static void InsertScanCompletedEvent(
         SqliteConnection connection,
