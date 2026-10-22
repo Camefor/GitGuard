@@ -24,7 +24,7 @@
 
 | 消费方 | 内容 |
 | --- | --- |
-| CLI `gitguard audit list/export`（`GGD-0022`；`view` 仍为 v0.2） | 分页查询结果 / 脱敏导出文件 |
+| CLI `gitguard audit list/view/export`（`GGD-0022` / `GGD-0036`） | 分页查询结果 / 单次运行摘要与 Finding 明细 / 脱敏导出文件 |
 | 桌面端（P3） | 同上，经 Application 层 |
 | 清理任务 | 按保留期删除旧数据 |
 
@@ -42,6 +42,7 @@
 | 导出原子性 | 同目录临时文件写完后再 `File.Move(overwrite)`；失败清理临时文件并抛 `AuditExportException`（CLI 退出码 31） |
 | CSV 防护 | UTF-8 BOM + CRLF；字段含 `,` / `"` / CR / LF 时按 RFC 4180 转义；以 `= + - @ \t \r` 开头时前置 `'` 防公式注入 |
 | 查询分页 | `started_at DESC, rowid DESC`；`--since` / `--result` 在 SQL 层筛选；`total` 为筛选后总数 |
+| 单次运行查询 | `FindScanRun(runId)` 按主键读回聚合与 Finding；不存在返回 `null`（CLI 映射 30 `AUDIT_RUN_NOT_FOUND`）；只读、不写事件；返回的 `snippet_masked` / 指纹保持脱敏形态（`GGD-0036`） |
 | 并发安全 | WAL 模式 + 短写锁；对 `BUSY` 做指数退避 3 次 |
 | 独立事件事务 | `PolicyOverride` / `FilePermissionFixed` / `FailClosed` 各自单事务写入；分类固定为 `Policy` / `Security` / `Error`（GGD-0015） |
 | 权限加固 | 打开审计库时加固数据目录（Unix `0700` / Windows 仅 CurrentUser）与 `audit.db` / WAL / SHM（Unix `0600`）；修复结果在同一次初始化中写入 `FilePermissionFixed`。指纹盐加载先于审计库时，修复记录暂存于组合根，待审计库可用后补写 |
@@ -127,6 +128,7 @@ sequenceDiagram
 sequenceDiagram
     participant CLI
     participant List as AuditListUseCase
+    participant View as AuditViewUseCase
     participant Export as AuditExportUseCase
     participant Store as SqliteAuditStore
     participant File as 输出文件
@@ -136,6 +138,11 @@ sequenceDiagram
     Store-->>List: AuditRunPage（total + 当前页）
     List-->>CLI: 摘要（文本 / JSON）
 
+    CLI->>View: Execute(runId)
+    View->>Store: FindScanRun(runId)
+    Store-->>View: ScanRun?（含 Finding）
+    View-->>CLI: 运行摘要 + Finding 明细（不存在返回 null）
+
     CLI->>Export: Execute(outputPath, format)
     Export->>Store: ListScanRunsForExport()
     Store-->>Export: ScanRun[]（含 Finding）
@@ -144,7 +151,7 @@ sequenceDiagram
     Export-->>CLI: AuditExportReport
 ```
 
-> 查询范围为整个审计库（所有仓库），只读且不要求当前目录是 Git 仓库；不触发配置加载与检测器装配。读取 / 写入失败分别映射退出码 14 / 31。原启动期清理流程顺延为 §6.5。
+> 查询范围为整个审计库（所有仓库），只读且不要求当前目录是 Git 仓库；不触发配置加载与检测器装配。`audit view` 查询不存在的运行返回 `null`，CLI 映射退出码 30；读取 / 写入失败分别映射退出码 14 / 31。原启动期清理流程顺延为 §6.5。
 
 ### 6.5 独立安全事件与启动期加固
 
@@ -206,6 +213,7 @@ flowchart LR
 - [ ] 清理阈值生效。
 - [x] `audit list` 分页、排序（`started_at DESC, rowid DESC`）与 `--since` / `--result` 筛选（GGD-0022：`SqliteAuditStoreQueryTests` + `CliAuditCommandTests`）。
 - [x] `audit export` 输出不含原文；JSON / CSV 脱敏字段、CSV 转义与公式注入防护、原子覆盖（GGD-0022：`AuditUseCaseTests` + `CliAuditCommandTests`）。
+- [x] `audit view` 按运行 ID 读回聚合与 Finding（含空 GUID 校验、未知 ID 返回 `null`）；输出保持脱敏；CLI 未知运行 → 30（GGD-0036：`AuditViewUseCaseTests` + `CliAuditCommandTests`）。
 - [x] `AuditExportException` → CLI 退出码 31（`ExitCodeMapperTests`）。
 - [x] `PolicyOverride` / `FilePermissionFixed` / `FailClosed` 分类与载荷落库、非法参数拒绝；FailClosed 不含原文（GGD-0015：`SqliteAuditStoreEventTests` / `AuditEventWiringTests`）。
 - [x] Unix `0644 → 0600`、目录 `0755 → 0700` 修复与事件；Windows 预置 Everyone Allow 后重置为仅 CurrentUser 并留痕（GGD-0015：`SqliteAuditStoreEventTests` / `FingerprintSaltStoreTests`）。
@@ -230,3 +238,4 @@ flowchart LR
 | 0.1.6 | 2026-10-21 | GGD-0022：§2.2 落地 `audit list/export`（`view` 保持 v0.2）；§3 新增导出原子性、CSV 防护与查询分页规则；§6.4 新增查询 / 导出流程（原清理流程顺延为 §6.5）；§9 勾选分页筛选、导出脱敏与退出码 31 测试；§10 导出格式更新为 JSON / CSV |
 | 0.1.7 | 2026-10-22 | GGD-0015：§2.1 输入补组合根三类安全事件；§3 新增独立事件事务、权限加固与 FailClosed 留痕规则；§6.5 新增安全事件 / 启动期加固流程（原清理顺延为 §6.6）；§9 勾选事件落库、Unix/Windows 权限修复与 V002 迁移测试 |
 | 0.1.8 | 2026-10-22 | GGD-0030：§2.1 输入改为白名单新增 / 删除用例；§3 新增白名单写事务规则（行与 `AllowlistChanged` 同事务、载荷字段、删除不存在不写事件、损坏行 FailClosed）；§9 勾选白名单持久化测试 |
+| 0.1.9 | 2026-10-22 | GGD-0036：§2.2 落地 `audit view`；§3 新增单次运行查询规则（`FindScanRun`、不存在返回 `null` → 30、只读脱敏）；§6.4 查询流程补 `AuditViewUseCase`；§9 勾选详情查询测试项 |

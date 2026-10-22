@@ -51,13 +51,13 @@ public static class ExitCodes
     /// <summary>参数错误：白名单条目不存在（<c>gitguard allowlist remove</c>）。</summary>
     public const int ALLOWLIST_NOT_FOUND = 21;
 
-    /// <summary>查询错误：run_id 不存在（v0.2 预留，<c>gitguard audit</c>）。</summary>
+    /// <summary>查询错误：run_id 不存在（<c>gitguard audit view</c>）。</summary>
     public const int AUDIT_RUN_NOT_FOUND = 30;
 
-    /// <summary>查询错误：审计导出失败（v0.2 预留）。</summary>
+    /// <summary>查询错误：审计导出失败（<c>gitguard audit export</c>）。</summary>
     public const int AUDIT_EXPORT_FAILED = 31;
 
-    /// <summary>查询错误：规则不存在（v0.2 预留，<c>gitguard rules</c>）。</summary>
+    /// <summary>查询错误：规则不存在（<c>gitguard rules view</c>）。</summary>
     public const int RULE_NOT_FOUND = 40;
 
     /// <summary>已有并发的 install / uninstall 持锁。</summary>

@@ -28,6 +28,7 @@ internal sealed class ReportWriter
     private const string VERSION_SCHEMA = "gitguard.version.v1";
     private const string BYPASS_SCHEMA = "gitguard.bypass.v1";
     private const string AUDIT_LIST_SCHEMA = "gitguard.audit.list.v1";
+    private const string AUDIT_VIEW_SCHEMA = "gitguard.audit.view.v1";
     private const string AUDIT_EXPORT_SUMMARY_SCHEMA = "gitguard.audit.export.summary.v1";
     private const string ALLOWLIST_ADD_SCHEMA = "gitguard.allowlist.add.v1";
     private const string ALLOWLIST_REMOVE_SCHEMA = "gitguard.allowlist.remove.v1";
@@ -333,6 +334,55 @@ internal sealed class ReportWriter
                     run.FindingCount,
                     duration,
                     run.RepoPath));
+        }
+    }
+
+    /// <summary>渲染单次审计运行详情（<c>06-API接口设计</c> §4.9；文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="run">扫描运行聚合（含 Finding 明细）。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="run"/> 为 <see langword="null"/>。</exception>
+    internal void WriteAuditView(ScanRun run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+
+        if (_json)
+        {
+            WriteAuditViewJson(run);
+            return;
+        }
+
+        _error.WriteLine(_text.Get(CliTextKey.AuditViewHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelRun), run.Id.ToString());
+        WriteIndented(_text.Get(CliTextKey.LabelRepo), run.RepoPath);
+        WriteIndented(_text.Get(CliTextKey.LabelType), ScanTypeText(run.ScanType));
+        WriteIndented(_text.Get(CliTextKey.LabelStartedAt), FormatAuditTimestamp(run.StartedAt));
+        string duration = run.DurationMs is { } durationMs
+            ? string.Create(CultureInfo.InvariantCulture, $"{durationMs}ms")
+            : _text.Get(CliTextKey.UnknownDuration);
+        WriteIndented(_text.Get(CliTextKey.LabelDuration), duration);
+        WriteIndented(_text.Get(CliTextKey.LabelResult), ScanResultText(run.Result));
+        WriteIndented(_text.Get(CliTextKey.LabelExitCode), run.ExitCode.ToString(CultureInfo.InvariantCulture));
+
+        if (run.Findings.IsEmpty)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelFindings), _text.Get(CliTextKey.AuditViewEmptyFindings));
+            return;
+        }
+
+        WriteIndented(_text.Get(CliTextKey.LabelFindings), run.Findings.Length.ToString(CultureInfo.InvariantCulture));
+        foreach (Finding finding in run.Findings)
+        {
+            string location = string.Create(
+                CultureInfo.InvariantCulture,
+                $"{finding.FilePath}:{finding.LineNumber}");
+            _error.WriteLine(string.Create(
+                CultureInfo.InvariantCulture,
+                $"    {finding.RuleId}  {location}  {finding.SnippetMasked.Value}"));
+            string commit = finding.CommitSha is { } sha
+                ? string.Create(CultureInfo.InvariantCulture, $"  commit={sha}")
+                : string.Empty;
+            _error.WriteLine(string.Create(
+                CultureInfo.InvariantCulture,
+                $"      severity={finding.Severity}  fingerprint={finding.Fingerprint.Hex}{commit}"));
         }
     }
 
@@ -1171,6 +1221,62 @@ internal sealed class ReportWriter
                 writer.WriteString("result", ScanResultText(run.Result));
                 writer.WriteNumber("exit_code", run.ExitCode);
                 writer.WriteNumber("findings_count", run.FindingCount);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteAuditViewJson(ScanRun run)
+    {
+        var buffer = new ArrayBufferWriter<byte>(1024);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", AUDIT_VIEW_SCHEMA);
+            writer.WriteStartObject("run");
+            writer.WriteString("run_id", run.Id.ToString());
+            writer.WriteString("repo_path", run.RepoPath);
+            writer.WriteString("scan_type", run.ScanType.ToString());
+            writer.WriteString("started_at", FormatAuditTimestamp(run.StartedAt));
+            if (run.DurationMs is { } duration)
+            {
+                writer.WriteNumber("duration_ms", duration);
+            }
+            else
+            {
+                writer.WriteNull("duration_ms");
+            }
+
+            writer.WriteString("result", ScanResultText(run.Result));
+            writer.WriteNumber("exit_code", run.ExitCode);
+            writer.WriteNumber("findings_count", run.Findings.Length);
+            writer.WriteEndObject();
+
+            writer.WriteStartArray("findings");
+            foreach (Finding finding in run.Findings)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("finding_id", finding.Id.ToString());
+                writer.WriteString("rule_id", finding.RuleId);
+                writer.WriteString("file_path", finding.FilePath);
+                writer.WriteNumber("line_number", finding.LineNumber);
+                writer.WriteString("severity", finding.Severity.ToString());
+                writer.WriteString("fingerprint", finding.Fingerprint.Hex);
+                writer.WriteString("snippet_masked", finding.SnippetMasked.Value);
+                if (finding.CommitSha is { } sha)
+                {
+                    writer.WriteString("commit_sha", sha);
+                }
+                else
+                {
+                    writer.WriteNull("commit_sha");
+                }
+
                 writer.WriteEndObject();
             }
 

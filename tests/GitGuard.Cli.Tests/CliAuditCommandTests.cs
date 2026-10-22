@@ -100,6 +100,118 @@ public sealed class CliAuditCommandTests
     }
 
     [Fact]
+    public async Task View_Json_ReportsRunAndFindingsWithoutSensitiveContent()
+    {
+        using var harness = new CliHarness();
+        string canary = CliHarness.CreateCanaryToken();
+        harness.WriteFile("config/app.env", $"aws_key={canary}\n");
+        harness.Stage("config/app.env");
+        (await harness.RunAsync("scan", "--staged")).Should().Be(ExitCodes.BLOCKED);
+        string runId = await GetLatestRunIdAsync(harness);
+
+        int outputOffset = harness.Output.Length;
+        int exitCode = await harness.RunAsync("audit", "view", runId, "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        using var document = JsonDocument.Parse(harness.Output[outputOffset..]);
+        JsonElement root = document.RootElement;
+        root.GetProperty("schema").GetString().Should().Be("gitguard.audit.view.v1");
+
+        JsonElement run = root.GetProperty("run");
+        run.GetProperty("run_id").GetString().Should().Be(runId);
+        run.GetProperty("repo_path").GetString().Should().Be(Path.TrimEndingDirectorySeparator(harness.Root));
+        run.GetProperty("scan_type").GetString().Should().Be("PreCommit");
+        run.GetProperty("started_at").GetString().Should().EndWith("Z");
+        run.GetProperty("duration_ms").ValueKind.Should().Be(JsonValueKind.Number);
+        run.GetProperty("result").GetString().Should().Be("Blocked");
+        run.GetProperty("exit_code").GetInt32().Should().Be(ExitCodes.BLOCKED);
+        run.GetProperty("findings_count").GetInt32().Should().Be(1);
+
+        JsonElement finding = root.GetProperty("findings").EnumerateArray().Single();
+        finding.EnumerateObject().Select(static property => property.Name).Should().BeEquivalentTo(
+            "finding_id",
+            "rule_id",
+            "file_path",
+            "line_number",
+            "severity",
+            "fingerprint",
+            "snippet_masked",
+            "commit_sha");
+        finding.GetProperty("rule_id").GetString().Should().Be("GGD/SECRET/AWS-AKID");
+        finding.GetProperty("file_path").GetString().Should().Be("config/app.env");
+        finding.GetProperty("line_number").GetInt32().Should().Be(1);
+        finding.GetProperty("severity").GetString().Should().Be("Critical");
+        finding.GetProperty("fingerprint").GetString().Should().HaveLength(64);
+        finding.GetProperty("snippet_masked").GetString().Should().NotBeNullOrWhiteSpace().And.NotContain(canary);
+        finding.GetProperty("commit_sha").ValueKind.Should().Be(JsonValueKind.Null);
+        harness.Output.Should().NotContain(canary, "审计详情不得回显密钥原文");
+    }
+
+    [Fact]
+    public async Task View_Text_RendersRunSummaryAndFindingLines()
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("config/app.env", $"aws_key={CliHarness.CreateCanaryToken()}\n");
+        harness.Stage("config/app.env");
+        (await harness.RunAsync("scan", "--staged")).Should().Be(ExitCodes.BLOCKED);
+        string runId = await GetLatestRunIdAsync(harness);
+
+        int outputOffset = harness.Output.Length;
+        int exitCode = await harness.RunAsync("audit", "view", runId);
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.Output[outputOffset..].Should().BeEmpty();
+        harness.Error.Should()
+            .Contain("GitGuard 审计运行详情")
+            .And.Contain(runId)
+            .And.Contain("pre-commit")
+            .And.Contain("Blocked")
+            .And.Contain("config/app.env:1")
+            .And.Contain("GGD/SECRET/AWS-AKID");
+    }
+
+    [Fact]
+    public async Task View_CleanRun_ReportsNoFindings()
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("notes.txt", "clean\n");
+        harness.Stage("notes.txt");
+        (await harness.RunAsync("scan", "--staged")).Should().Be(ExitCodes.SUCCESS);
+        string runId = await GetLatestRunIdAsync(harness);
+
+        (await harness.RunAsync("audit", "view", runId)).Should().Be(ExitCodes.SUCCESS);
+
+        harness.Error.Should().Contain("无（本次运行未记录发现项）");
+    }
+
+    [Fact]
+    public async Task View_UnknownRun_ReturnsAuditRunNotFound()
+    {
+        using var harness = new CliHarness(isRepository: false);
+
+        int exitCode = await harness.RunAsync("audit", "view", Guid.NewGuid().ToString());
+
+        exitCode.Should().Be(ExitCodes.AUDIT_RUN_NOT_FOUND);
+        harness.Output.Should().BeEmpty();
+        harness.Error.Should()
+            .Contain("审计运行不存在")
+            .And.Contain("AUDIT_RUN_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task View_InvalidRunId_ReturnsUsageError()
+    {
+        using var harness = new CliHarness(isRepository: false);
+
+        (await harness.RunAsync("audit", "view", "not-a-guid")).Should().Be(ExitCodes.USAGE_ERROR);
+        harness.Error.Should().Contain("GUID");
+        (await harness.RunAsync("audit", "view", "00000000-0000-0000-0000-000000000000"))
+            .Should().Be(ExitCodes.USAGE_ERROR);
+
+        harness.Output.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task InvalidAuditArguments_ReturnUsageError()
     {
         using var harness = new CliHarness(isRepository: false);
@@ -199,5 +311,14 @@ public sealed class CliAuditCommandTests
         exitCode.Should().Be(ExitCodes.AUDIT_EXPORT_FAILED);
         harness.Output.Should().BeEmpty();
         harness.Error.Should().Contain(AuditExportException.AUDIT_EXPORT_FAILED);
+    }
+
+    /// <summary>经 <c>audit list --format json</c> 读取最近一次运行的 ID（列表按开始时间倒序）。</summary>
+    private static async Task<string> GetLatestRunIdAsync(CliHarness harness)
+    {
+        (await harness.RunAsync("audit", "list", "--format", "json")).Should().Be(ExitCodes.SUCCESS);
+        using var document = JsonDocument.Parse(harness.Output);
+        return document.RootElement.GetProperty("runs")[0].GetProperty("run_id").GetString()
+            ?? throw new InvalidOperationException("审计列表缺少 run_id。");
     }
 }

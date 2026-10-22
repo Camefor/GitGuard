@@ -10,7 +10,8 @@ namespace GitGuard.Cli.Commands;
 
 /// <summary>
 /// <c>gitguard audit</c>（<c>06-API接口设计</c> §5.6 / FR-023）：本地审计查询与导出。
-/// <c>list</c> 支持分页、起始时间与结果筛选；<c>export</c> 把脱敏审计记录写入 JSON / CSV 文件。
+/// <c>list</c> 支持分页、起始时间与结果筛选；<c>view</c> 按运行 ID 展示摘要与 Finding 明细；
+/// <c>export</c> 把脱敏审计记录写入 JSON / CSV 文件。
 /// 查询范围为整个本地审计库（含所有仓库），命令本身不要求当前目录是 Git 仓库。
 /// </summary>
 internal static class AuditCommand
@@ -20,7 +21,7 @@ internal static class AuditCommand
 
     /// <summary>创建 <c>audit</c> 命令组。</summary>
     /// <param name="runtime">运行时上下文。</param>
-    /// <returns>已接线 <c>list</c> / <c>export</c> 子命令的命令组。</returns>
+    /// <returns>已接线 <c>list</c> / <c>view</c> / <c>export</c> 子命令的命令组。</returns>
     /// <exception cref="ArgumentNullException"><paramref name="runtime"/> 为 <see langword="null"/>。</exception>
     internal static Command Create(CliRuntime runtime)
     {
@@ -28,6 +29,7 @@ internal static class AuditCommand
 
         var command = new Command("audit", runtime.Text.Get(CliTextKey.AuditDescription));
         command.Subcommands.Add(CreateList(runtime));
+        command.Subcommands.Add(CreateView(runtime));
         command.Subcommands.Add(CreateExport(runtime));
         return command;
     }
@@ -61,6 +63,20 @@ internal static class AuditCommand
 
         command.SetAction(parseResult =>
             ExecuteList(runtime, parseResult, limitOption, offsetOption, sinceOption, resultOption));
+        return command;
+    }
+
+    private static Command CreateView(CliRuntime runtime)
+    {
+        var runIdArgument = new Argument<string>("run-id")
+        {
+            Description = runtime.Text.Get(CliTextKey.AuditRunIdArgumentDescription),
+        };
+
+        var command = new Command("view", runtime.Text.Get(CliTextKey.AuditViewDescription));
+        command.Arguments.Add(runIdArgument);
+
+        command.SetAction(parseResult => ExecuteView(runtime, parseResult, runIdArgument));
         return command;
     }
 
@@ -146,6 +162,53 @@ internal static class AuditCommand
             CliLogLevel.Information,
             "Audit.List",
             runtime.Text.Get(CliTextKey.LogAuditListed),
+            new LogFields { ExitCode = ExitCodes.SUCCESS, TraceId = runtime.TraceId });
+        return ExitCodes.SUCCESS;
+    }
+
+    private static int ExecuteView(
+        CliRuntime runtime,
+        ParseResult parseResult,
+        Argument<string> runIdArgument)
+    {
+        string? rawRunId = parseResult.GetValue(runIdArgument)?.Trim();
+        if (string.IsNullOrWhiteSpace(rawRunId))
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.AuditRunIdRequired));
+        }
+
+        if (!Guid.TryParse(rawRunId, out Guid runId) || runId == Guid.Empty)
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.AuditRunIdInvalid));
+        }
+
+        ScanRun? run = runtime.Session.CreateAuditView().Execute(runId);
+        if (run is null)
+        {
+            string message = runtime.Text.Format(CliTextKey.AuditRunNotFound, runId);
+            runtime.Writer.WriteError(
+                ExitCodes.AUDIT_RUN_NOT_FOUND,
+                ExitCodeMapper.AUDIT_RUN_NOT_FOUND,
+                message,
+                runtime.TraceId);
+            runtime.Logger.Log(
+                CliLogLevel.Warning,
+                "Audit.View",
+                message,
+                new LogFields
+                {
+                    ErrorCode = ExitCodeMapper.AUDIT_RUN_NOT_FOUND,
+                    ExitCode = ExitCodes.AUDIT_RUN_NOT_FOUND,
+                    TraceId = runtime.TraceId,
+                });
+            return ExitCodes.AUDIT_RUN_NOT_FOUND;
+        }
+
+        runtime.Writer.WriteAuditView(run);
+        runtime.Logger.Log(
+            CliLogLevel.Information,
+            "Audit.View",
+            runtime.Text.Get(CliTextKey.LogAuditViewed),
             new LogFields { ExitCode = ExitCodes.SUCCESS, TraceId = runtime.TraceId });
         return ExitCodes.SUCCESS;
     }

@@ -213,7 +213,9 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 
 ### 4.8 分页
 
-`gitguard audit list` 支持 `--limit N --offset M`：`N` 取值 1~1000（默认 20），`M` ≥ 0。结果排序固定为 `started_at DESC, rowid DESC`（同一毫秒内后写入者在前）；`--since` / `--result` 筛选与分页均在 SQLite 查询层完成，`total` 为筛选后的总数。`gitguard audit view` 尚未注册（v0.2，退出码 30 预留）。
+`gitguard audit list` 支持 `--limit N --offset M`：`N` 取值 1~1000（默认 20），`M` ≥ 0。结果排序固定为 `started_at DESC, rowid DESC`（同一毫秒内后写入者在前）；`--since` / `--result` 筛选与分页均在 SQLite 查询层完成，`total` 为筛选后的总数。
+
+`gitguard audit view <run-id>` 按运行身份标识读取单次运行摘要与 Finding 明细：`run-id` 必须为合法的非空 GUID（非法 → 退出码 7）；运行不存在 → 退出码 30（`AUDIT_RUN_NOT_FOUND`，输出 `gitguard.error.v1`）。查询范围同样为整个本地审计库。
 
 ### 4.9 审计查询与导出输出（JSON / CSV）
 
@@ -245,6 +247,40 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 - `scan_type` / `result`：`ScanType` / `ScanResult` 枚举名；`started_at` 为 UTC ISO 8601（毫秒 + `Z`）。
 - `duration_ms`：Bypass 等未记录耗时的运行为 `null`。
 - 查询范围为整个本地审计库（含所有仓库）；命令不要求当前目录是 Git 仓库。
+
+`gitguard audit view <run-id> --format json` 输出 `gitguard.audit.view.v1`（stdout 单行紧凑）：
+
+```json
+{
+  "schema": "gitguard.audit.view.v1",
+  "run": {
+    "run_id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c33",
+    "repo_path": "D:/work/my-project",
+    "scan_type": "PreCommit",
+    "started_at": "2026-10-21T08:00:00.000Z",
+    "duration_ms": 91,
+    "result": "Blocked",
+    "exit_code": 1,
+    "findings_count": 1
+  },
+  "findings": [
+    {
+      "finding_id": "0192f4a4-aec8-7e7b-8f0a-6b0e8b1d2c34",
+      "rule_id": "GGD/SECRET/AWS-AKID",
+      "file_path": "config/app.env",
+      "line_number": 1,
+      "severity": "Critical",
+      "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "snippet_masked": "AK****************42",
+      "commit_sha": null
+    }
+  ]
+}
+```
+
+- `run` 字段与 `gitguard.audit.list.v1` 的单行对象一致；`findings` 字段与导出文件中的 Finding 对象一致（只含脱敏片段与 HMAC 指纹）。
+- 无 Finding 的运行输出空 `findings` 数组；`commit_sha` 在 PreCommit / Manual 运行中为 `null`。
+- 文本模式下摘要与 Finding 明细写 stderr，不输出原文。
 
 `gitguard audit export --output <path>` 写出 `gitguard.audit.export.v1`（JSON）或 CSV；文件只包含 `snippet_masked` 与 HMAC 指纹，不包含原文：
 
@@ -490,11 +526,13 @@ gitguard install --format json
   - `export --output <path> [--format json|csv]`
     - `--output` 必填；相对路径按当前工作目录解析，`~` 展开为用户主目录。
     - 子命令后的局部 `--format` 表示**导出文件格式**（默认 `json`）；全局输出格式须置于 `export` 之前（如 `gitguard --format json audit export --output a.json`）。
-  - `view <run-id>`：尚未注册（v0.2，退出码 30 预留）。
+  - `view <run-id>`
+    - `<run-id>` 必填，必须为合法的非空 GUID（非法 / 空 GUID → 退出码 7）；运行不存在 → 退出码 30（`AUDIT_RUN_NOT_FOUND`）。
+    - 输出运行摘要（仓库 / 类型 / 开始时间 / 耗时 / 结果 / 退出码 / Finding 数）与 Finding 明细（规则 / 位置 / 脱敏片段 / 严重度 / 指纹 / 提交 SHA）。
 - **输入**：无（查询整个本地审计库，含所有仓库；不要求当前目录是 Git 仓库）。
-- **输出**：文本摘要 → stderr；`--format json` 时列表 / 导出摘要 → stdout（Schema 见 §4.9）；导出文件由用例直接写入 `--output`。
-- **脱敏**：导出与列表只包含 `snippet_masked` 与 HMAC 指纹，不恢复、不写入任何原文（DR-02）。
-- **退出码**：0 成功；7 参数非法；14 审计库读取失败；31 导出写入失败。
+- **输出**：文本摘要 → stderr；`--format json` 时列表 / 详情 / 导出摘要 → stdout（Schema 见 §4.9）；导出文件由用例直接写入 `--output`。
+- **脱敏**：列表、详情与导出只包含 `snippet_masked` 与 HMAC 指纹，不恢复、不写入任何原文（DR-02）。
+- **退出码**：0 成功；7 参数非法；14 审计库读取失败；30 运行不存在（`view`）；31 导出写入失败。
 - **关联需求**：SRS §4 审计导出接口；`DR-02`。
 
 ### 5.7 `gitguard rules` — 规则查看
@@ -565,7 +603,7 @@ gitguard install --format json
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
-> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 40 已由 `rules view` 实际使用（`GGD-0034`，`RULE_NOT_FOUND`）；退出码 30 仍为 v0.2 的 `audit view` 预留（`ExitCodes` 已定义常量）。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。
+> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 已由 `audit view` 实际使用（`GGD-0036`，`AUDIT_RUN_NOT_FOUND`）；退出码 40 已由 `rules view` 实际使用（`GGD-0034`，`RULE_NOT_FOUND`）。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。
 
 ## 7. 限流与配额
 
@@ -596,3 +634,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.7 | 2026-10-22 | GGD-0031：§4.2 新增 `--all` 的 `full_scan` 对象契约（`include_history` / `commits_scanned` / `remaining_commits` / `truncated` / `next_since_sha`）与 `scan_type = Manual`；§4.3 补充历史扫描 `commit_sha` 语义；§5.4 注册 `--all` / `--include-history` / `--since` / `--max-files` 并固化三选一与历史选项组合校验 |
 | 0.1.8 | 2026-10-22 | GGD-0032：§4.2 新增 `summary.ignored_by_baseline` 与可选 `baseline` 对象（`path` / `generated` / `entries` / `suppressed_findings`）；§4.3 动作枚举新增 `AllowedByBaseline` 并声明白名单优先级；§5.4 注册 `--baseline <path>` 及组合 / 路径校验，补充基线相关退出码 13 / 31；§6 退出码 13 / 31 场景扩展 |
 | 0.1.9 | 2026-10-22 | GGD-0034：§4.11 新增 `gitguard.rules.list.v1` / `gitguard.rules.view.v1` Schema（默认隐藏 `pattern`，`--show-pattern` 才输出）；§5.7 重写 `rules list` / `view` 选项、筛选与过滤语义、无仓库可用与退出码 7 / 40；§6 退出码 40 转为已使用 |
+| 0.1.10 | 2026-10-22 | GGD-0036：§4.8 注册 `audit view <run-id>`；§4.9 新增 `gitguard.audit.view.v1` Schema（`run` 对象 + `findings` 数组，字段与列表 / 导出一致）；§5.6 补充 `view` 选项、输出分流与退出码 7 / 14 / 30；§6 退出码 30 转为已使用 |

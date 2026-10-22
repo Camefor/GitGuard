@@ -88,7 +88,7 @@
 | 2 | `GGD-0033` | 内置规则扩充至 ≥40 条 | P1 | 4d |
 | 2 | `GGD-0034` | FR-080 自定义正则规则与 `gitguard rules` | P2 | 4d |
 | 2 | `GGD-0035` | FR-090 GitleaksAdapter（已完成） | P2 | 3d |
-| 2 | `GGD-0036` | `gitguard audit view <run-id>` | P2 | 2d |
+| 2 | `GGD-0036` | `gitguard audit view <run-id>`（已完成） | P2 | 2d |
 | 2 | `GGD-0037` | 误报治理指南与 v0.2 验收支撑 | P2 | 1d |
 
 阶段 3 任务待 v0.2 完成后再拆解登记。
@@ -144,3 +144,4 @@ flowchart LR
 | 0.1.11 | 2026-10-22 | GGD-0032：FR-061 基线文件落地（`gitguard.baseline.v1` / `--baseline` 生成 / 默认消费 / `AllowedByBaseline` / 13、31 错误码）；§2.2 交付物同步；新增 20 项测试，全量 1132 项通过（1123 通过 + 9 跳过） |
 | 0.1.12 | 2026-10-22 | GGD-0033：内置规则扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），每条规则夹具 ≥3 正 / ≥3 负 / 边界正反各 ≥1；§2.2 交付物与退出条件同步 |
 | 0.1.13 | 2026-10-22 | GGD-0035：GitleaksAdapter 提前落地（启动探测 / 逐文件暂存 / `detect --no-git` 报告映射 / `GLK/` 命名空间 / 跨引擎去重），§2.2 交付物、任务表与 M5 里程碑同步 |
+| 0.1.14 | 2026-10-22 | GGD-0036：`gitguard audit view <run-id>` 落地（单次运行摘要 + Finding 明细、文本 / JSON、退出码 7 / 30），§3 任务表标记完成 |

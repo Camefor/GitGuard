@@ -307,6 +307,11 @@ public sealed class GitGuardSession
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
     public AuditListUseCase CreateAuditList() => new AuditListUseCase(AuditStore);
 
+    /// <summary>装配审计运行详情用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的详情用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public AuditViewUseCase CreateAuditView() => new AuditViewUseCase(AuditStore);
+
     /// <summary>装配审计导出用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
     /// <returns>已接线的导出用例。</returns>
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>

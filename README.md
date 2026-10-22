@@ -6,7 +6,7 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发中，2026-10-22）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则与可选 Gitleaks 引擎已落地。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎与 `audit view` 已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -22,7 +22,7 @@
 - `gitguard scan --push`：推送范围扫描（覆盖范围内全部提交，一次批量取差异，Finding 带来源 commit SHA）
 - `gitguard scan --all`：HEAD 全量快照扫描；`--include-history` 扫描历史提交，`--max-files` 截断后可用 `--since` 续扫
 - 基线文件：`scan --all --baseline <path>` 生成 `gitguard.baseline.v1`，后续全量扫描自动消费 `.gitguard-baseline.json`，历史噪声不阻断但保留在报告中
-- `gitguard audit list` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）与脱敏 JSON / CSV 导出
+- `gitguard audit list` / `audit view` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）、单次运行摘要与 Finding 明细、脱敏 JSON / CSV 导出
 - `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
 - 40 条内置规则：Secret 16 / Privacy 9 / LocalPath 7 / Url 8（每条规则均含正反例夹具）
 - 自定义正则规则：`.gitguard.yml` 的 `rules.custom` 支持命名、严重度、上下文关键字与文件 glob；`gitguard rules list` / `view` 只读查看规则目录
@@ -33,7 +33,6 @@
 
 尚未实现（不影响核心试用）：
 
-- `audit view <run-id>` 单次运行明细（v0.2）
 - Avalonia 桌面端（v0.3）
 
 ## 快速开始（从源码构建）

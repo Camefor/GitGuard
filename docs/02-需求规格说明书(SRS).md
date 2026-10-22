@@ -232,7 +232,7 @@
 | --- | --- | --- | --- |
 | 对外（CLI） | `gitguard` 命令集 | 开发者与 Hook 调用 | 冷启动 < 150ms（Native AOT 目标），单命令 FailClosed 必须 < 配置超时 |
 | 对外（配置） | `.gitguard.yml` / 用户级 config | 规则与策略 | 解析失败 → FailClosed |
-| 对外（审计查询 / 导出） | `gitguard audit list` / `gitguard audit export --output <path> --format json/csv` | 用户事后分析 | 已实现（`GGD-0022`）：分页 / 时间 / 结果筛选，导出仅含脱敏片段与 HMAC 指纹；`audit view` 仍为 v0.2 |
+| 对外（审计查询 / 导出） | `gitguard audit list` / `gitguard audit view <run-id>` / `gitguard audit export --output <path> --format json/csv` | 用户事后分析 | 已实现（`GGD-0022` / `GGD-0036`）：分页 / 时间 / 结果筛选，单次运行摘要与 Finding 明细，导出仅含脱敏片段与 HMAC 指纹 |
 | 对内（Git） | `git diff --cached`、`git rev-list`、`git log --no-walk=unsorted --stdin` | 读取仓库差异 | 失败即 FailClosed |
 | 对内（可选） | `gitleaks` CLI | v0.2 秘密检测补强（`GGD-0035`） | 启动期缺失 / 不可执行 → 降级禁用，不阻断；扫描期执行失败 → FailClosed |
 
@@ -362,3 +362,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.17 | 2026-10-22 | GGD-0033：§2.5 FR-021 规则库扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），补四类检测器覆盖说明与夹具有效性要求；§8 追溯矩阵标记 40 条规则 |
 | 0.1.18 | 2026-10-22 | GGD-0034：新增 §2.12.2 FR-080 自定义正则规则（`rules.custom` 字段 / 校验 / 合并与启用语义、200ms 超时、超长行不跳过、`gitguard rules list/view` 与退出码 7 / 40）；§8 追溯矩阵标记已实现；§9 Q-02 记录命名捕获组决议 |
 | 0.1.19 | 2026-10-22 | GGD-0035：§2.12 更新 `use_gitleaks` / `gitleaks_path` 配置语义（空白路径 → 13，缺失可执行文件 → 告警降级）；§2.13 FR-090 按实现重写（启动探测、逐文件暂存、命令与退出码、GLK 映射、禁用规则过滤、跨引擎去重、FailClosed 与临时目录清理）；§4 可选依赖说明与 §8 追溯矩阵同步标记已实现 |
+| 0.1.20 | 2026-10-22 | GGD-0036：§4 审计接口补充 `gitguard audit view <run-id>`（单次运行摘要与 Finding 明细，脱敏输出，退出码 7 / 30）并标记已实现 |
