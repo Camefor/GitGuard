@@ -60,7 +60,10 @@ internal static class SqliteTestHelpers
         {
             if (File.Exists(path))
             {
-                builder.Append(Encoding.UTF8.GetString(File.ReadAllBytes(path)));
+                // 审计存储可能仍持有连接：共享读写打开，避免 Windows 文件锁导致读取失败
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                builder.Append(reader.ReadToEnd());
             }
         }
 

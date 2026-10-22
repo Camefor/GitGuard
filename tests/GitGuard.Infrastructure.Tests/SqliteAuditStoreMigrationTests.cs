@@ -44,7 +44,7 @@ public sealed class SqliteAuditStoreMigrationTests
     }
 
     [Fact]
-    public void Ctor_FreshDatabase_RecordsSchemaVersionOne()
+    public void Ctor_FreshDatabase_RecordsAllMigrationVersions()
     {
         using var directory = new TempDirectory();
         string dbPath = Path.Combine(directory.Root, "audit.db");
@@ -53,7 +53,7 @@ public sealed class SqliteAuditStoreMigrationTests
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadLongColumn(connection, "SELECT version FROM schema_version ORDER BY version;")
-            .Should().Equal(1L);
+            .Should().Equal(1L, 2L);
     }
 
     [Fact]
@@ -67,7 +67,35 @@ public sealed class SqliteAuditStoreMigrationTests
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadLongColumn(connection, "SELECT version FROM schema_version ORDER BY version;")
-            .Should().Equal(1L);
+            .Should().Equal(1L, 2L);
+    }
+
+    [Fact]
+    public void Ctor_V001Database_PreservesExistingAuditRowsAndSequence()
+    {
+        using var directory = new TempDirectory();
+        string dbPath = Path.Combine(directory.Root, "audit.db");
+        using (SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath))
+        {
+            ExecuteSql(connection, ReadMigrationScript("V001_initial_schema.sql"));
+            ExecuteSql(connection, "CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);");
+            ExecuteSql(connection, "INSERT INTO schema_version (version, applied_at) VALUES (1, 0);");
+            const string insertLegacyEvent =
+                "INSERT INTO audit_logs (occurred_at, category, event_type, payload_json) " +
+                "VALUES (1234567890, 'Scan', 'ScanCompleted', '{\"RunId\":\"legacy-run\"}');";
+            ExecuteSql(connection, insertLegacyEvent);
+        }
+
+        _ = CreateStore(dbPath);
+
+        using SqliteConnection reopened = SqliteTestHelpers.OpenRawConnection(dbPath);
+        SqliteTestHelpers.ReadLongColumn(reopened, "SELECT seq FROM audit_logs ORDER BY seq;").Should().Equal(1L);
+        SqliteTestHelpers.ReadScalarString(
+                reopened,
+                "SELECT category || '|' || event_type || '|' || payload_json FROM audit_logs WHERE seq = 1;")
+            .Should().Be("Scan|ScanCompleted|{\"RunId\":\"legacy-run\"}", "V002 重建 audit_logs 时必须保留既有行与自增序列");
+        SqliteTestHelpers.ReadLongColumn(reopened, "SELECT version FROM schema_version ORDER BY version;")
+            .Should().Equal(1L, 2L);
     }
 
     [Fact]
@@ -120,4 +148,22 @@ public sealed class SqliteAuditStoreMigrationTests
 
     private static SqliteAuditStore CreateStore(string databasePath, IReadOnlyList<TimeSpan>? busyRetryDelays = null) =>
         new SqliteAuditStore(databasePath, busyRetryDelays: busyRetryDelays);
+
+    private static string ReadMigrationScript(string fileName)
+    {
+        var assembly = typeof(SqliteAuditStore).Assembly;
+        string resourceName = assembly.GetManifestResourceNames()
+            .Single(name => name.EndsWith("." + fileName, StringComparison.Ordinal));
+        using Stream stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"内嵌迁移脚本缺失：{fileName}");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static void ExecuteSql(SqliteConnection connection, string sql)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
 }

@@ -159,6 +159,7 @@ internal enum CliTextKey
     LogAuditExported,
     LogCrashLogWritten,
     LogFileWriteFailed,
+    LogFailClosedAuditWriteFailed,
 
     // 提示行
     NoticeSkip,

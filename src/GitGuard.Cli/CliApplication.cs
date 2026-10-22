@@ -155,6 +155,17 @@ public static class CliApplication
             message,
             new LogFields { ErrorCode = errorCode, ExitCode = exitCode, TraceId = runtime.TraceId });
 
+        // 08-权限设计 §7：任何 FailClosed 退出（≥10）都尽力留痕；审计库不可用时只告警，不递归失败
+        if (exitCode >= ExitCodes.GIT_COMMAND_FAILED
+            && !runtime.Session.TryRecordFailClosed(exitCode, errorCode, message))
+        {
+            runtime.Logger.Log(
+                CliLogLevel.Warning,
+                "Audit",
+                runtime.Text.Format(CliTextKey.LogFailClosedAuditWriteFailed, exitCode),
+                new LogFields { ErrorCode = errorCode, ExitCode = exitCode, TraceId = runtime.TraceId });
+        }
+
         if (exitCode == ExitCodes.UNKNOWN_ERROR)
         {
             if (CrashLogWriter.TryWrite(runtime.Session, runtime.TraceId, exception) is { } crashLogPath)

@@ -2,6 +2,8 @@
 using GitGuard.Application.Configuration;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
+using GitGuard.Core.Model;
+using GitGuard.Core.Policy;
 using GitGuard.Core.Rules;
 using GitGuard.Detection.Detectors;
 using GitGuard.Detection.Rules;
@@ -32,7 +34,10 @@ internal static class DetectorAssembly
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(warnings);
 
-        IReadOnlyList<DetectionRule> rules = ApplyDisabledRules(BuiltinRuleLoader.LoadEmbedded(), config, warnings);
+        IReadOnlyList<DetectionRule> builtinRules = BuiltinRuleLoader.LoadEmbedded();
+        HashSet<string> disabledIds = CreateDisabledIdSet(config);
+        ImmutableArray<PolicyOverride> policyOverrides = CollectPolicyOverrides(builtinRules, config, disabledIds);
+        IReadOnlyList<DetectionRule> rules = ApplyDisabledRules(builtinRules, disabledIds, warnings);
 
         var detectors = ImmutableArray.CreateBuilder<IDetector>(4);
         if (config.Secrets.Enabled)
@@ -68,7 +73,47 @@ internal static class DetectorAssembly
                 "rules 的四个类别（secrets / privacy / local_path / url）全部被禁用：扫描将无任何检测能力，配置无效。");
         }
 
-        return new DetectorSet(detectors.ToImmutable(), CountEnabledRules(rules, config));
+        return new DetectorSet(detectors.ToImmutable(), CountEnabledRules(rules, config), policyOverrides);
+    }
+
+    /// <summary>
+    /// 计算相对默认策略的降级项（08-权限设计 §7 <c>PolicyOverride</c>）：
+    /// 严重度映射降级使用合成 ID <c>SEVERITY/&lt;Severity&gt;</c>；被禁用规则（含类别禁用）按规则 ID 记 <c>from → Allow</c>。
+    /// 仅记录实际收紧程度下降的项；未知 <c>disabled_rules</c> 由装配警告处理，不计入覆盖。
+    /// </summary>
+    private static ImmutableArray<PolicyOverride> CollectPolicyOverrides(
+        IReadOnlyList<DetectionRule> rules,
+        GitGuardConfig config,
+        HashSet<string> disabledIds)
+    {
+        var overrides = ImmutableArray.CreateBuilder<PolicyOverride>();
+
+        foreach (Severity severity in Enum.GetValues<Severity>())
+        {
+            PolicyAction defaultAction = SeverityPolicy.Default.ActionFor(severity);
+            PolicyAction effectiveAction = config.Policy.ActionFor(severity);
+            if (effectiveAction < defaultAction)
+            {
+                overrides.Add(new PolicyOverride($"SEVERITY/{severity}", defaultAction, effectiveAction));
+            }
+        }
+
+        foreach (DetectionRule rule in rules)
+        {
+            bool disabled = disabledIds.Contains(rule.RuleId) || !IsCategoryEnabled(CategoryOf(rule.RuleId), config);
+            if (!disabled)
+            {
+                continue;
+            }
+
+            PolicyAction effectiveAction = config.Policy.ActionFor(rule.Severity);
+            if (effectiveAction > PolicyAction.Allow)
+            {
+                overrides.Add(new PolicyOverride(rule.RuleId, effectiveAction, PolicyAction.Allow));
+            }
+        }
+
+        return overrides.ToImmutable();
     }
 
     /// <summary>统计实际交付检测器的规则数（类别启用且规则未禁用）。</summary>
@@ -88,9 +133,10 @@ internal static class DetectorAssembly
 
     private static bool IsCategoryEnabled(string category, GitGuardConfig config) => category switch
     {
+        // 规则 ID 的类别段与检测器 RULE_CATEGORY 常量一致：LOCALPATH 而非配置键 local_path
         "SECRET" => config.Secrets.Enabled,
         "PRIVACY" => config.Privacy.Enabled,
-        "LOCAL_PATH" => config.LocalPath.Enabled,
+        "LOCALPATH" => config.LocalPath.Enabled,
         "URL" => config.Url.Enabled,
         _ => false,
     };
@@ -106,15 +152,9 @@ internal static class DetectorAssembly
     /// <summary>把 <c>disabled_rules</c> 声明的规则重建为禁用规则（<see cref="DetectionRule"/> 不可变，无原位开关）。</summary>
     private static IReadOnlyList<DetectionRule> ApplyDisabledRules(
         IReadOnlyList<DetectionRule> rules,
-        GitGuardConfig config,
+        HashSet<string> disabledIds,
         ICollection<string> warnings)
     {
-        var disabledIds = new HashSet<string>(StringComparer.Ordinal);
-        CollectDisabledIds(disabledIds, config.Secrets.DisabledRules);
-        CollectDisabledIds(disabledIds, config.Privacy.DisabledRules);
-        CollectDisabledIds(disabledIds, config.LocalPath.DisabledRules);
-        CollectDisabledIds(disabledIds, config.Url.DisabledRules);
-
         if (disabledIds.Count == 0)
         {
             return rules;
@@ -137,6 +177,16 @@ internal static class DetectorAssembly
         }
 
         return rebuilt;
+    }
+
+    private static HashSet<string> CreateDisabledIdSet(GitGuardConfig config)
+    {
+        var disabledIds = new HashSet<string>(StringComparer.Ordinal);
+        CollectDisabledIds(disabledIds, config.Secrets.DisabledRules);
+        CollectDisabledIds(disabledIds, config.Privacy.DisabledRules);
+        CollectDisabledIds(disabledIds, config.LocalPath.DisabledRules);
+        CollectDisabledIds(disabledIds, config.Url.DisabledRules);
+        return disabledIds;
     }
 
     private static void CollectDisabledIds(HashSet<string> target, IReadOnlyList<string> disabledRules)
@@ -170,10 +220,15 @@ internal sealed record DetectorSet
     /// <summary>初始化装配结果。</summary>
     /// <param name="detectors">检测器列表。</param>
     /// <param name="rulesEvaluated">启用规则总数（类别启用且规则未禁用）。</param>
-    internal DetectorSet(ImmutableArray<IDetector> detectors, int rulesEvaluated)
+    /// <param name="policyOverrides">相对默认策略的降级项（供 PolicyOverride 审计事件）。</param>
+    internal DetectorSet(
+        ImmutableArray<IDetector> detectors,
+        int rulesEvaluated,
+        ImmutableArray<PolicyOverride> policyOverrides)
     {
         Detectors = detectors;
         RulesEvaluated = rulesEvaluated;
+        PolicyOverrides = policyOverrides;
     }
 
     /// <summary>检测器列表（FR-021 顺序：Secret → Privacy → LocalPath → Url）。</summary>
@@ -181,4 +236,7 @@ internal sealed record DetectorSet
 
     /// <summary>本次扫描参与评估的启用规则总数。</summary>
     internal int RulesEvaluated { get; }
+
+    /// <summary>相对默认策略的降级项（配置级；进程生命周期内不变）。</summary>
+    internal ImmutableArray<PolicyOverride> PolicyOverrides { get; }
 }

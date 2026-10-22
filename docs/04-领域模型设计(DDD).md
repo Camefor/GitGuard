@@ -91,6 +91,7 @@ flowchart LR
 | `ScanResult` | `Clean / Warned / Blocked / Failed` | 枚举 | `Failed ⇒ ExitCode ≥ 10` |
 | `PolicyAction` | `Allow / Warn / Block` | 枚举 | `Critical` 不允许映射为 `Allow`（硬下限，FR-022） |
 | `PolicyDecision` | `Action, IgnoredByAllowlist, Severity` | record | `IgnoredByAllowlist ⇒ Action = Allow`（FR-040） |
+| `PolicyOverride` | `RuleId, From, To` | record | `RuleId` 非空；`From` / `To` 为已定义枚举；`To < From`（仅记录实际降级；合成 ID 为 `SEVERITY/<Severity>`，GGD-0015） |
 | `RuleSource` | `Builtin / User / Gitleaks` | 枚举 | 记录规则来源，用于审计 |
 
 ## 5. 领域事件
@@ -102,8 +103,11 @@ flowchart LR
 | `HookInstalled` | `InstallHookUseCase` 成功 | `{ RepoPath, HookType, Version, HadLegacyHook }` | 审计 Sink |
 | `HookUninstalled` | `UninstallHookUseCase` 成功 | `{ RepoPath, HookType, RestoredLegacyHook }` | 审计 Sink |
 | `AllowlistChanged` | 白名单 Add / Remove | `{ EntryId, Action, RuleId?, PathPattern?, Fingerprint?, Reason }` | 审计 Sink |
+| `PolicyOverride` | 配置相对默认策略发生降级（严重度映射降级或规则 / 类别被禁用） | `{ RuleId, From, To }`；严重度降级用 `SEVERITY/<Severity>` 合成 ID（GGD-0015） | 审计 Sink |
+| `FilePermissionFixed` | 启动期修复了数据文件 / 目录权限 | `{ FilePath, PrevMode, NewMode }`；Unix 为八进制 mode，Windows 为 SDDL（GGD-0015） | 审计 Sink |
+| `FailClosed` | 任一 FailClosed 退出（退出码 ≥ 10） | `{ ExitCode, ErrorCode, MessageHash }`；仅保存脱敏消息的 SHA-256（GGD-0015） | 审计 Sink |
 
-> **实现约束**：事件总线 MVP 内不引入异步（本地单进程），直接调用 `IAuditStore` 同步落库。保留事件抽象是为桌面端二期做准备。
+> **实现约束**：事件总线 MVP 内不引入异步（本地单进程），直接调用 `IAuditStore` 同步落库。保留事件抽象是为桌面端二期做准备。`PolicyOverride` 由组合根在首次装配检测器时写入（同进程去重）；`FilePermissionFixed` 由审计库初始化与指纹盐加载产生；`FailClosed` 经 `GitGuardSession.TryRecordFailClosed` 尽力写入，审计库不可用时只返回失败，不递归触发新的 FailClosed。
 
 ## 6. 领域服务
 
@@ -193,6 +197,7 @@ flowchart LR
 | 白名单匹配器 | `AllowlistMatcher` | `GitGuard.Core.Policy` |
 | 策略动作 | `PolicyAction`（enum） | `GitGuard.Core.Policy` |
 | 策略判定 | `PolicyDecision`（record） | `GitGuard.Core.Policy` |
+| 策略降级 | `PolicyOverride`（record） | `GitGuard.Core.Model` |
 | 指纹器 | `Fingerprinter` | `GitGuard.Core.Services` |
 | 脱敏器 | `Masker` | `GitGuard.Core.Services` |
 | 脱敏流水线 | `SanitizingLogger` | `GitGuard.Core.Services` |
@@ -228,3 +233,4 @@ flowchart LR
 | 0.1.4 | 2026-10-16 | 与 GGD-0007 实现同步：`IClock` 抽象（`GitGuard.Core.Abstractions`）与 `SystemClock`（`GitGuard.Infrastructure.Time`）落地；`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`（白名单优先、过期条目不生效），§6 依赖列同步；术语表补「时钟抽象」 |
 | 0.1.5 | 2026-10-16 | 与 GGD-0008 实现同步：§3.4 修正重装语义为 upsert（`Replaced` 预留无写入方）、补备份文件名 / 路径 / UTC 约束；§6 `HookScriptBuilder` 更正为仅渲染 POSIX sh 分发脚本（撤销 PowerShell 变体），注明落地于 Application 层 |
 | 0.1.6 | 2026-10-21 | 与 GGD-0013 实现同步：§5 `BypassDetected` 载荷补 `Reason` 并区分 `GitGuardSkip` / `NoVerify`；§6 新增 `PendingScanRecorder` / `BypassDetectionService`；§7.6 展开 DR-06 预测身份、标记文件语义、判定矩阵与落库形态；§8 术语表补 `PendingScan` / `BypassReason` / `IPendingScanStore` 等 |
+| 0.1.7 | 2026-10-22 | 与 GGD-0015 实现同步：§4.2 新增 `PolicyOverride` 值对象及降级不变式；§5 补 `PolicyOverride` / `FilePermissionFixed` / `FailClosed` 三个领域事件与写入来源；§8 术语表补 `PolicyOverride` |

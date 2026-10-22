@@ -190,6 +190,7 @@ internal sealed class CliText
         CliTextKey.LogAuditExported => "审计记录导出完成",
         CliTextKey.LogCrashLogWritten => "已写入脱敏崩溃日志：{0}",
         CliTextKey.LogFileWriteFailed => "日志文件写入失败：{0}（已停用文件日志，本次运行仅输出终端日志）",
+        CliTextKey.LogFailClosedAuditWriteFailed => "FailClosed 审计事件写入失败（exit_code={0}），请检查审计库权限与可用性",
 
         CliTextKey.NoticeSkip => "GitGuard: GITGUARD_SKIP=1，已跳过暂存区扫描；本次提交将登记为绕过事件（DR-06）。",
         CliTextKey.PendingClearFailed => "待提交标记清理失败（{0}）：后续提交可能被误判为绕过事件。",
@@ -343,6 +344,7 @@ internal sealed class CliText
         CliTextKey.LogAuditExported => "Audit records exported",
         CliTextKey.LogCrashLogWritten => "Sanitized crash log written: {0}",
         CliTextKey.LogFileWriteFailed => "Failed to write log file: {0} (file logging disabled; only terminal logs for this run)",
+        CliTextKey.LogFailClosedAuditWriteFailed => "Failed to write FailClosed audit event (exit_code={0}); check audit database permissions and availability",
 
         CliTextKey.NoticeSkip => "GitGuard: GITGUARD_SKIP=1, staging-area scan skipped; this commit will be recorded as a bypass event (DR-06).",
         CliTextKey.PendingClearFailed => "Failed to clear the pending-commit marker ({0}): subsequent commits may be misidentified as bypass events.",

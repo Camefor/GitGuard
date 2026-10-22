@@ -217,6 +217,15 @@ internal sealed class RecordingAuditStore : IAuditStore
     internal List<(ScanRun Run, BypassReason Reason, string CommitSha)> SavedBypassEvents { get; } =
         new List<(ScanRun, BypassReason, string)>();
 
+    internal List<(string RuleId, PolicyAction From, PolicyAction To)> SavedPolicyOverrides { get; } =
+        new List<(string, PolicyAction, PolicyAction)>();
+
+    internal List<(string FilePath, string PreviousMode, string NewMode)> SavedPermissionFixes { get; } =
+        new List<(string, string, string)>();
+
+    internal List<(int ExitCode, string ErrorCode, string MessageHash)> SavedFailClosedEvents { get; } =
+        new List<(int, string, string)>();
+
     public void SaveScanRun(ScanRun run, IReadOnlyDictionary<Finding, PolicyDecision> findingDecisions)
     {
         SavedRuns.Add(run);
@@ -260,6 +269,15 @@ internal sealed class RecordingAuditStore : IAuditStore
 
     public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook) =>
         SavedHookUninstallations.Add((installation, restoredLegacyHook));
+
+    public void SavePolicyOverrideEvent(string ruleId, PolicyAction fromAction, PolicyAction toAction) =>
+        SavedPolicyOverrides.Add((ruleId, fromAction, toAction));
+
+    public void SaveFilePermissionFixedEvent(string filePath, string previousMode, string newMode) =>
+        SavedPermissionFixes.Add((filePath, previousMode, newMode));
+
+    public void SaveFailClosedEvent(int exitCode, string errorCode, string messageHash) =>
+        SavedFailClosedEvents.Add((exitCode, errorCode, messageHash));
 }
 
 /// <summary>测试用审计存储：写入必败，用于验证 AuditWriteFailed 降级路径（不改变扫描判定）。</summary>
@@ -285,6 +303,15 @@ internal sealed class FailingAuditStore : IAuditStore
         throw new SqliteException("审计写入失败（测试注入）。");
 
     public void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook) =>
+        throw new SqliteException("审计写入失败（测试注入）。");
+
+    public void SavePolicyOverrideEvent(string ruleId, PolicyAction fromAction, PolicyAction toAction) =>
+        throw new SqliteException("审计写入失败（测试注入）。");
+
+    public void SaveFilePermissionFixedEvent(string filePath, string previousMode, string newMode) =>
+        throw new SqliteException("审计写入失败（测试注入）。");
+
+    public void SaveFailClosedEvent(int exitCode, string errorCode, string messageHash) =>
         throw new SqliteException("审计写入失败（测试注入）。");
 }
 

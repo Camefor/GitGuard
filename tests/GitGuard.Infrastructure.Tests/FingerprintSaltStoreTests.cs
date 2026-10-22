@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using System.Runtime.Versioning;
+using FluentAssertions;
 using GitGuard.Core.Abstractions;
 using GitGuard.Core.Services;
 using GitGuard.Infrastructure.FileSystem;
@@ -95,6 +96,33 @@ public sealed class FingerprintSaltStoreTests
 
         File.GetUnixFileMode(saltPath)
             .Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite, "08-权限设计 §5.1：盐文件 0600");
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void LoadOrCreate_OnUnix_FixesBroadCacheDirectoryAndReturnsFix()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Unix mode 断言仅在 Unix 运行（08-权限设计 §5.1）");
+        }
+
+        using var directory = new TempDirectory();
+        string cachePath = Path.Combine(directory.Root, "cache");
+        Directory.CreateDirectory(cachePath);
+        const UnixFileMode broadMode =
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(cachePath, broadMode);
+
+        FingerprintSaltLoadResult result = new FingerprintSaltStore(
+            Path.Combine(cachePath, "fingerprint.salt"),
+            new DeterministicSecretRandom()).LoadOrCreate();
+
+        File.GetUnixFileMode(cachePath)
+            .Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, "08-权限设计 §5.1：缓存目录 0700");
+        result.PermissionFixes.Should().Contain(fix => fix.FilePath == cachePath && fix.NewMode == "0700");
     }
 
     [Fact]

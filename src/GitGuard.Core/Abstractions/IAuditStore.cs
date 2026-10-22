@@ -90,4 +90,39 @@ public interface IAuditStore
     /// <exception cref="ArgumentNullException"><paramref name="installation"/> 为 <see langword="null"/>。</exception>
     /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽），调用方按 FailClosed 处理。</exception>
     void SaveHookUninstallation(HookInstallation installation, bool restoredLegacyHook);
+
+    /// <summary>
+    /// 写入一条策略降级事件（08-权限设计 §7）：category = <c>Policy</c>，event_type = <c>PolicyOverride</c>，
+    /// 载荷 <c>{ RuleId, From, To }</c>。用于记录 <c>disabled_rules</c> 或严重度级策略相对默认值的降级。
+    /// </summary>
+    /// <param name="ruleId">规则 ID，或严重度级合成标识 <c>SEVERITY/&lt;Severity&gt;</c>。</param>
+    /// <param name="fromAction">降级前的动作。</param>
+    /// <param name="toAction">降级后的动作（必须比 <paramref name="fromAction"/> 更宽松）。</param>
+    /// <exception cref="ArgumentException"><paramref name="ruleId"/> 为空 / 全空白，或 <paramref name="toAction"/> 未比 <paramref name="fromAction"/> 更宽松。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">动作取值未定义。</exception>
+    /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽），调用方按 FailClosed 处理。</exception>
+    void SavePolicyOverrideEvent(string ruleId, PolicyAction fromAction, PolicyAction toAction);
+
+    /// <summary>
+    /// 写入一条文件权限修复事件（08-权限设计 §5 / §7）：category = <c>Security</c>，
+    /// event_type = <c>FilePermissionFixed</c>，载荷 <c>{ FilePath, PrevMode, NewMode }</c>。
+    /// </summary>
+    /// <param name="filePath">被修复的文件或目录路径。</param>
+    /// <param name="previousMode">修复前的权限表示（Unix 为八进制 mode，Windows 为 SDDL）。</param>
+    /// <param name="newMode">修复后的权限表示（Unix 为八进制 mode，Windows 为 SDDL）。</param>
+    /// <exception cref="ArgumentException">任一参数为空或全空白。</exception>
+    /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽）。</exception>
+    void SaveFilePermissionFixedEvent(string filePath, string previousMode, string newMode);
+
+    /// <summary>
+    /// 写入一条 FailClosed 退出事件（08-权限设计 §7 / 10-异常处理设计 §3）：category = <c>Error</c>，
+    /// event_type = <c>FailClosed</c>，载荷 <c>{ ExitCode, ErrorCode, MessageHash }</c>。
+    /// </summary>
+    /// <param name="exitCode">FailClosed 退出码（≥ 10）。</param>
+    /// <param name="errorCode">错误码（<c>ExitCodeMapper</c> 的稳定字符串）。</param>
+    /// <param name="messageHash">脱敏后错误消息的 SHA-256 小写十六进制摘要（64 字符）；原文不入库。</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="exitCode"/> 小于 10。</exception>
+    /// <exception cref="ArgumentException"><paramref name="errorCode"/> 为空 / 全空白，或 <paramref name="messageHash"/> 非 64 位十六进制。</exception>
+    /// <exception cref="SqliteException">写入失败（含 BUSY 重试耗尽）。</exception>
+    void SaveFailClosedEvent(int exitCode, string errorCode, string messageHash);
 }

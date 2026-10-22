@@ -18,6 +18,7 @@
 | `InstallHookUseCase` / `UninstallHookUseCase` | `HookInstallation` + `HookInstalled` / `HookUninstalled` 事件（卸载附 `RestoredLegacyHook`） |
 | `AllowlistUseCase` | `AllowlistEntry` 变更 |
 | `BypassDetectionService` | `ScanRun`（`ScanType.Bypass`）+ `BypassDetected` 事件（载荷含 `Reason`） |
+| `GitGuardSession` | `PolicyOverride`（配置降级）、`FilePermissionFixed`（启动期权限修复）、`FailClosed`（退出码 ≥ 10） |
 
 ### 2.2 输出
 
@@ -41,6 +42,9 @@
 | CSV 防护 | UTF-8 BOM + CRLF；字段含 `,` / `"` / CR / LF 时按 RFC 4180 转义；以 `= + - @ \t \r` 开头时前置 `'` 防公式注入 |
 | 查询分页 | `started_at DESC, rowid DESC`；`--since` / `--result` 在 SQL 层筛选；`total` 为筛选后总数 |
 | 并发安全 | WAL 模式 + 短写锁；对 `BUSY` 做指数退避 3 次 |
+| 独立事件事务 | `PolicyOverride` / `FilePermissionFixed` / `FailClosed` 各自单事务写入；分类固定为 `Policy` / `Security` / `Error`（GGD-0015） |
+| 权限加固 | 打开审计库时加固数据目录（Unix `0700` / Windows 仅 CurrentUser）与 `audit.db` / WAL / SHM（Unix `0600`）；修复结果在同一次初始化中写入 `FilePermissionFixed`。指纹盐加载先于审计库时，修复记录暂存于组合根，待审计库可用后补写 |
+| FailClosed 留痕 | `TryRecordFailClosed(exitCode, errorCode, message)` 只写 SHA-256 摘要；审计库不可用（SQLite / IO / 权限异常）返回 `false`，CLI 输出警告，不递归失败 |
 
 ## 4. 外部依赖
 
@@ -141,7 +145,28 @@ sequenceDiagram
 
 > 查询范围为整个审计库（所有仓库），只读且不要求当前目录是 Git 仓库；不触发配置加载与检测器装配。读取 / 写入失败分别映射退出码 14 / 31。原启动期清理流程顺延为 §6.5。
 
-### 6.5 启动期保留清理
+### 6.5 独立安全事件与启动期加固
+
+```mermaid
+sequenceDiagram
+    participant Session as GitGuardSession
+    participant Store as SqliteAuditStore
+    participant Salt as FingerprintSaltStore
+    participant DB
+
+    Session->>Store: new SqliteAuditStore(...)
+    Store->>Store: 加固数据目录 / audit.db / WAL / SHM
+    Store->>DB: INSERT audit_logs（Security/FilePermissionFixed，若有修复）
+    Session->>Salt: LoadOrCreate()
+    Salt-->>Session: 盐 + PermissionFixes（盐文件 / 缓存目录）
+    Session->>Store: SaveFilePermissionFixedEvent(...)（审计库已就绪时）
+    Session->>Store: SavePolicyOverrideEvent(...)（首次装配扫描用例，进程内去重）
+    Session->>Store: SaveFailClosedEvent(exitCode, errorCode, SHA256(message))
+```
+
+> 盐加载早于审计库创建时，修复记录暂存于 `GitGuardSession`，在 `CreateAuditStore()` 后统一补写。`PolicyOverride` 由 `DetectorAssembly` 计算：严重度映射低于默认值记 `SEVERITY/<Severity>`；被 `disabled_rules` 或类别禁用剔除的规则记 `<RuleId>` → `Allow`；未知禁用 ID 只产生配置警告、不写覆盖事件。
+
+### 6.6 启动期保留清理
 
 ```mermaid
 flowchart LR
@@ -180,7 +205,10 @@ flowchart LR
 - [x] `audit list` 分页、排序（`started_at DESC, rowid DESC`）与 `--since` / `--result` 筛选（GGD-0022：`SqliteAuditStoreQueryTests` + `CliAuditCommandTests`）。
 - [x] `audit export` 输出不含原文；JSON / CSV 脱敏字段、CSV 转义与公式注入防护、原子覆盖（GGD-0022：`AuditUseCaseTests` + `CliAuditCommandTests`）。
 - [x] `AuditExportException` → CLI 退出码 31（`ExitCodeMapperTests`）。
-- [ ] 迁移 V001 幂等执行。
+- [x] `PolicyOverride` / `FilePermissionFixed` / `FailClosed` 分类与载荷落库、非法参数拒绝；FailClosed 不含原文（GGD-0015：`SqliteAuditStoreEventTests` / `AuditEventWiringTests`）。
+- [x] Unix `0644 → 0600`、目录 `0755 → 0700` 修复与事件；Windows 预置 Everyone Allow 后重置为仅 CurrentUser 并留痕（GGD-0015：`SqliteAuditStoreEventTests` / `FingerprintSaltStoreTests`）。
+- [x] V001 → V002 迁移后既有审计行与 `seq` 保留；空库创建全部表 / 索引（`SqliteAuditStoreMigrationTests`）。
+- [ ] 迁移 V001 幂等执行（新建库路径已覆盖，历史库重放待补）。
 
 ## 10. 演进与扩展位
 
@@ -198,3 +226,4 @@ flowchart LR
 | 0.1.4 | 2026-10-18 | GGD-0012 文档回填：§2.2 标注 CLI `gitguard audit list/view/export` 为 v0.2 规划（`GGD-0022`），v0.1 无审计查询命令 |
 | 0.1.5 | 2026-10-21 | GGD-0013：§2.1 输入改为 `Bypass` 运行 + `BypassDetected` 事件；§3 新增绕过写事务规则；§6.3 新增写入流程（无 Finding、duration/summary 为 NULL、载荷含 Reason；原 Hook / 清理流程顺延为 §6.2 / §6.4）；§9 勾选绕过事件落库测试 |
 | 0.1.6 | 2026-10-21 | GGD-0022：§2.2 落地 `audit list/export`（`view` 保持 v0.2）；§3 新增导出原子性、CSV 防护与查询分页规则；§6.4 新增查询 / 导出流程（原清理流程顺延为 §6.5）；§9 勾选分页筛选、导出脱敏与退出码 31 测试；§10 导出格式更新为 JSON / CSV |
+| 0.1.7 | 2026-10-22 | GGD-0015：§2.1 输入补组合根三类安全事件；§3 新增独立事件事务、权限加固与 FailClosed 留痕规则；§6.5 新增安全事件 / 启动期加固流程（原清理顺延为 §6.6）；§9 勾选事件落库、Unix/Windows 权限修复与 V002 迁移测试 |

@@ -25,7 +25,7 @@
 | --- | --- |
 | Application UseCase | `PolicyDecision { Action, IgnoredByAllowlist, Severity }` |
 | CLI 层 | 最终退出码 |
-| Audit | `PolicyOverride` 事件（若用户降级规则） |
+| Audit | `PolicyOverride` 事件（配置相对默认策略发生降级；GGD-0015） |
 
 ## 3. 核心规则
 
@@ -33,7 +33,8 @@
 | --- | --- |
 | 默认映射 | `Critical → Block, High → Block, Medium → Warn, Low → Warn` |
 | 用户覆写 | 允许改映射，但 `Critical → Allow` 禁止（启动期拒绝） |
-| 禁用内置规则 | `enabled: false` 允许，但记录 `PolicyOverride` 审计 |
+| 禁用内置规则 | `enabled: false` 或类别 `enabled: false` 允许，但记录 `PolicyOverride` 审计（`<rule_id>`，`To = Allow`） |
+| 降级审计 | 严重度映射低于默认值（如 `high: warn`）记 `SEVERITY/<Severity>` 降级；仅记录实际降级，同进程只写一次；未知 `disabled_rules` ID 只告警、不写覆盖 |
 | 白名单匹配 | 对单条 Finding，命中任一 AllowlistEntry 即视作 ignored（但仍记录到报告） |
 | 排除匹配 | `exclude.paths` 以仓库相对路径匹配，`exclude.files` 以文件名在任意深度匹配；命中文件不进入扫描、不产生 Finding，也不计入 `skipped_files` |
 | 配置文件合并 | 项目级覆盖用户级；深度合并 map，列表则替换 |
@@ -178,6 +179,7 @@ allowlist:
 - [x] 未知字段：警告但不阻断（宽松解析；含未知顶层键与未知段落内键）。
 - [x] 未知 `version` 值：阻断（TC-FR-070-04）。
 - [x] 排除规则：`exclude.paths` 命中路径、`exclude.files` 命中任意深度文件名 → 不扫描且不产生 Finding；项目级按字段覆盖用户级；空白列表项 → 退出码 13（TC-FR-070-05）。
+- [x] 降级审计：`policy.high: warn` 与 `disabled_rules: [GGD/SECRET/AWS-AKID]` 首次装配各写一条 `PolicyOverride`，同 Session 多次装配不重复；本地路径规则不被误判为禁用（`AuditEventWiringTests`，GGD-0015）。
 
 ## 10. 演进与扩展位
 
@@ -193,3 +195,4 @@ allowlist:
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：`PolicyEvaluator` 落地于 `GitGuard.Core.Policy`——逐条 Finding 先查白名单（命中且未过期 → `Allow` + `IgnoredByAllowlist`），否则按 `SeverityPolicy` 映射；聚合规则：任一 `Block` → 退出码 1，仅 `Warn` → 退出码 0（§6.1 流程图同步为 `Allow + IgnoredByAllowlist`） |
 | 0.1.3 | 2026-10-16 | 与 GGD-0009 实现同步：FR-070 / FR-071 落地为 `GitGuard.Application.Configuration.GitGuardConfigLoader`（用户级 `~/.config/gitguard/config.yml` + 项目级 `.gitguard.yml`；深度合并：map 递归、列表整体替换；`version: 1` 必填；`policy.critical: allow` 硬下限；取值越界与 `use_gitleaks: true` FailClosed → 退出码 13）。新增宽松解析实现说明：反序列化忽略未知属性、由 YAML 语法树比对已知键产生警告（`warnings`）；白名单条目由配置声明时 `created_by` / `created_at` 取注入时钟与当前 OS 用户名。§9 勾选已覆盖项；§10 登记 `exclude` 消费顺延 |
 | 0.1.4 | 2026-10-21 | GGD-0019：`exclude` 接线——`GitGuardConfigLoader` 映射 `exclude.paths` / `exclude.files`（trim、空项 FailClosed），`ScanPolicy.IsExcluded` 基于 `GlobMatcher` 判定，`ScanExecutor` 在二进制 / 体积检查前静默丢弃命中文件（无 Finding、不计 `files_scanned`、不登记 `skipped_files`）；项目级按字段覆盖用户级。§3 新增排除规则，§7 补充排除语义，§9 增补 TC-FR-070-05，§10 移除顺延项 |
+| 0.1.5 | 2026-10-22 | GGD-0015：§2.2 / §3 落地 `PolicyOverride` 审计——严重度降级使用 `SEVERITY/<Severity>` 合成 ID、禁用规则记 `To = Allow`、同进程去重、未知 ID 不写事件；§9 增补降级审计用例 |

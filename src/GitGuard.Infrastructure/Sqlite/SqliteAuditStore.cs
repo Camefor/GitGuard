@@ -3,6 +3,7 @@ using System.Text.Json;
 using GitGuard.Core.Abstractions;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
+using GitGuard.Infrastructure.FileSystem;
 using Microsoft.Data.Sqlite;
 using GitGuardSqliteException = GitGuard.Core.SqliteException;
 using MsSqliteException = Microsoft.Data.Sqlite.SqliteException;
@@ -12,8 +13,8 @@ namespace GitGuard.Infrastructure.Sqlite;
 /// <summary>
 /// SQLite 审计存储（SAD §5 / 模块设计/Audit.md）：本地单文件审计库，WAL 模式、ScanRun 与 Findings 单事务写入、
 /// BUSY 指数退避重试（10-异常处理设计 §6：50ms / 100ms / 200ms，重试耗尽后 FailClosed）。
-/// 构造期执行一次 schema 迁移（<see cref="SchemaMigrator"/>）与文件加固：Unix 0600（08-权限设计 §5.1）、
-/// 符号链接路径拒绝（08-权限设计 §9）。
+/// 构造期执行一次 schema 迁移（<see cref="SchemaMigrator"/>）与文件加固：Unix 0700/0600（08-权限设计 §5.1）、
+/// Windows ACL 收紧（08 §5.2）、符号链接路径拒绝（08-权限设计 §9）。
 /// </summary>
 public sealed class SqliteAuditStore : IAuditStore
 {
@@ -187,6 +188,64 @@ public sealed class SqliteAuditStore : IAuditStore
         });
     }
 
+    /// <inheritdoc />
+    public void SavePolicyOverrideEvent(string ruleId, PolicyAction fromAction, PolicyAction toAction)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ruleId);
+        if (!Enum.IsDefined(fromAction))
+        {
+            throw new ArgumentOutOfRangeException(nameof(fromAction), fromAction, "未知的 PolicyAction 取值");
+        }
+
+        if (!Enum.IsDefined(toAction))
+        {
+            throw new ArgumentOutOfRangeException(nameof(toAction), toAction, "未知的 PolicyAction 取值");
+        }
+
+        if (toAction >= fromAction)
+        {
+            throw new ArgumentException("策略覆盖事件必须记录降级（toAction 必须比 fromAction 更宽松）。", nameof(toAction));
+        }
+
+        InsertStandaloneAuditEvent(
+            "写入策略覆盖事件",
+            "Policy",
+            "PolicyOverride",
+            BuildPolicyOverridePayload(ruleId, fromAction, toAction));
+    }
+
+    /// <inheritdoc />
+    public void SaveFilePermissionFixedEvent(string filePath, string previousMode, string newMode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(previousMode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newMode);
+
+        InsertStandaloneAuditEvent(
+            "写入文件权限修复事件",
+            "Security",
+            "FilePermissionFixed",
+            BuildFilePermissionFixedPayload(filePath, previousMode, newMode));
+    }
+
+    /// <inheritdoc />
+    public void SaveFailClosedEvent(int exitCode, string errorCode, string messageHash)
+    {
+        const int MIN_FAIL_CLOSED_EXIT_CODE = 10;
+        ArgumentOutOfRangeException.ThrowIfLessThan(exitCode, MIN_FAIL_CLOSED_EXIT_CODE, nameof(exitCode));
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
+        if (!IsSha256Hex(messageHash))
+        {
+            throw new ArgumentException($"消息摘要必须是 64 位十六进制 SHA-256：{messageHash}", nameof(messageHash));
+        }
+
+        InsertStandaloneAuditEvent(
+            "写入 FailClosed 事件",
+            "Error",
+            "FailClosed",
+            BuildFailClosedPayload(exitCode, errorCode, messageHash));
+    }
+
     private static TimeSpan[] ResolveBusyRetryDelays(IReadOnlyList<TimeSpan>? delays)
     {
         if (delays is null)
@@ -243,6 +302,10 @@ public sealed class SqliteAuditStore : IAuditStore
         value.Length is 40 or 64
         && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F');
 
+    private static bool IsSha256Hex(string value) =>
+        value.Length == 64
+        && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F');
+
     private static GitGuardSqliteException CreateSqliteException(string operation, MsSqliteException exception) =>
         new GitGuardSqliteException($"{operation}失败（SQLite 错误码 {exception.SqliteErrorCode}）：{exception.Message}", exception);
 
@@ -251,17 +314,6 @@ public sealed class SqliteAuditStore : IAuditStore
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode=WAL;";
         command.ExecuteScalar();
-    }
-
-    private static void SetOwnerOnlyMode(string path)
-    {
-        // 平台守卫置于方法内：CA1416 不做跨方法分析，调用方（Windows 早退）不足以使其识别
-        if (OperatingSystem.IsWindows() || !File.Exists(path))
-        {
-            return;
-        }
-
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
     private static void InsertFinding(SqliteConnection connection, SqliteTransaction transaction, Guid runId, Finding finding, PolicyDecision decision)
@@ -390,6 +442,51 @@ public sealed class SqliteAuditStore : IAuditStore
             writer.WriteString("CommitSha", commitSha);
             writer.WriteNumber("DetectedAt", run.StartedAt.ToUnixTimeMilliseconds());
             writer.WriteString("Reason", reason.ToString());
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static string BuildPolicyOverridePayload(string ruleId, PolicyAction from, PolicyAction to)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("RuleId", ruleId);
+            writer.WriteString("From", from.ToString());
+            writer.WriteString("To", to.ToString());
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static string BuildFilePermissionFixedPayload(string filePath, string previousMode, string newMode)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("FilePath", filePath);
+            writer.WriteString("PrevMode", previousMode);
+            writer.WriteString("NewMode", newMode);
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static string BuildFailClosedPayload(int exitCode, string errorCode, string messageHash)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("ExitCode", exitCode);
+            writer.WriteString("ErrorCode", errorCode);
+            writer.WriteString("MessageHash", messageHash);
             writer.WriteEndObject();
         }
 
@@ -609,26 +706,63 @@ public sealed class SqliteAuditStore : IAuditStore
 
     private void Initialize()
     {
+        var permissionFixes = new List<FilePermissionFix>();
+        HardenDataDirectory(permissionFixes);
+
         ExecuteWithBusyRetry("初始化审计数据库", connection =>
         {
             EnableWriteAheadLogging(connection);
             SchemaMigrator.Apply(connection);
         });
 
-        ApplyFilePermissions();
+        HardenDatabaseFiles(permissionFixes);
+        if (permissionFixes.Count > 0)
+        {
+            // 权限修复与初始化同源：单事务写入全部 FilePermissionFixed 事件，失败按审计写入失败处理
+            ExecuteWithBusyRetry("写入文件权限修复事件", connection =>
+            {
+                using SqliteTransaction transaction = connection.BeginTransaction();
+                DateTimeOffset occurredAt = DateTimeOffset.UtcNow;
+                foreach (FilePermissionFix fix in permissionFixes)
+                {
+                    InsertAuditEvent(
+                        connection,
+                        transaction,
+                        "Security",
+                        "FilePermissionFixed",
+                        BuildFilePermissionFixedPayload(fix.FilePath, fix.PreviousMode, fix.NewMode),
+                        occurredAt);
+                }
+
+                transaction.Commit();
+            });
+        }
     }
 
-    private void ApplyFilePermissions()
+    /// <summary>先收紧数据目录（08 §5.1/§5.2），使随后创建的 audit.db / WAL / SHM 继承受限 ACL。</summary>
+    private void HardenDataDirectory(List<FilePermissionFix> fixes)
     {
-        if (OperatingSystem.IsWindows())
+        string? directory = Path.GetDirectoryName(_databasePath);
+        if (string.IsNullOrEmpty(directory))
         {
-            // Windows ACL 加固（08-权限设计 §5.2）延后至 CLI 路径解析任务，见 AGENT-GUIDE GGD-0005 会话记录
             return;
         }
 
-        SetOwnerOnlyMode(_databasePath);
-        SetOwnerOnlyMode(_databasePath + "-wal");
-        SetOwnerOnlyMode(_databasePath + "-shm");
+        if (FilePermissionHardener.HardenDirectory(directory) is { } fix)
+        {
+            fixes.Add(fix);
+        }
+    }
+
+    private void HardenDatabaseFiles(List<FilePermissionFix> fixes)
+    {
+        foreach (string path in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        {
+            if (FilePermissionHardener.HardenFile(path) is { } fix)
+            {
+                fixes.Add(fix);
+            }
+        }
     }
 
     private void InsertScanRun(SqliteConnection connection, SqliteTransaction transaction, ScanRun run)
@@ -648,6 +782,14 @@ public sealed class SqliteAuditStore : IAuditStore
         command.Parameters.AddWithValue("$gitguard_version", _gitGuardVersion);
         command.ExecuteNonQuery();
     }
+
+    private void InsertStandaloneAuditEvent(string operation, string category, string eventType, string payloadJson) =>
+        ExecuteWithBusyRetry(operation, connection =>
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            InsertAuditEvent(connection, transaction, category, eventType, payloadJson, DateTimeOffset.UtcNow);
+            transaction.Commit();
+        });
 
     private SqliteConnection OpenConnection()
     {

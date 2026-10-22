@@ -1,5 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
@@ -7,6 +9,7 @@ using GitGuard.Application.Hooks;
 using GitGuard.Application.Scanning;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
+using GitGuard.Core.Model;
 using GitGuard.Core.Services;
 using GitGuard.Detection.Detectors;
 using GitGuard.Detection.Rules;
@@ -42,6 +45,11 @@ public sealed class GitGuardSession
 
     // 检测器装配期间填充（Lazy 的执行一次语义保证无并发写）
     private readonly List<string> _ruleWarnings = new List<string>();
+
+    // 指纹盐加载先于审计库创建时暂存权限修复，待 AuditStore 可用后补写 FilePermissionFixed 事件
+    private readonly List<FilePermissionFix> _pendingPermissionFixes = new List<FilePermissionFix>();
+
+    private bool _policyOverridesRecorded;
 
     /// <summary>初始化组合根。</summary>
     /// <param name="options">外部注入点（工作目录 / git 可执行文件 / 数据目录 / 版本）；<see langword="null"/> 取默认值。</param>
@@ -158,6 +166,35 @@ public sealed class GitGuardSession
         return version is null ? "0.0.0" : version.ToString();
     }
 
+    /// <summary>
+    /// 尽力记录一次 FailClosed 退出事件（08-权限设计 §7）：消息只保存 SHA-256 摘要，不落原文。
+    /// 审计库本身不可用时返回 <see langword="false"/>，由 CLI 输出警告，不递归触发新的 FailClosed。
+    /// </summary>
+    /// <param name="exitCode">FailClosed 退出码（≥ 10）。</param>
+    /// <param name="errorCode">错误码（<c>ExitCodeMapper</c> 的稳定字符串）。</param>
+    /// <param name="message">已脱敏的错误消息；原文不会写入审计库。</param>
+    /// <returns>写入成功返回 <see langword="true"/>；审计库不可用返回 <see langword="false"/>。</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="exitCode"/> 小于 10。</exception>
+    /// <exception cref="ArgumentException"><paramref name="errorCode"/> 为空或全空白。</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="message"/> 为 <see langword="null"/>。</exception>
+    public bool TryRecordFailClosed(int exitCode, string errorCode, string message)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(exitCode, 10, nameof(exitCode));
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
+        ArgumentNullException.ThrowIfNull(message);
+
+        try
+        {
+            string messageHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(message)));
+            AuditStore.SaveFailClosedEvent(exitCode, errorCode, messageHash);
+            return true;
+        }
+        catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>装配暂存区扫描用例（扫描设置与策略映射全部来自有效配置）。</summary>
     /// <param name="collectRuleTimings">是否采集规则级耗时（NFR-M-002，CLI <c>--verbose</c>）；<see langword="false"/> 时无计时开销。</param>
     /// <returns>已接线配置的暂存区扫描用例。</returns>
@@ -167,10 +204,13 @@ public sealed class GitGuardSession
     public ScanStagedUseCase CreateStagedScan(bool collectRuleTimings = false)
     {
         GitGuardConfig config = Config;
+        IAuditStore auditStore = AuditStore;
+        DetectorSet detectors = _detectors.Value;
+        RecordPolicyOverrides(auditStore, detectors.PolicyOverrides);
         return new ScanStagedUseCase(
             GitAccess,
-            _detectors.Value.Detectors,
-            AuditStore,
+            detectors.Detectors,
+            auditStore,
             _clock,
             config.Scan,
             BuildScanPolicy(config),
@@ -186,10 +226,13 @@ public sealed class GitGuardSession
     public ScanPushUseCase CreatePushScan(bool collectRuleTimings = false)
     {
         GitGuardConfig config = Config;
+        IAuditStore auditStore = AuditStore;
+        DetectorSet detectors = _detectors.Value;
+        RecordPolicyOverrides(auditStore, detectors.PolicyOverrides);
         return new ScanPushUseCase(
             GitAccess,
-            _detectors.Value.Detectors,
-            AuditStore,
+            detectors.Detectors,
+            auditStore,
             _clock,
             config.Scan,
             BuildScanPolicy(config),
@@ -240,18 +283,76 @@ public sealed class GitGuardSession
     private static ScanPolicy BuildScanPolicy(GitGuardConfig config) =>
         new ScanPolicy(config.Policy, config.Allowlist, config.ExcludePaths, config.ExcludeFiles);
 
+    private static void RecordPermissionFixes(IAuditStore store, IEnumerable<FilePermissionFix> fixes)
+    {
+        foreach (FilePermissionFix fix in fixes)
+        {
+            store.SaveFilePermissionFixedEvent(fix.FilePath, fix.PreviousMode, fix.NewMode);
+        }
+    }
+
     private GitGuardConfig LoadConfig() =>
         new GitGuardConfigLoader(_options.WorkingDirectory, _paths.UserConfigPath, _clock).Load();
 
     private GitAccess CreateGitAccess() => new GitAccess(_options.WorkingDirectory, _options.GitExecutable);
 
-    private SqliteAuditStore CreateAuditStore() => new SqliteAuditStore(_paths.AuditDatabasePath, Version);
+    private SqliteAuditStore CreateAuditStore()
+    {
+        var store = new SqliteAuditStore(_paths.AuditDatabasePath, Version);
+        FlushPendingPermissionFixes(store);
+        return store;
+    }
 
     private FilePendingScanStore CreatePendingScanStore() =>
         new FilePendingScanStore(Path.Combine(GitAccess.GetGitDirectory(), "gitguard"));
 
-    private FingerprintSaltLoadResult CreateSalt() =>
-        new FingerprintSaltStore(_paths.FingerprintSaltPath, _secretRandom).LoadOrCreate();
+    private FingerprintSaltLoadResult CreateSalt()
+    {
+        FingerprintSaltLoadResult result = new FingerprintSaltStore(_paths.FingerprintSaltPath, _secretRandom).LoadOrCreate();
+        if (result.PermissionFixes.IsEmpty)
+        {
+            return result;
+        }
+
+        if (_auditStore.IsValueCreated)
+        {
+            RecordPermissionFixes(_auditStore.Value, result.PermissionFixes);
+        }
+        else
+        {
+            _pendingPermissionFixes.AddRange(result.PermissionFixes);
+        }
+
+        return result;
+    }
+
+    /// <summary>把指纹盐 / 缓存目录的权限修复补写到审计库（审计库创建晚于盐加载时使用）。</summary>
+    private void FlushPendingPermissionFixes(IAuditStore store)
+    {
+        if (_pendingPermissionFixes.Count == 0)
+        {
+            return;
+        }
+
+        RecordPermissionFixes(store, _pendingPermissionFixes);
+        _pendingPermissionFixes.Clear();
+    }
+
+    /// <summary>记录配置相对默认策略的降级项；同一 Session 只写一次，避免同进程多次装配产生重复事件。</summary>
+    private void RecordPolicyOverrides(IAuditStore store, ImmutableArray<PolicyOverride> overrides)
+    {
+        if (_policyOverridesRecorded)
+        {
+            return;
+        }
+
+        foreach (PolicyOverride policyOverride in overrides)
+        {
+            store.SavePolicyOverrideEvent(policyOverride.RuleId, policyOverride.From, policyOverride.To);
+        }
+
+        _policyOverridesRecorded = true;
+    }
 
     private DetectorSet CreateDetectors()
     {
