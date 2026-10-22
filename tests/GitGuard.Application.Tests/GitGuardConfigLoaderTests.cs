@@ -4,6 +4,7 @@ using GitGuard.Application.Scanning;
 using GitGuard.Core;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
+using GitGuard.Core.Rules;
 
 namespace GitGuard.Application.Tests;
 
@@ -406,6 +407,147 @@ public sealed class GitGuardConfigLoaderTests
         Action act = () => CreateLoader(project.Root).Load();
 
         act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("rules.*.disabled_rules");
+    }
+
+    [Fact]
+    public void Load_CustomRules_CompilesWithUserSourceAndPatternMetadata()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            rules:
+              custom:
+                - id: USR/SECRET/INTERNAL-TOKEN
+                  name: 内部令牌
+                  severity: high
+                  pattern: "INT-[A-Z0-9]{8}"
+                  context_keywords:
+                    - token
+                  file_path_globs:
+                    - "src/**"
+                  enabled: true
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        DetectionRule rule = config.CustomRules.Should().ContainSingle().Subject;
+        rule.RuleId.Should().Be("USR/SECRET/INTERNAL-TOKEN");
+        rule.Name.Should().Be("内部令牌");
+        rule.Severity.Should().Be(Severity.High);
+        rule.Source.Should().Be(RuleSource.User);
+        rule.Enabled.Should().BeTrue();
+        rule.Pattern.ContextKeywords.Should().ContainSingle().Which.Should().Be("token");
+        rule.Pattern.FilePathGlobs.Should().ContainSingle().Which.Should().Be("src/**");
+        rule.Pattern.Regex.IsMatch("INT-ABCDEFGH").Should().BeTrue();
+        config.Warnings.Should().BeEmpty("rules.custom 的全部字段均为已知配置项");
+    }
+
+    [Fact]
+    public void Load_ProjectCustomRules_ReplaceUserLevelList()
+    {
+        using var project = new TempDirectory();
+        string userConfigPath = Path.Combine(project.Root, "user-config.yml");
+        const string userYaml = """
+            version: 1
+            rules:
+              custom:
+                - id: USR/SECRET/USER-RULE
+                  name: 用户级规则
+                  severity: low
+                  pattern: "USER-[0-9]{4}"
+            """;
+        const string projectYaml = """
+            version: 1
+            rules:
+              custom:
+                - id: USR/SECRET/PROJECT-RULE
+                  name: 项目级规则
+                  severity: medium
+                  pattern: "PROJECT-[0-9]{4}"
+            """;
+        File.WriteAllText(userConfigPath, userYaml);
+        File.WriteAllText(ProjectConfigPath(project), projectYaml);
+
+        GitGuardConfig config = CreateLoader(project.Root, userConfigPath).Load();
+
+        config.CustomRules.Should().ContainSingle()
+            .Which.RuleId.Should().Be("USR/SECRET/PROJECT-RULE", "列表字段整体替换，项目级声明即接管用户级");
+    }
+
+    [Theory]
+    [InlineData("GGD/SECRET/INTERNAL-TOKEN", "High", "INT-[0-9]{4}", "必须以 USR/ 开头")]
+    [InlineData("USR/OTHER/INTERNAL-TOKEN", "High", "INT-[0-9]{4}", "类别不受支持")]
+    [InlineData("USR/SECRET/internal-token", "High", "INT-[0-9]{4}", "命名契约")]
+    [InlineData("USR/SECRET/INTERNAL-TOKEN", "Severe", "INT-[0-9]{4}", "severity 非法")]
+    [InlineData("USR/SECRET/INTERNAL-TOKEN", "High", "[", "校验失败")]
+    public void Load_InvalidCustomRule_FailsClosed(
+        string ruleId,
+        string severity,
+        string pattern,
+        string expectedMessage)
+    {
+        using var project = new TempDirectory();
+        string yaml = $"""
+            version: 1
+            rules:
+              custom:
+                - id: {ruleId}
+                  name: 内部规则
+                  severity: {severity}
+                  pattern: "{pattern}"
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        Action act = () => CreateLoader(project.Root).Load();
+
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain(expectedMessage);
+    }
+
+    [Fact]
+    public void Load_DuplicateCustomRuleIds_FailsClosed()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            rules:
+              custom:
+                - id: USR/SECRET/INTERNAL-TOKEN
+                  name: 第一条
+                  severity: high
+                  pattern: "INT-[0-9]{4}"
+                - id: USR/SECRET/INTERNAL-TOKEN
+                  name: 第二条
+                  severity: low
+                  pattern: "INT-[A-Z]{4}"
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        Action act = () => CreateLoader(project.Root).Load();
+
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("规则 ID 重复");
+    }
+
+    [Fact]
+    public void Load_CustomRuleWithBlankContextKeyword_FailsClosed()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            rules:
+              custom:
+                - id: USR/SECRET/INTERNAL-TOKEN
+                  name: 内部规则
+                  severity: high
+                  pattern: "INT-[0-9]{4}"
+                  context_keywords:
+                    - "  "
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        Action act = () => CreateLoader(project.Root).Load();
+
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("context_keywords");
     }
 
     private static string ProjectConfigPath(TempDirectory project) =>

@@ -114,7 +114,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | `FR-061` | 基线文件生成与消费 | P2 | 3.6 | 基线以指纹为单位；用户修改后触发警告 | 已实现（GGD-0032：`--baseline` 生成、默认自动消费、`AllowedByBaseline` 放行、13 / 31 错误码） |
 | `FR-070` | 配置：`.gitguard.yml` 项目级 | P0 | 全部 | 支持规则开关、严重度覆写、exclude 路径 | 已实现（`GGD-0019`：`exclude.paths` 匹配仓库相对路径、`exclude.files` 匹配任意深度文件名） |
 | `FR-071` | 配置：用户级 `~/.config/gitguard/config.yml` | P1 | 全部 | 项目级覆盖用户级 | 已实现（GGD-0009） |
-| `FR-080` | 自定义正则规则 | P2 | 3.2 | 支持命名、严重度、上下文过滤 | 未实现（v0.2） |
+| `FR-080` | 自定义正则规则 | P2 | 3.2 | 支持命名、严重度、上下文过滤 | 已实现（GGD-0034：`rules.custom` + `gitguard rules list/view`，USR 规则参与四类检测与策略） |
 | `FR-090` | GitleaksAdapter | P2 | 3.2 | 通过 `IDetector` 接入；可独立开关；无 Gitleaks 时降级不报错 | 未实现（v0.2；`use_gitleaks: true` → 退出码 13） |
 | `FR-100` | Avalonia 桌面端 | P3 | 全部 | 风险列表、规则管理、安装状态查看、多仓库 | 未实现（v0.3） |
 
@@ -173,3 +173,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.8 | 2026-10-22 | GGD-0031：§3.6 / §4 FR-060 标记已实现（HEAD 全量树、`--include-history`、`--since` 续扫、`--max-files` 提交边界截断与 `next_since_sha`）；§4 状态列更名为「实现状态」并同步 FR-040 / FR-041 的 GGD-0030 落地状态 |
 | 0.1.9 | 2026-10-22 | GGD-0032：§3.6 主流程更新为生成当次不抑制、后续默认自动消费；§4 FR-061 标记已实现（基线 schema、`AllowedByBaseline`、13 / 31 错误码、本地盐不可移植） |
 | 0.1.10 | 2026-10-22 | GGD-0033：§4 FR-021 实现状态更新为 40 条内置规则（Secret 16 / Privacy 9 / LocalPath 7 / Url 8） |
+| 0.1.11 | 2026-10-22 | GGD-0034：§4 FR-080 标记已实现（`rules.custom` 自定义规则、USR 前缀与加载期校验、上下文 / 文件 glob 过滤、`gitguard rules list/view`） |

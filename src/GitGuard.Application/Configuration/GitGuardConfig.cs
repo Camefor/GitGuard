@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using GitGuard.Application.Scanning;
 using GitGuard.Core.Policy;
+using GitGuard.Core.Rules;
 using GitGuard.Infrastructure.FileSystem;
 
 namespace GitGuard.Application.Configuration;
@@ -120,6 +121,12 @@ public sealed record GitGuardConfig
 
     /// <summary>排除的文件名 glob（<c>exclude.files</c>，匹配任意目录下的文件名）；命中文件不进入扫描。</summary>
     public ImmutableArray<string> ExcludeFiles { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>
+    /// 项目配置声明的自定义规则（<c>rules.custom</c>，FR-080）：已编译并以 <see cref="RuleSource.User"/> 标注，
+    /// 与内置规则一同交给四类检测器；正则编译失败或 ID / 严重度非法在加载期 FailClosed（退出码 13）。
+    /// </summary>
+    public ImmutableArray<DetectionRule> CustomRules { get; init; } = ImmutableArray<DetectionRule>.Empty;
 
     /// <summary>实际参与合并的配置文件路径（低优先级在前）；空表示全部使用内置默认。</summary>
     public ImmutableArray<string> LoadedConfigFiles { get; }

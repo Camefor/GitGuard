@@ -23,8 +23,8 @@
 
 | 消费方 | 内容 |
 | --- | --- |
-| 用户 / Git | stderr 的人类可读报告 + 退出码（`audit list` 文本、`audit export` 摘要、`allowlist add/remove/list` 文本同样走 stderr） |
-| 脚本调用方 | stdout 的 JSON（`--format json`；含 `audit list` / `audit export` 摘要、`allowlist add/remove/list`） |
+| 用户 / Git | stderr 的人类可读报告 + 退出码（`audit list` 文本、`audit export` 摘要、`allowlist add/remove/list`、`rules list/view` 文本同样走 stderr） |
+| 脚本调用方 | stdout 的 JSON（`--format json`；含 `audit list` / `audit export` 摘要、`allowlist add/remove/list`、`rules list/view`） |
 | Audit | 一次扫描调用对应一个 `ScanRun`；`audit list` / `audit export` 只读查询，不产生 `ScanRun`；`allowlist add/remove` 只写 `AllowlistChanged` 事件 |
 
 ## 3. 核心规则
@@ -33,8 +33,9 @@
 | --- | --- |
 | 退出码契约 | 严格按 `06-API接口设计.md` §6 的退出码表；常量唯一来源为 `ExitCodes`，禁止就地写字面量 |
 | 解析失败 | 未知命令 / 未知选项 / 受限取值非法 / 参数组合非法 → 退出码 7（`CLI_USAGE_ERROR`），在命令动作执行前返回，不触碰仓库与配置 |
-| JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` / `bypass.v1` / `audit.list.v1` / `audit.export.summary.v1` / `allowlist.add.v1` / `allowlist.remove.v1` / `allowlist.list.v1` 版本号；单行紧凑、中文不转义 |
+| JSON Schema | 按 `gitguard.scan.v1` / `error.v1` / `install.v1` / `uninstall.v1` / `status.v1` / `version.v1` / `bypass.v1` / `audit.list.v1` / `audit.export.summary.v1` / `allowlist.add.v1` / `allowlist.remove.v1` / `allowlist.list.v1` / `rules.list.v1` / `rules.view.v1` 版本号；单行紧凑、中文不转义 |
 | 白名单管理 | `allowlist add/remove/list` 直接读写本地审计库，不要求当前目录是 Git 仓库；`add` 校验失败映射 20、`remove` 条目不存在映射 21、库读写失败映射 14；分页参数非法映射 7 |
+| 规则查询 | `rules list` / `rules view` 只读配置与内置规则目录，不要求 Git 仓库、不打开审计库；`--category` 大小写不敏感（非法 → 7）、`--enabled` 按有效启用筛选、默认隐藏正则原文（`--show-pattern` 才输出）；`view` 未知 ID → 40（`GGD-0034`） |
 | 全量扫描 | `scan --staged` / `--push` / `--all` 三选一（否则 7）；`--include-history` / `--since` / `--max-files` 仅能与 `--all` 组合；`--since` 从指定提交的父提交向更早历史扫描，`--max-files` 按提交边界截断；文本报告展示历史进度，JSON 输出 `full_scan`（`GGD-0031`） |
 | 基线文件 | `--baseline <path>` 仅能与 `--all` 组合（否则 7），生成当次不抑制命中；未指定时若仓库根存在 `.gitguard-baseline.json` 则自动消费；基线命中记为 `AllowedByBaseline`（白名单优先），JSON 输出 `baseline` 对象与 `ignored_by_baseline`；读取 / 解析失败 → 13，写入失败 → 31（`GGD-0032`） |
 | 审计格式化 | `audit export` 的文件格式由子命令 `--format json\|csv` 决定，与全局 `--format text\|json` 同名但作用于不同层级；导出为同目录临时文件 + 原子替换，失败映射 31 |
@@ -172,6 +173,7 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 - [x] 白名单管理（GGD-0030）：`allowlist add/remove/list` 文本 / JSON 渲染、无仓库环境可用、校验失败 20、条目不存在 21、非法 ID / 分页参数 7、SQLite 条目参与扫描放行（`CliAllowlistCommandTests` + `ExitCodeMapperTests`）。
 - [x] 全量扫描（GGD-0031）：`scan --all` HEAD 快照 / 历史提交扫描、`full_scan` JSON 字段、`--max-files` 截断与 `--since` 续扫、三选一与历史选项组合校验（`CliScanAllTests`）。
 - [x] 基线文件（GGD-0032）：`--baseline` 生成当次不抑制、默认自动消费与 `AllowedByBaseline` / `ignored_by_baseline`、内容变化重新阻断、损坏基线 13、非法组合 / 空路径 7、写入失败 31、文本基线摘要（`CliScanBaselineTests` + `ExitCodeMapperTests`）。
+- [x] 规则查询（GGD-0034）：`rules list` / `view` 文本与 JSON 渲染、类别 / `--enabled` 筛选、`--show-pattern` 门禁、无仓库可用、自定义规则参与扫描、退出码 7 / 40（`CliRulesCommandTests`）。
 - [ ] `--help` 覆盖所有命令（随 Shell 补全一并补测）。
 
 ## 10. 演进与扩展位
@@ -193,3 +195,4 @@ CLI 层无独立配置；选项通过命令行参数传递。全局选项均为�
 | 0.1.6 | 2026-10-22 | GGD-0030：§2.2 输出补白名单管理；§3 JSON Schema 补 `allowlist.add.v1` / `allowlist.remove.v1` / `allowlist.list.v1` 并新增白名单管理规则；§9 勾选白名单管理测试项（`CliAllowlistCommandTests`） |
 | 0.1.7 | 2026-10-22 | GGD-0031：§3 新增全量扫描规则（三选一、历史选项组合、截断续扫）；新增 §6.2 `scan --all` 入口流程（原 post-commit / 异常捕获顺延为 §6.3 / §6.4）；§9 勾选全量扫描测试项（`CliScanAllTests`） |
 | 0.1.8 | 2026-10-22 | GGD-0032：§3 新增基线文件规则；§6.2 流程补生成 / 消费分支与 `baseline` 输出；§6.4 异常捕获补 `BaselineException` → 13 / 31；§9 勾选基线文件测试项（`CliScanBaselineTests`） |
+| 0.1.9 | 2026-10-22 | GGD-0034：§2.2 输出补规则查询；§3 新增规则查询规则、JSON Schema 补 `rules.list.v1` / `rules.view.v1`；§9 勾选规则查询测试项（`CliRulesCommandTests`） |

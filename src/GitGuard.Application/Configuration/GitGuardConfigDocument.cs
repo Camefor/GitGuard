@@ -90,6 +90,37 @@ internal sealed class RulesSectionDto
 
     /// <summary>URL 检测类别。</summary>
     public RuleCategorySectionDto? Url { get; set; }
+
+    /// <summary>自定义规则列表（FR-080）；列表整体替换，项目级声明即接管用户级。</summary>
+    public List<CustomRuleSectionDto>? Custom { get; set; }
+}
+
+/// <summary>
+/// 单条自定义规则 DTO（<c>rules.custom[]</c>，FR-080）。
+/// 规则 ID 必须使用 <c>USR/</c> 前缀且类别段为 <c>SECRET</c> / <c>PRIVACY</c> / <c>LOCALPATH</c> / <c>URL</c>。
+/// </summary>
+internal sealed class CustomRuleSectionDto
+{
+    /// <summary>规则 ID（<c>USR/&lt;CATEGORY&gt;/&lt;NAME&gt;</c>）。</summary>
+    public string? Id { get; set; }
+
+    /// <summary>规则名称（面向用户展示）。</summary>
+    public string? Name { get; set; }
+
+    /// <summary>严重度（<c>Critical</c> / <c>High</c> / <c>Medium</c> / <c>Low</c>）。</summary>
+    public string? Severity { get; set; }
+
+    /// <summary>正则表达式文本（加载期编译，200ms 超时）。</summary>
+    public string? Pattern { get; set; }
+
+    /// <summary>上下文关键字（命中行须包含任一关键字，大小写不敏感）。</summary>
+    public List<string>? ContextKeywords { get; set; }
+
+    /// <summary>文件 glob 白名单（非空时仅扫描匹配文件）。</summary>
+    public List<string>? FilePathGlobs { get; set; }
+
+    /// <summary>是否启用该规则（默认 <see langword="true"/>）。</summary>
+    public bool? Enabled { get; set; }
 }
 
 /// <summary>规则类别通用 DTO（<c>enabled</c> + <c>disabled_rules</c>）；<c>rules.local_path</c> / <c>rules.url</c> 直接使用。</summary>
@@ -205,6 +236,7 @@ internal sealed class AllowlistEntryDto
 [YamlSerializable(typeof(ExcludeSectionDto))]
 [YamlSerializable(typeof(AllowlistSectionDto))]
 [YamlSerializable(typeof(AllowlistEntryDto))]
+[YamlSerializable(typeof(CustomRuleSectionDto))]
 public partial class GitGuardConfigYamlContext : StaticContext
 {
 }

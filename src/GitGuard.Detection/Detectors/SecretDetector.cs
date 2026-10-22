@@ -68,12 +68,16 @@ public sealed class SecretDetector : RegexRuleDetector
         return false;
     }
 
-    /// <summary>超长行仅保留高置信度规则（模块设计 Secret §6）。</summary>
+    /// <summary>
+    /// 超长行仅保留高置信度规则（模块设计 Secret §6）；自定义规则由用户显式声明，视为高置信度，始终保持求值。
+    /// </summary>
     /// <param name="rule">当前规则。</param>
     /// <param name="line">当前变更行。</param>
     /// <returns>跳过返回 <see langword="true"/>。</returns>
     protected override bool ShouldSkipRuleForLine(DetectionRule rule, ChangedLine line) =>
-        line.Text.Length > LONG_LINE_THRESHOLD && !_highConfidenceRuleIds.Contains(rule.RuleId);
+        line.Text.Length > LONG_LINE_THRESHOLD
+        && rule.Source != RuleSource.User
+        && !_highConfidenceRuleIds.Contains(rule.RuleId);
 
     private static Dictionary<string, Func<string, bool>> BuildValidators(SecretDetectorOptions options)
     {

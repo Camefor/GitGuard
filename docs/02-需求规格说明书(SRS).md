@@ -181,6 +181,21 @@
   - 格式或取值非法与项目级同等处理（FailClosed，退出码 13）。
 - **关联测试用例**：`TC-FR-070-01`（覆盖「项目级覆盖用户级」的加载链顺序断言）
 
+### 2.12.2 `FR-080` 自定义正则规则
+
+- **描述**：项目级 / 用户级配置可通过 `rules.custom` 声明项目特定正则规则，与内置规则一同参与四类检测与策略判定；CLI 提供 `gitguard rules list` / `view` 只读查询。
+- **处理规则**：
+  - 规则字段：`id` / `name` / `severity` / `pattern` 必填；`context_keywords` / `file_path_globs` 可选；`enabled` 默认 `true`。
+  - 规则 ID 必须以 `USR/` 开头并满足 `^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$`；类别段仅支持 `SECRET` / `PRIVACY` / `LOCALPATH` / `URL`；同一列表内 ID 重复 → FailClosed（退出码 13）。
+  - `pattern` 按 .NET 正则语法在加载期编译；非法正则、非法 `severity`、缺少必填字段、空白 `context_keywords` 项 → 退出码 13。检测与脱敏取第一个捕获组（命名捕获组语法可原样使用，但名称不参与语义）。
+  - `context_keywords` 为大小写不敏感的子串门禁：声明后命中行必须包含任一关键字；`file_path_globs` 以仓库相对路径匹配，语义与 `exclude` 的 glob 一致。两者均未声明时不做额外过滤。
+  - 自定义规则按声明顺序追加在内置规则之后，来源标注为 `User`；`disabled_rules` 与类别 `enabled: false` 共同决定「有效启用」状态。项目级 `rules.custom` 整体替换用户级列表。
+  - 自定义规则与内置规则共用 200ms 正则匹配超时：超时 → `DetectionException`（`DETECTOR_FAILED`）→ 退出码 11。自定义 SECRET 规则由用户显式声明，超长行（> 2048 字符，疑似 minified）不跳过。
+  - `gitguard rules list [--category Secret|Privacy|LocalPath|Url] [--enabled] [--show-pattern]` 与 `rules view <rule-id> [--show-pattern]` 不要求当前目录是 Git 仓库；默认隐藏正则原文；未知规则 → 退出码 40，非法类别 → 退出码 7。JSON Schema 为 `gitguard.rules.list.v1` / `gitguard.rules.view.v1`。
+- **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（加载与校验）、`GitGuard.Application.Rules.RuleCatalog`（规则目录）、`GitGuard.Cli.Commands.RulesCommand`（CLI）。
+- **v0.2 实现状态**：已实现（`GGD-0034`）。
+- **关联测试用例**：`TC-FR-080-01` ~ `TC-FR-080-04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`）
+
 ### 2.13 `FR-090` GitleaksAdapter（P2）
 
 - **描述**：通过实现 `IDetector`，把 Gitleaks 命令行作为可选秘密检测引擎接入。
@@ -304,7 +319,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-061` | 3.6 | `模块设计/Cli.md` | `TC-FR-061-01~05`（`BaselineUseCaseTests` / `CliScanBaselineTests` / `ExitCodeMapperTests`） | 已实现（`GGD-0032`） |
 | `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~05`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
-| `FR-080` | 3.2 | `模块设计/Policy.md` | 无 | 未实现（v0.2） |
+| `FR-080` | 3.2 | `模块设计/Policy.md` / `06-API接口设计` §5.7 | `TC-FR-080-01~04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`） | 已实现（`GGD-0034`） |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | 无 | 未实现（v0.2） |
 | `FR-100` | 全部 | `11-前端UI设计` | 无 | 未实现（v0.3） |
 
@@ -313,7 +328,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | # | 问题 | 影响 | 决策人 | 期限 |
 | --- | --- | --- | --- | --- |
 | Q-01 | 是否对 `--no-verify` 加 `post-commit` 探测，还是走 reflog 对比 | 中 | 项目负责人 | 已决议（GGD-0013）：`post-commit` +「父提交 + 暂存树」预测；reflog 无法区分正常 Hook 链且格式不稳定 |
-| Q-02 | 自定义正则是否支持命名捕获组用于更精确上下文 | 低 | 项目负责人 | P2 启动前 |
+| Q-02 | 自定义正则是否支持命名捕获组用于更精确上下文 | 低 | 项目负责人 | 已决议（GGD-0034）：命名捕获组语法原样支持，但检测与脱敏仍取第一个捕获组、名称不参与语义；上下文过滤由 `context_keywords`（任一关键字 OR）承担，不引入按组名取值 |
 
 ## 10. 变更记录
 
@@ -337,3 +352,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.15 | 2026-10-22 | GGD-0031：§2.11 FR-060 按实现重写（空树 HEAD 快照、历史枚举与提交归属、`--since` 不含起点语义、`--max-files` 提交边界软上限与 `next_since_sha` 续扫、空仓库 Clean）；§8 追溯矩阵 FR-060 更新测试类并标记已实现 |
 | 0.1.16 | 2026-10-22 | GGD-0032：新增 §2.11.1 FR-061 基线文件（schema / 默认路径、生成不抑制当次命中、默认自动消费、`AllowedByBaseline` 动作与 `Warned` 结果、允许清单优先级、13 / 31 错误码、本地盐不可移植限制）；§8 追溯矩阵 FR-061 更新测试类并标记已实现 |
 | 0.1.17 | 2026-10-22 | GGD-0033：§2.5 FR-021 规则库扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），补四类检测器覆盖说明与夹具有效性要求；§8 追溯矩阵标记 40 条规则 |
+| 0.1.18 | 2026-10-22 | GGD-0034：新增 §2.12.2 FR-080 自定义正则规则（`rules.custom` 字段 / 校验 / 合并与启用语义、200ms 超时、超长行不跳过、`gitguard rules list/view` 与退出码 7 / 40）；§8 追溯矩阵标记已实现；§9 Q-02 记录命名捕获组决议 |

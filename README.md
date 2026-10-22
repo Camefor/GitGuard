@@ -6,14 +6,14 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发中，2026-10-22）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件与 40 条内置规则已落地。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则与自定义正则规则已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
 | 范围 | 完成度 | 说明 |
 | --- | --- | --- |
 | P0 核心功能（11 条） | 约 95% | 10 条完整实现；终端报告缺少逐规则「建议」文案（其余字段齐全） |
-| 全部 FR（21 条） | 约 83% | 17 条完整 + 1 条部分 + 3 条未实现（完整计 1、部分计 0.5） |
+| 全部 FR（21 条） | 约 88% | 18 条完整 + 1 条部分 + 2 条未实现（完整计 1、部分计 0.5） |
 
 已可用：
 
@@ -25,6 +25,7 @@
 - `gitguard audit list` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）与脱敏 JSON / CSV 导出
 - `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
 - 40 条内置规则：Secret 16 / Privacy 9 / LocalPath 7 / Url 8（每条规则均含正反例夹具）
+- 自定义正则规则：`.gitguard.yml` 的 `rules.custom` 支持命名、严重度、上下文关键字与文件 glob；`gitguard rules list` / `view` 只读查看规则目录
 - 文本 / JSON 报告、严重度策略、配置文件 + SQLite 白名单、`exclude` 路径排除
 - `--no-verify` 与 `GITGUARD_SKIP=1` 绕过检测及 SQLite 审计落库
 - 中英文输出、Native AOT 单文件发布
@@ -32,7 +33,7 @@
 尚未实现（不影响核心试用）：
 
 - `audit view <run-id>` 单次运行明细（v0.2）
-- 自定义正则规则与 `gitguard rules`、GitleaksAdapter（v0.2）
+- GitleaksAdapter（v0.2）
 - Avalonia 桌面端（v0.3）
 
 ## 快速开始（从源码构建）
@@ -259,7 +260,37 @@ gitguard allowlist remove --id <条目 GUID>
 - 条目写入本地 SQLite 并记录 `AllowlistChanged` 审计事件；后续 `scan --staged` / `scan --push` 会同时应用配置文件的 `allowlist.entries` 与 SQLite 条目。
 - 校验失败退出码 20，条目不存在退出码 21；可加全局 `--format json` 获取机器可读结果。
 
-### 8. 卸载
+### 8. 自定义规则与规则查询
+
+在 `.gitguard.yml`（或用户级 `config.yml`）中声明项目特定正则：
+
+```yaml
+version: 1
+rules:
+  custom:
+    - id: USR/SECRET/INTERNAL-TOKEN
+      name: 内部令牌
+      severity: High
+      pattern: "INT-[A-Z0-9]{8}"
+      context_keywords:
+        - token
+      file_path_globs:
+        - "src/**"
+```
+
+```bash
+gitguard rules list --category Secret --enabled   # 文本列表（stderr）
+gitguard rules view USR/SECRET/INTERNAL-TOKEN     # 规则详情
+gitguard rules view USR/SECRET/INTERNAL-TOKEN --show-pattern
+gitguard --format json rules list                 # 机器可读 JSON（stdout）
+```
+
+- 规则 ID 必须以 `USR/` 开头，类别段仅支持 `SECRET` / `PRIVACY` / `LOCALPATH` / `URL`；非法配置（包括无法编译的正则、重复 ID）→ 退出码 13。
+- `context_keywords` 为大小写不敏感的任一关键字门禁；`file_path_globs` 匹配仓库相对路径；`enabled` 默认 `true`。
+- 自定义规则与内置规则走同一检测 / 策略管线，参与 `disabled_rules` 与类别开关；共享 200ms 正则超时（FailClosed）。
+- `rules list` / `view` 不要求 Git 仓库；默认隐藏正则原文，仅 `--show-pattern` 输出；未知规则退出码 40，非法类别退出码 7。
+
+### 9. 卸载
 
 ```bash
 gitguard uninstall    # 移除 GitGuard Hook 并还原被包裹的原 Hook

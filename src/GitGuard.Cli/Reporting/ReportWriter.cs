@@ -5,6 +5,7 @@ using System.Text.Json;
 using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Rules;
 using GitGuard.Application.Scanning;
 using GitGuard.Cli.Localization;
 using GitGuard.Core.Model;
@@ -31,6 +32,8 @@ internal sealed class ReportWriter
     private const string ALLOWLIST_ADD_SCHEMA = "gitguard.allowlist.add.v1";
     private const string ALLOWLIST_REMOVE_SCHEMA = "gitguard.allowlist.remove.v1";
     private const string ALLOWLIST_LIST_SCHEMA = "gitguard.allowlist.list.v1";
+    private const string RULES_LIST_SCHEMA = "gitguard.rules.list.v1";
+    private const string RULES_VIEW_SCHEMA = "gitguard.rules.view.v1";
 
     private readonly TextWriter _output;
     private readonly TextWriter _error;
@@ -447,6 +450,92 @@ internal sealed class ReportWriter
         }
     }
 
+    /// <summary>渲染规则列表（<c>06-API接口设计</c> §5.7；文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="rules">过滤后的规则条目。</param>
+    /// <param name="category">类别筛选（<c>Secret</c> / <c>Privacy</c> / <c>LocalPath</c> / <c>Url</c>）；未筛选为 <see langword="null"/>。</param>
+    /// <param name="enabledOnly">是否仅显示有效启用的规则。</param>
+    /// <param name="showPattern">是否输出正则原文。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="rules"/> 为 <see langword="null"/>。</exception>
+    internal void WriteRulesList(
+        IReadOnlyList<RuleCatalogEntry> rules,
+        string? category,
+        bool enabledOnly,
+        bool showPattern)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+
+        if (_json)
+        {
+            WriteRulesListJson(rules, category, enabledOnly, showPattern);
+            return;
+        }
+
+        _error.WriteLine(_text.Get(CliTextKey.RulesListHeader));
+        int enabledCount = 0;
+        foreach (RuleCatalogEntry rule in rules)
+        {
+            if (rule.Enabled)
+            {
+                enabledCount++;
+            }
+        }
+
+        WriteIndented(null, _text.Format(CliTextKey.RulesListSummary, rules.Count, enabledCount));
+        if (rules.Count == 0)
+        {
+            WriteIndented(null, _text.Get(CliTextKey.RulesListEmpty));
+            return;
+        }
+
+        foreach (RuleCatalogEntry rule in rules)
+        {
+            string line = _text.Format(
+                CliTextKey.RulesListLine,
+                rule.RuleId,
+                rule.Name,
+                rule.Category,
+                rule.Severity,
+                rule.Source,
+                rule.Enabled ? _text.Get(CliTextKey.RuleEnabled) : _text.Get(CliTextKey.RuleDisabled));
+            if (showPattern)
+            {
+                line += _text.Format(CliTextKey.RulesPatternSuffix, rule.Pattern.Regex.ToString());
+            }
+
+            WriteIndented(null, line);
+        }
+    }
+
+    /// <summary>渲染单条规则详情（<c>06-API接口设计</c> §5.7；文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="rule">规则条目。</param>
+    /// <param name="showPattern">是否输出正则原文。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="rule"/> 为 <see langword="null"/>。</exception>
+    internal void WriteRule(RuleCatalogEntry rule, bool showPattern)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+
+        if (_json)
+        {
+            WriteRuleJson(rule, showPattern);
+            return;
+        }
+
+        WriteColored("✔ ", ConsoleColor.Green);
+        _error.WriteLine(_text.Get(CliTextKey.RulesViewHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelRule), rule.RuleId);
+        WriteIndented(_text.Get(CliTextKey.LabelName), rule.Name);
+        WriteIndented(_text.Get(CliTextKey.LabelCategory), rule.Category);
+        WriteIndented(_text.Get(CliTextKey.LabelSeverity), rule.Severity.ToString());
+        WriteIndented(_text.Get(CliTextKey.LabelSource), rule.Source.ToString());
+        WriteIndented(
+            _text.Get(CliTextKey.LabelStatus),
+            rule.Enabled ? _text.Get(CliTextKey.RuleEnabled) : _text.Get(CliTextKey.RuleDisabled));
+        if (showPattern)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelPattern), rule.Pattern.Regex.ToString());
+        }
+    }
+
     /// <summary>渲染错误报告（文本 → stderr；JSON → stdout）。</summary>
     /// <param name="exitCode">退出码。</param>
     /// <param name="errorCode">错误码（<c>10-异常处理设计</c> §4 登记值）。</param>
@@ -626,6 +715,23 @@ internal sealed class ReportWriter
         else
         {
             writer.WriteNull("commit_sha");
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void WriteRuleEntryJson(Utf8JsonWriter writer, RuleCatalogEntry rule, bool showPattern)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("rule_id", rule.RuleId);
+        writer.WriteString("name", rule.Name);
+        writer.WriteString("category", rule.Category);
+        writer.WriteString("severity", rule.Severity.ToString());
+        writer.WriteString("source", rule.Source.ToString());
+        writer.WriteBoolean("enabled", rule.Enabled);
+        if (showPattern)
+        {
+            writer.WriteString("pattern", rule.Pattern.Regex.ToString());
         }
 
         writer.WriteEndObject();
@@ -1144,6 +1250,49 @@ internal sealed class ReportWriter
             }
 
             writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteRulesListJson(
+        IReadOnlyList<RuleCatalogEntry> rules,
+        string? category,
+        bool enabledOnly,
+        bool showPattern)
+    {
+        var buffer = new ArrayBufferWriter<byte>(1024);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", RULES_LIST_SCHEMA);
+            writer.WriteNumber("total", rules.Count);
+            writer.WriteNumber("count", rules.Count);
+            writer.WriteString("category", category);
+            writer.WriteBoolean("enabled_only", enabledOnly);
+            writer.WriteStartArray("rules");
+            foreach (RuleCatalogEntry rule in rules)
+            {
+                WriteRuleEntryJson(writer, rule, showPattern);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WriteRuleJson(RuleCatalogEntry rule, bool showPattern)
+    {
+        var buffer = new ArrayBufferWriter<byte>(512);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", RULES_VIEW_SCHEMA);
+            writer.WritePropertyName("rule");
+            WriteRuleEntryJson(writer, rule, showPattern);
             writer.WriteEndObject();
         }
 

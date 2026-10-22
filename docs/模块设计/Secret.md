@@ -75,7 +75,7 @@ flowchart LR
 **关键细节**：
 
 - 文件后缀过滤：`.lock`、`.min.js`、`.min.css` 整文件跳过；二进制文件过滤由上游差异收集（`FR-020`）承担。
-- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY` 及新增的 Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face 平台 Token 规则；跳过 `GENERIC-PASSWORD` / `AWS-SECRET` / `AZURE-STORAGE-KEY` 这类低置信度或依赖上下文的规则）。
+- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY` 及新增的 Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face 平台 Token 规则；跳过 `GENERIC-PASSWORD` / `AWS-SECRET` / `AZURE-STORAGE-KEY` 这类低置信度或依赖上下文的规则）。自定义 `USR/SECRET/*` 规则由用户显式声明，视为高置信度，超长行不跳过（`GGD-0034`）。
 - 熵值用来辅助判定 `AWS-SECRET`：仅在 Shannon 熵 > 4.0 时命中。
 
 ## 7. 配置项
@@ -122,3 +122,4 @@ flowchart LR
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：上游差异解析落地（`UnifiedDiffParser` 将 `git diff --cached -U0` / `git diff-tree -p -U0` 输出按行号展开为逐文件变更）；§2.1 输入格式修正为 `FileChange { Path, Lines[ChangedLine] }` |
 | 0.1.3 | 2026-10-21 | GGD-0020：§8 单规则耗时测量方式改为 `--verbose` 的 `Scan.RuleTiming`（`duration_us`），替换未落地的 BenchmarkDotNet 引用 |
 | 0.1.4 | 2026-10-22 | GGD-0033：规则库扩充至 16 条 Secret 规则（新增 Google API Key / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face / Azure Storage Key）；§6 长行高置信度规则集同步扩充；§9 勾选样本覆盖项 |
+| 0.1.5 | 2026-10-22 | GGD-0034：§6 明确自定义 `USR/SECRET/*` 规则视为高置信度，超长行不跳过（`SecretDetector` 按 `RuleSource.User` 保持求值） |

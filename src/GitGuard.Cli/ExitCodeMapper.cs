@@ -15,6 +15,9 @@ public static class ExitCodeMapper
     /// <summary>错误码：扫描超时或外部取消（退出码 12，<c>10-异常处理设计</c> §4 登记值）。</summary>
     public const string SCAN_TIMEOUT = "SCAN_TIMEOUT";
 
+    /// <summary>错误码：规则 ID 不存在（退出码 40，<c>10-异常处理设计</c> §4 登记值）。</summary>
+    public const string RULE_NOT_FOUND = "RULE_NOT_FOUND";
+
     /// <summary>错误码：未分类异常（退出码 99，<c>10-异常处理设计</c> §4 登记值）。</summary>
     public const string UNKNOWN_ERROR = "UNKNOWN_ERROR";
 

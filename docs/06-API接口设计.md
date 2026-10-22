@@ -360,6 +360,51 @@ CSV 契约：
 - `total` 为全表条目数；`count` 为当前页条数（可为 0）；排序固定为 `created_at DESC, rowid DESC`。
 - 管理命令只读写本地审计库，不产生 `ScanRun`；`add` / `remove` 在同一事务内写 `AllowlistChanged` 审计事件（`category = Allowlist`，载荷 `EntryId` / `Action` / `RuleId` / `PathPattern` / `Fingerprint` / `Reason`）。
 
+### 4.11 规则查询输出（JSON）
+
+`gitguard rules list --format json` 输出 `gitguard.rules.list.v1`（stdout 单行紧凑）：
+
+```json
+{
+  "schema": "gitguard.rules.list.v1",
+  "total": 17,
+  "count": 17,
+  "category": "SECRET",
+  "enabled_only": true,
+  "rules": [
+    {
+      "rule_id": "GGD/SECRET/AWS-AKID",
+      "name": "AWS Access Key ID",
+      "category": "SECRET",
+      "severity": "Critical",
+      "source": "Builtin",
+      "enabled": true
+    }
+  ]
+}
+```
+
+`gitguard rules view <rule-id> --format json` 输出 `gitguard.rules.view.v1`：
+
+```json
+{
+  "schema": "gitguard.rules.view.v1",
+  "rule": {
+    "rule_id": "USR/SECRET/INTERNAL-TOKEN",
+    "name": "内部令牌",
+    "category": "SECRET",
+    "severity": "High",
+    "source": "User",
+    "enabled": true
+  }
+}
+```
+
+- `category` 为 `null` 表示未按类别筛选；`total` / `count` 均为筛选后条数（规则目录不分页）。
+- `severity` ∈ `Critical` / `High` / `Medium` / `Low`；`source` ∈ `Builtin` / `User` / `Gitleaks`。
+- `pattern` 仅在显式 `--show-pattern` 时出现，值为 .NET 正则原文；默认省略以避免被误用。
+- 规则顺序为内置规则顺序 + `rules.custom` 声明顺序；未知规则输出 `gitguard.error.v1` 并返回退出码 40。
+
 ## 5. 命令清单
 
 > MVP 阶段固化以下命令集；新增命令需同步更新本文件、`模块设计/Cli.md`、`AGENT-GUIDE` 任务台账。
@@ -455,10 +500,13 @@ gitguard install --format json
 ### 5.7 `gitguard rules` — 规则查看
 
 - **子命令**：
-  - `list [--category Secret|Privacy|LocalPath|Url] [--enabled]`
-  - `view <rule-id>`
-- **输出**：规则 ID、名称、严重度、来源（Builtin/User/Gitleaks）、是否启用；**不输出正则原文**（避免误用），除非 `--show-pattern`。
-- **退出码**：0 成功；40 规则不存在。
+  - `list [--category Secret|Privacy|LocalPath|Url] [--enabled] [--show-pattern]`
+  - `view <rule-id> [--show-pattern]`
+- **输入**：无（不要求当前目录是 Git 仓库）；只读配置与内置规则，不打开审计库。
+- **输出**：规则 ID、名称、类别、严重度、来源（`Builtin` / `User` / `Gitleaks`）、是否启用；文本 → stderr，`--format json` → stdout（Schema 见 §4.11）。**默认不输出正则原文**，仅显式 `--show-pattern` 时追加 `pattern`。
+- **筛选语义**：`--category` 大小写不敏感，接受 `Secret` / `Privacy` / `LocalPath` / `Url`（其他取值 → 退出码 7）；`--enabled` 仅保留「有效启用」规则（已考虑自定义规则 `enabled`、`disabled_rules` 与类别开关）。
+- **退出码**：0 成功；7 类别 / 参数非法；40 规则不存在（输出 `gitguard.error.v1`）。
+- **关联 FR**：`FR-080`（`GGD-0034`）。
 
 ### 5.8 `gitguard version` — 版本
 
@@ -517,7 +565,7 @@ gitguard install --format json
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
-> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 / 40 仍为 v0.2 的 `audit view` / `rules` 命令预留（`ExitCodes` 已定义常量），对应命令未注册。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。
+> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 40 已由 `rules view` 实际使用（`GGD-0034`，`RULE_NOT_FOUND`）；退出码 30 仍为 v0.2 的 `audit view` 预留（`ExitCodes` 已定义常量）。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。
 
 ## 7. 限流与配额
 
@@ -547,3 +595,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.6 | 2026-10-22 | GGD-0030：§5.5 落地 `allowlist add` / `remove` / `list`（条件校验、分页、无仓库要求、SQLite 条目参与扫描合并、退出码 7 / 14 / 20 / 21）；新增 §4.10 白名单 JSON Schema（`gitguard.allowlist.add.v1` / `gitguard.allowlist.remove.v1` / `gitguard.allowlist.list.v1`）；§6 退出码 20 / 21 转为已使用 |
 | 0.1.7 | 2026-10-22 | GGD-0031：§4.2 新增 `--all` 的 `full_scan` 对象契约（`include_history` / `commits_scanned` / `remaining_commits` / `truncated` / `next_since_sha`）与 `scan_type = Manual`；§4.3 补充历史扫描 `commit_sha` 语义；§5.4 注册 `--all` / `--include-history` / `--since` / `--max-files` 并固化三选一与历史选项组合校验 |
 | 0.1.8 | 2026-10-22 | GGD-0032：§4.2 新增 `summary.ignored_by_baseline` 与可选 `baseline` 对象（`path` / `generated` / `entries` / `suppressed_findings`）；§4.3 动作枚举新增 `AllowedByBaseline` 并声明白名单优先级；§5.4 注册 `--baseline <path>` 及组合 / 路径校验，补充基线相关退出码 13 / 31；§6 退出码 13 / 31 场景扩展 |
+| 0.1.9 | 2026-10-22 | GGD-0034：§4.11 新增 `gitguard.rules.list.v1` / `gitguard.rules.view.v1` Schema（默认隐藏 `pattern`，`--show-pattern` 才输出）；§5.7 重写 `rules list` / `view` 选项、筛选与过滤语义、无仓库可用与退出码 7 / 40；§6 退出码 40 转为已使用 |

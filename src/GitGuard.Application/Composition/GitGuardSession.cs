@@ -7,6 +7,7 @@ using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Rules;
 using GitGuard.Application.Scanning;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
@@ -41,6 +42,7 @@ public sealed class GitGuardSession
     private readonly Lazy<SqliteAuditStore> _auditStore;
     private readonly Lazy<FingerprintSaltLoadResult> _salt;
     private readonly Lazy<DetectorSet> _detectors;
+    private readonly Lazy<ImmutableArray<RuleCatalogEntry>> _ruleCatalog;
     private readonly Lazy<ImmutableArray<string>> _warnings;
     private readonly Lazy<GitVersionProbeResult> _gitProbe;
 
@@ -76,6 +78,7 @@ public sealed class GitGuardSession
         _auditStore = new Lazy<SqliteAuditStore>(CreateAuditStore);
         _salt = new Lazy<FingerprintSaltLoadResult>(CreateSalt);
         _detectors = new Lazy<DetectorSet>(CreateDetectors);
+        _ruleCatalog = new Lazy<ImmutableArray<RuleCatalogEntry>>(() => RuleCatalog.Build(Config));
         _warnings = new Lazy<ImmutableArray<string>>(CollectWarnings);
         _gitProbe = new Lazy<GitVersionProbeResult>(() => GitVersionProbe.Probe(_options.GitExecutable));
     }
@@ -169,6 +172,15 @@ public sealed class GitGuardSession
         Version? version = assembly.GetName().Version;
         return version is null ? "0.0.0" : version.ToString();
     }
+
+    /// <summary>
+    /// 当前配置下的规则目录（内置 + 自定义，含有效启用状态）；首次访问触发配置加载与内置规则加载，
+    /// 不装配检测器、不打开审计库（<c>gitguard rules</c> 命令专用）。
+    /// </summary>
+    /// <returns>内置规则在前、自定义规则在后的只读条目列表。</returns>
+    /// <exception cref="ConfigurationException">配置无效（解析失败 / 自定义规则非法）。</exception>
+    /// <exception cref="DetectionException">内置规则集加载失败（FailClosed）。</exception>
+    public ImmutableArray<RuleCatalogEntry> GetRuleCatalog() => _ruleCatalog.Value;
 
     /// <summary>
     /// 尽力记录一次 FailClosed 退出事件（08-权限设计 §7）：消息只保存 SHA-256 摘要，不落原文。

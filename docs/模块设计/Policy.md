@@ -4,7 +4,7 @@
 
 - **一句话定位**：策略引擎——把 Finding 的严重度映射为「阻断 / 警告 / 放行」动作，并应用白名单；承载 `.gitguard.yml` 的 Schema 定义与校验。
 - **所属限界上下文**：Scanning Context
-- **承担 FR**：`FR-022, FR-040, FR-041, FR-070, FR-071`
+- **承担 FR**：`FR-022, FR-040, FR-041, FR-070, FR-071, FR-080`
 - **承担 DR**：`DR-03`（FailClosed）、`DR-05`（硬下限：Critical 不可降级）
 - **关联 ADR**：无
 
@@ -40,6 +40,7 @@
 | 基线覆盖 | `scan --all` 消费 `.gitguard-baseline.json` 时，`ScanExecutor` 在策略评估后按指纹把未命中白名单的 Finding 覆盖为 `Allow + IgnoredByBaseline`；白名单优先（GGD-0032） |
 | 排除匹配 | `exclude.paths` 以仓库相对路径匹配，`exclude.files` 以文件名在任意深度匹配；命中文件不进入扫描、不产生 Finding，也不计入 `skipped_files` |
 | 配置文件合并 | 项目级覆盖用户级；深度合并 map，列表则替换 |
+| 自定义规则 | `rules.custom` 在加载期校验（`USR/` 前缀、类别、必填字段、正则可编译、列表内 ID 唯一），非法即退出码 13；编译后以 `RuleSource.User` 追加在内置规则之后，参与四类检测与「有效启用」计算（`GGD-0034`） |
 | Schema 版本 | `.gitguard.yml` 必须有 `version: 1`；未知版本 FailClosed |
 
 ## 4. 外部依赖
@@ -91,6 +92,7 @@ flowchart LR
     Merge --> Validate{Validator}
     Validate -- 版本未知 --> Fail1[退出码 13]
     Validate -- Critical 降级为 Allow --> Fail2[退出码 13]
+    Validate -- 自定义规则非法 --> Fail3[退出码 13]
     Validate -- 通过 --> Config[Immutable GitGuardConfig]
 ```
 
@@ -142,6 +144,17 @@ rules:
     enabled: true
     disabled_rules: []
 
+  custom:
+    - id: USR/SECRET/INTERNAL-TOKEN   # 必须以 USR/ 开头；类别段仅限 SECRET/PRIVACY/LOCALPATH/URL
+      name: 内部令牌
+      severity: High                  # Critical / High / Medium / Low（大小写不敏感）
+      pattern: "INT-[A-Z0-9]{8}"      # .NET 正则，加载期编译
+      context_keywords:               # 可选；任一关键字命中即通过（大小写不敏感子串）
+        - token
+      file_path_globs:                # 可选；仓库相对路径 glob
+        - "src/**"
+      enabled: true                   # 可选，默认 true
+
 policy:
   critical: block   # 不可改为 allow
   high: block
@@ -168,6 +181,8 @@ allowlist:
 
 **排除语义（GGD-0019）**：`exclude.paths` 的 glob 与仓库相对路径（`/` 分隔）匹配；`exclude.files` 的 glob 与文件名（路径最后一段）匹配，因而对所有目录深度生效。glob 支持 `*`（段内任意字符）、`?`（段内单字符）、`**`（独立段，匹配零或多层目录），大小写敏感。命中文件在扫描分区阶段直接丢弃：不调用检测器、不产生 Finding、不计入 `files_scanned`、也不登记到 `skipped_files`（与「因二进制 / 超限跳过」相区分）。列表项空白 → `CONFIG_INVALID`（退出码 13）。
 
+**自定义规则语义（GGD-0034）**：`rules.custom` 为列表，项目级声明整体替换用户级列表。`id` 必须以 `USR/` 开头并满足规则 ID 命名契约；`name` / `severity` / `pattern` 必填；同一列表内 ID 重复、正则在加载期编译失败、`context_keywords` / `file_path_globs` 含空白项 → `CONFIG_INVALID`（退出码 13）。规则按声明顺序追加在内置规则之后（`RuleSource.User`），受 `disabled_rules` 与所属类别 `enabled` 共同约束；`enabled: false` 仅关闭该规则。上下文关键字为大小写不敏感子串，声明多个时任一命中即通过；文件 glob 使用与 `exclude` 相同的 `GlobMatcher`。自定义规则与内置规则共用 200ms 正则超时（超时 FailClosed），且自定义 SECRET 规则在超长行（> 2048 字符）不跳过。
+
 ## 8. 质量属性
 
 | 属性 | 目标 |
@@ -187,6 +202,7 @@ allowlist:
 - [x] 未知 `version` 值：阻断（TC-FR-070-04）。
 - [x] 排除规则：`exclude.paths` 命中路径、`exclude.files` 命中任意深度文件名 → 不扫描且不产生 Finding；项目级按字段覆盖用户级；空白列表项 → 退出码 13（TC-FR-070-05）。
 - [x] 降级审计：`policy.high: warn` 与 `disabled_rules: [GGD/SECRET/AWS-AKID]` 首次装配各写一条 `PolicyOverride`，同 Session 多次装配不重复；本地路径规则不被误判为禁用（`AuditEventWiringTests`，GGD-0015）。
+- [x] 自定义规则（GGD-0034）：加载期编译与校验（`USR/` 前缀、类别、必填字段、非法正则、重复 ID、空白上下文关键字 → 13）、项目级整体替换用户级；规则目录追加顺序与 `User` 来源；`enabled` / `disabled_rules` / 类别开关对有效启用的组合；检测器命中、上下文 / glob 过滤与 200ms 超时 FailClosed（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests`）。
 
 ## 10. 演进与扩展位
 
@@ -206,3 +222,4 @@ allowlist:
 | 0.1.6 | 2026-10-22 | GGD-0016：§7 `logging.file.path` 缺省值改为跟随 `UserDataPaths.LogFilePath`，与平台数据目录一致 |
 | 0.1.7 | 2026-10-22 | GGD-0030：§3 新增白名单来源规则（配置文件与 SQLite 条目合并、读取失败 FailClosed）；§9 增补 SQLite 白名单管理测试项 |
 | 0.1.8 | 2026-10-22 | GGD-0032：§2.2 / §3 / §6.1 补基线覆盖（`ScanExecutor` 按指纹覆盖为 `Allow + IgnoredByBaseline`，白名单优先）与 `PolicyDecision.IgnoredByBaseline` 字段 |
+| 0.1.9 | 2026-10-22 | GGD-0034：§1 承担 FR 补 `FR-080`；§3 / §6.2 / §7 新增 `rules.custom` 自定义规则（加载期校验、列表替换、`RuleSource.User` 追加、有效启用语义、200ms 超时与超长行不跳过）；§9 增补配置 / 目录 / 检测测试项 |

@@ -50,6 +50,13 @@ internal enum CliTextKey
     AllowlistIdOptionDescription,
     AllowlistListLimitDescription,
     AllowlistListOffsetDescription,
+    RulesDescription,
+    RulesListDescription,
+    RulesViewDescription,
+    RulesCategoryOptionDescription,
+    RulesEnabledOptionDescription,
+    RulesShowPatternOptionDescription,
+    RulesRuleIdArgumentDescription,
 
     // 通用标签与分隔符
     LabelRepo,
@@ -87,6 +94,12 @@ internal enum CliTextKey
     LabelFingerprint,
     LabelCreatedAt,
     LabelCreatedBy,
+    LabelName,
+    LabelCategory,
+    LabelSeverity,
+    LabelSource,
+    LabelStatus,
+    LabelPattern,
     ValueSeparator,
 
     // 用法错误
@@ -111,6 +124,8 @@ internal enum CliTextKey
     AllowlistIdInvalid,
     AllowlistLimitInvalid,
     AllowlistOffsetInvalid,
+    RulesCategoryInvalid,
+    RulesRuleIdRequired,
     ErrorJoinSeparator,
 
     // 扫描报告
@@ -153,6 +168,17 @@ internal enum CliTextKey
     AllowlistListLine,
     AllowlistConditionItem,
     AllowlistConditionSeparator,
+
+    // 规则查询
+    RulesListHeader,
+    RulesViewHeader,
+    RulesListSummary,
+    RulesListEmpty,
+    RulesListLine,
+    RulesPatternSuffix,
+    RuleEnabled,
+    RuleDisabled,
+    RulesNotFound,
 
     // 绕过检测
     BypassDetected,
@@ -210,6 +236,8 @@ internal enum CliTextKey
     LogAllowlistAdded,
     LogAllowlistRemoved,
     LogAllowlistListed,
+    LogRulesListed,
+    LogRuleViewed,
     LogCrashLogWritten,
     LogFileWriteFailed,
     LogFailClosedAuditWriteFailed,

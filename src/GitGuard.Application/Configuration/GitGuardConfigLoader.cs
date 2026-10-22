@@ -1,10 +1,12 @@
 ﻿using System.Collections.Immutable;
+using GitGuard.Application.Rules;
 using GitGuard.Application.Scanning;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
 using GitGuard.Core.Domain;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
+using GitGuard.Core.Rules;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
@@ -53,11 +55,12 @@ public sealed class GitGuardConfigLoader
             ["exclude"] = ImmutableHashSet.Create(StringComparer.Ordinal, "paths", "files"),
             ["logging"] = ImmutableHashSet.Create(StringComparer.Ordinal, "verbose", "file"),
             ["logging.file"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "path", "max_bytes", "max_files"),
-            ["rules"] = ImmutableHashSet.Create(StringComparer.Ordinal, "secrets", "privacy", "local_path", "url"),
+            ["rules"] = ImmutableHashSet.Create(StringComparer.Ordinal, "secrets", "privacy", "local_path", "url", "custom"),
             ["rules.secrets"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules", "use_gitleaks", "gitleaks_path", "min_entropy"),
             ["rules.privacy"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules", "require_context", "test_file_patterns"),
             ["rules.local_path"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules"),
             ["rules.url"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules"),
+            ["rules.custom[]"] = ImmutableHashSet.Create(StringComparer.Ordinal, "id", "name", "severity", "pattern", "context_keywords", "file_path_globs", "enabled"),
             ["policy"] = ImmutableHashSet.Create(StringComparer.Ordinal, "critical", "high", "medium", "low"),
             ["allowlist"] = ImmutableHashSet.Create(StringComparer.Ordinal, "entries"),
             ["allowlist.entries[]"] = ImmutableHashSet.Create(StringComparer.Ordinal, "rule_id", "path_pattern", "fingerprint", "reason"),
@@ -270,6 +273,9 @@ public sealed class GitGuardConfigLoader
                     Enabled = project?.Url?.Enabled ?? user?.Url?.Enabled,
                     DisabledRules = project?.Url?.DisabledRules ?? user?.Url?.DisabledRules,
                 },
+
+            // 列表替换语义：项目级声明 custom 即整体接管用户级
+            Custom = project?.Custom ?? user?.Custom,
         };
 
     private static PolicySectionDto? MergePolicy(PolicySectionDto? user, PolicySectionDto? project) => BothNull(user, project)
@@ -337,6 +343,7 @@ public sealed class GitGuardConfigLoader
 
         SeverityPolicy policy = BuildPolicy(merged.Policy);
         ImmutableArray<AllowlistEntry> allowlist = BuildAllowlist(merged.Allowlist, now, createdBy);
+        var customRules = BuildCustomRules(rules.Custom);
         ImmutableArray<string> excludePaths = NormalizeList(merged.Exclude?.Paths, "exclude.paths");
         ImmutableArray<string> excludeFiles = NormalizeList(merged.Exclude?.Files, "exclude.files");
 
@@ -356,6 +363,7 @@ public sealed class GitGuardConfigLoader
         {
             ExcludePaths = excludePaths,
             ExcludeFiles = excludeFiles,
+            CustomRules = customRules,
         };
     }
 
@@ -421,6 +429,96 @@ public sealed class GitGuardConfigLoader
         Enabled = dto?.Enabled ?? true,
         DisabledRules = NormalizeList(dto?.DisabledRules, "rules.*.disabled_rules"),
     };
+
+    /// <summary>
+    /// 编译 <c>rules.custom</c> 声明的自定义规则（FR-080）：ID 必须为 <c>USR/</c> 前缀且类别段属于四类检测器，
+    /// 严重度 / 正则 / 列表项在加载期校验；任一非法项 → <see cref="ConfigurationException"/>（退出码 13，FailClosed）。
+    /// </summary>
+    private static ImmutableArray<DetectionRule> BuildCustomRules(List<CustomRuleSectionDto>? dtos)
+    {
+        if (dtos is null || dtos.Count == 0)
+        {
+            return ImmutableArray<DetectionRule>.Empty;
+        }
+
+        var rules = ImmutableArray.CreateBuilder<DetectionRule>(dtos.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < dtos.Count; i++)
+        {
+            DetectionRule rule = BuildCustomRule(dtos[i], i);
+            if (!seenIds.Add(rule.RuleId))
+            {
+                throw new ConfigurationException($"rules.custom[{i}] 的规则 ID 重复：{rule.RuleId}");
+            }
+
+            rules.Add(rule);
+        }
+
+        return rules.ToImmutable();
+    }
+
+    private static DetectionRule BuildCustomRule(CustomRuleSectionDto dto, int index)
+    {
+        string location = $"rules.custom[{index}]";
+        if (string.IsNullOrWhiteSpace(dto.Id))
+        {
+            throw new ConfigurationException($"{location} 缺少 id 字段");
+        }
+
+        string ruleId = dto.Id.Trim();
+        if (!ruleId.StartsWith("USR/", StringComparison.Ordinal))
+        {
+            throw new ConfigurationException($"{location} 的规则 ID 必须以 USR/ 开头：{ruleId}");
+        }
+
+        if (!RuleIdFormat.IsValid(ruleId))
+        {
+            throw new ConfigurationException($"{location} 的规则 ID 不符合命名契约：{ruleId}");
+        }
+
+        string category = RuleSelection.CategoryOf(ruleId);
+        if (!RuleSelection.SupportedCategories.Contains(category))
+        {
+            throw new ConfigurationException(
+                $"{location} 的规则类别不受支持：{category}（应为 SECRET / PRIVACY / LOCALPATH / URL）");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            throw new ConfigurationException($"{location} 缺少 name 字段");
+        }
+
+        if (!Enum.TryParse(dto.Severity, ignoreCase: true, out Severity severity) || !Enum.IsDefined(severity))
+        {
+            throw new ConfigurationException(
+                $"{location} 的 severity 非法：{dto.Severity ?? "(缺失)"}（应为 Low/Medium/High/Critical）");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Pattern))
+        {
+            throw new ConfigurationException($"{location} 缺少 pattern 字段");
+        }
+
+        try
+        {
+            var pattern = RulePattern.Create(
+                dto.Pattern,
+                NormalizeList(dto.ContextKeywords, $"{location}.context_keywords"),
+                NormalizeList(dto.FilePathGlobs, $"{location}.file_path_globs"));
+
+            return DetectionRule.Create(
+                ruleId,
+                dto.Name.Trim(),
+                severity,
+                pattern,
+                RuleSource.User,
+                dto.Enabled ?? true);
+        }
+        catch (InvariantViolationException ex)
+        {
+            throw new ConfigurationException($"{location} 校验失败：{ex.Message}", ex, sourcePath: null, line: null);
+        }
+    }
 
     private static LogFileSettings BuildLogFile(LoggingSectionDto? logging, string defaultLogFilePath)
     {

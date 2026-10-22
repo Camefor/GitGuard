@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using GitGuard.Application.Configuration;
+using GitGuard.Application.Rules;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
 using GitGuard.Core.Model;
@@ -12,8 +13,9 @@ namespace GitGuard.Application.Composition;
 
 /// <summary>
 /// 检测器装配（FR-021 固定顺序 Secret → Privacy → LocalPath → Url；<c>模块设计/Policy.md</c> §7 <c>rules</c> 段落接线）：
-/// 内置规则集经 <c>disabled_rules</c> 重标为禁用后再交给四类检测器（基类按类别段过滤并剔除禁用规则）；
-/// 类别 <c>enabled: false</c> 则完全不装配该检测器；全部类别禁用视为配置无效（FailClosed，退出码 13）。
+/// 内置规则集与 <c>rules.custom</c> 自定义规则合并后，经 <c>disabled_rules</c> 重标为禁用再交给四类检测器
+/// （基类按类别段过滤并剔除禁用规则）；类别 <c>enabled: false</c> 则完全不装配该检测器；
+/// 全部类别禁用视为配置无效（FailClosed，退出码 13）。
 /// </summary>
 internal static class DetectorAssembly
 {
@@ -35,9 +37,13 @@ internal static class DetectorAssembly
         ArgumentNullException.ThrowIfNull(warnings);
 
         IReadOnlyList<DetectionRule> builtinRules = BuiltinRuleLoader.LoadEmbedded();
-        HashSet<string> disabledIds = CreateDisabledIdSet(config);
-        ImmutableArray<PolicyOverride> policyOverrides = CollectPolicyOverrides(builtinRules, config, disabledIds);
-        IReadOnlyList<DetectionRule> rules = ApplyDisabledRules(builtinRules, disabledIds, warnings);
+        var allRules = new List<DetectionRule>(builtinRules.Count + config.CustomRules.Length);
+        allRules.AddRange(builtinRules);
+        allRules.AddRange(config.CustomRules);
+
+        HashSet<string> disabledIds = RuleSelection.CreateDisabledIdSet(config);
+        ImmutableArray<PolicyOverride> policyOverrides = CollectPolicyOverrides(allRules, config, disabledIds);
+        IReadOnlyList<DetectionRule> rules = RuleSelection.ApplyDisabledRules(allRules, disabledIds, warnings);
 
         var detectors = ImmutableArray.CreateBuilder<IDetector>(4);
         if (config.Secrets.Enabled)
@@ -73,7 +79,7 @@ internal static class DetectorAssembly
                 "rules 的四个类别（secrets / privacy / local_path / url）全部被禁用：扫描将无任何检测能力，配置无效。");
         }
 
-        return new DetectorSet(detectors.ToImmutable(), CountEnabledRules(rules, config), policyOverrides);
+        return new DetectorSet(detectors.ToImmutable(), RuleSelection.CountEnabledRules(rules, config), policyOverrides);
     }
 
     /// <summary>
@@ -100,7 +106,8 @@ internal static class DetectorAssembly
 
         foreach (DetectionRule rule in rules)
         {
-            bool disabled = disabledIds.Contains(rule.RuleId) || !IsCategoryEnabled(CategoryOf(rule.RuleId), config);
+            bool disabled = disabledIds.Contains(rule.RuleId)
+                || !RuleSelection.IsCategoryEnabled(RuleSelection.CategoryOf(rule.RuleId), config);
             if (!disabled)
             {
                 continue;
@@ -114,100 +121,6 @@ internal static class DetectorAssembly
         }
 
         return overrides.ToImmutable();
-    }
-
-    /// <summary>统计实际交付检测器的规则数（类别启用且规则未禁用）。</summary>
-    private static int CountEnabledRules(IReadOnlyList<DetectionRule> rules, GitGuardConfig config)
-    {
-        int count = 0;
-        foreach (DetectionRule rule in rules)
-        {
-            if (rule.Enabled && IsCategoryEnabled(CategoryOf(rule.RuleId), config))
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    private static bool IsCategoryEnabled(string category, GitGuardConfig config) => category switch
-    {
-        // 规则 ID 的类别段与检测器 RULE_CATEGORY 常量一致：LOCALPATH 而非配置键 local_path
-        "SECRET" => config.Secrets.Enabled,
-        "PRIVACY" => config.Privacy.Enabled,
-        "LOCALPATH" => config.LocalPath.Enabled,
-        "URL" => config.Url.Enabled,
-        _ => false,
-    };
-
-    /// <summary>取规则 ID 的类别段（第 2 段；命名契约保证恰好 3 段）。</summary>
-    private static string CategoryOf(string ruleId)
-    {
-        int firstSlash = ruleId.IndexOf('/');
-        int secondSlash = ruleId.IndexOf('/', firstSlash + 1);
-        return ruleId.Substring(firstSlash + 1, secondSlash - firstSlash - 1);
-    }
-
-    /// <summary>把 <c>disabled_rules</c> 声明的规则重建为禁用规则（<see cref="DetectionRule"/> 不可变，无原位开关）。</summary>
-    private static IReadOnlyList<DetectionRule> ApplyDisabledRules(
-        IReadOnlyList<DetectionRule> rules,
-        HashSet<string> disabledIds,
-        ICollection<string> warnings)
-    {
-        if (disabledIds.Count == 0)
-        {
-            return rules;
-        }
-
-        foreach (string ruleId in disabledIds)
-        {
-            if (!ContainsRule(rules, ruleId))
-            {
-                warnings.Add($"disabled_rules 含未知规则 ID：{ruleId}（已忽略；可用 gitguard rules list 核对有效 ID）");
-            }
-        }
-
-        var rebuilt = new List<DetectionRule>(rules.Count);
-        foreach (DetectionRule rule in rules)
-        {
-            rebuilt.Add(disabledIds.Contains(rule.RuleId)
-                ? DetectionRule.Create(rule.RuleId, rule.Name, rule.Severity, rule.Pattern, rule.Source, enabled: false)
-                : rule);
-        }
-
-        return rebuilt;
-    }
-
-    private static HashSet<string> CreateDisabledIdSet(GitGuardConfig config)
-    {
-        var disabledIds = new HashSet<string>(StringComparer.Ordinal);
-        CollectDisabledIds(disabledIds, config.Secrets.DisabledRules);
-        CollectDisabledIds(disabledIds, config.Privacy.DisabledRules);
-        CollectDisabledIds(disabledIds, config.LocalPath.DisabledRules);
-        CollectDisabledIds(disabledIds, config.Url.DisabledRules);
-        return disabledIds;
-    }
-
-    private static void CollectDisabledIds(HashSet<string> target, IReadOnlyList<string> disabledRules)
-    {
-        foreach (string ruleId in disabledRules)
-        {
-            target.Add(ruleId);
-        }
-    }
-
-    private static bool ContainsRule(IReadOnlyList<DetectionRule> rules, string ruleId)
-    {
-        foreach (DetectionRule rule in rules)
-        {
-            if (string.Equals(rule.RuleId, ruleId, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
 
