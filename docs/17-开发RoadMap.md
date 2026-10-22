@@ -38,6 +38,7 @@
 - **交付物**：
   - `gitguard scan --all`（已于 `GGD-0031` 落地）与基线文件（FR-061，已于 `GGD-0032` 落地） / `gitguard rules`（`gitguard allowlist` 已于 `GGD-0030` 提前落地）。
   - `GitleaksAdapter` 实现（ADR-0003 落地）。
+  - 内置规则扩充至 40 条（已于 `GGD-0033` 落地：Secret 16 / Privacy 9 / LocalPath 7 / Url 8）。
   - 规则分级与项目自定义正则。
   - 误报治理指南文档。
 - **依赖**：阶段 1 完成。
@@ -46,7 +47,7 @@
   - 自定义正则引入 ReDoS → 用例集 + Regex.MatchTimeout 兜底。
 - **退出条件**：
   - [ ] 在至少 1 个真实中等规模项目（10+ 开发者）试用，首周误报率 ≤ 10%。
-  - [ ] 规则数量 ≥ 40。
+  - [x] 规则数量 ≥ 40（`GGD-0033`：40 条，Secret 16 / Privacy 9 / LocalPath 7 / Url 8）。
 
 ### 2.3 阶段 3：桌面端（v0.3）
 
@@ -141,3 +142,4 @@ flowchart LR
 | 0.1.9 | 2026-10-22 | GGD-0031：取消 `GGD-0028`（Windows 单平台为最终 CI 范围）；v0.1 验收项标记为用户亲自执行；提前启动 v0.2 并登记 `GGD-0031` ~ `GGD-0037` 任务分解 |
 | 0.1.10 | 2026-10-22 | GGD-0031：FR-060 全量扫描落地（HEAD 空树差异快照 / `--include-history` 历史扫描 / `--since` 续扫 / `--max-files` 提交边界软截断 + `next_since_sha`）；§2.2 交付物同步；新增 36 项测试（Application 16 / Infrastructure 8 / CLI 12），全量 1112 项通过 |
 | 0.1.11 | 2026-10-22 | GGD-0032：FR-061 基线文件落地（`gitguard.baseline.v1` / `--baseline` 生成 / 默认消费 / `AllowedByBaseline` / 13、31 错误码）；§2.2 交付物同步；新增 20 项测试，全量 1132 项通过（1123 通过 + 9 跳过） |
+| 0.1.12 | 2026-10-22 | GGD-0033：内置规则扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），每条规则夹具 ≥3 正 / ≥3 负 / 边界正反各 ≥1；§2.2 交付物与退出条件同步 |

@@ -1,0 +1,14 @@
+﻿; GGD/URL/DISCORD-WEBHOOK（High）：discord.com / discordapp.com / canary / ptb webhook
+[positive]
+https://discord.com/api/webhooks/{{DIGIT:18}}/{{ALNUM:64}}
+https://discordapp.com/api/webhooks/{{DIGIT:18}}/{{ALNUM:64}}
+https://canary.discord.com/api/webhooks/{{DIGIT:18}}/{{ALNUM:66}}
+
+[negative]
+https://discord.com/api/webhooks/123456789012345678
+https://discord.com/api/webhooks/{{DIGIT:4}}/{{ALNUM:64}}
+http://discord.com/api/webhooks/{{DIGIT:18}}/{{ALNUM:64}}
+
+[edge]
+hit: WEBHOOK=https://ptb.discordapp.com/api/webhooks/{{DIGIT:18}}/{{ALNUM:64}}
+miss: https://discord.com/api/webhooks/{{DIGIT:18}}/{{ALNUM:11}}

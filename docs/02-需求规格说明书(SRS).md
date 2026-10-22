@@ -49,13 +49,13 @@
 ### 2.5 `FR-021` 四类检测器
 
 - **描述**：MVP 必须内置以下四类检测器：
-  - **SecretDetector**：匹配常见凭据格式（JWT、Slack、GitHub、AWS、通用 `password = "..."`）。
-  - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱。
-  - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\` 等。
-  - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` 查询参数、内网保留 IP 段（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、127.0.0.0/8）。
-- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 21 条（Secret 8 / Privacy 5 / LocalPath 4 / Url 4），可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
+  - **SecretDetector**：匹配常见凭据格式（JWT、Slack、GitHub、AWS、通用 `password = "..."`）、主流平台 Token（Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face）及 Azure 存储密钥。
+  - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱、护照、座机、美国 SSN、姓名与地址组合。
+  - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\`、UNC 共享路径、`/opt` `/srv` `/data` 部署目录等。
+  - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` / `password=` 查询参数、Slack / Discord Webhook、AWS 预签名 URL、RFC 1918 私网段与环回段。
+- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 扩充），可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
 - **关联领域规则**：`DR-01, DR-02`
-- **关联测试用例**：`TC-FR-021-S-*`（Secret）/ `TC-FR-021-P-*`（Privacy）/ `TC-FR-021-L-*`（LocalPath）/ `TC-FR-021-U-*`（Url）
+- **关联测试用例**：`TC-FR-021-S-*`（Secret）/ `TC-FR-021-P-*`（Privacy）/ `TC-FR-021-L-*`（LocalPath）/ `TC-FR-021-U-*`（Url）；每条规则由 `BuiltinRuleFixtureTests` 覆盖 ≥3 正例 / ≥3 反例 / 边界正反例
 
 ### 2.6 `FR-022` 策略引擎
 
@@ -290,7 +290,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-011` | 3.1 | 同上 | `TC-FR-010-04`（`UninstallHookUseCaseTests` / `HookEndToEndTests`） | 已实现 |
 | `FR-012` | 3.1 | `模块设计/Cli.md` / `模块设计/Hook.md` | `TC-FR-012-01`（`StatusUseCaseTests` / `CliHookLifecycleTests`） | 已实现 |
 | `FR-020` | 3.2 | `模块设计/Secret.md` / `Privacy.md` / `模块设计/Policy.md` | `TC-FR-020-01~05`（`ScanEndToEndTests` / `ScanStagedUseCaseTests` / `UnifiedDiffParserTests` / `CliScanCommandTests`） | 已实现 |
-| `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/LocalPathUrl.md` | `TC-FR-021-*`（`DetectorTests` / `BuiltinRuleFixtureTests` / `DetectorRobustnessTests`） | 已实现（21 条规则） |
+| `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/LocalPathUrl.md` | `TC-FR-021-*`（`DetectorTests` / `BuiltinRuleFixtureTests` / `DetectorRobustnessTests`） | 已实现（40 条规则，GGD-0033） |
 | `FR-022` | 3.2 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `SeverityPolicyTests` / `PolicyDecisionTests` | 已实现 |
 | `FR-023` | 3.2 | `模块设计/Cli.md` / `06-API接口设计` §4.2 | `CliScanCommandTests` + E2E S1（text / JSON） | 部分实现（无逐规则建议文案） |
 | `FR-030` | 3.3 | `模块设计/Hook.md` | `TC-FR-030-01~02`（`ScanEndToEndTests` / `ScanPushUseCaseTests` / `PushUpdateTests`） | 已实现 |
@@ -336,3 +336,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.14 | 2026-10-22 | `GGD-0028` 取消，NFR-A-001 / A-002 / S-001 的跨平台 CI 与 Linux `strace` 描述改为「不再计划」；v0.1 性能与真实仓库验收由用户亲自执行 |
 | 0.1.15 | 2026-10-22 | GGD-0031：§2.11 FR-060 按实现重写（空树 HEAD 快照、历史枚举与提交归属、`--since` 不含起点语义、`--max-files` 提交边界软上限与 `next_since_sha` 续扫、空仓库 Clean）；§8 追溯矩阵 FR-060 更新测试类并标记已实现 |
 | 0.1.16 | 2026-10-22 | GGD-0032：新增 §2.11.1 FR-061 基线文件（schema / 默认路径、生成不抑制当次命中、默认自动消费、`AllowedByBaseline` 动作与 `Warned` 结果、允许清单优先级、13 / 31 错误码、本地盐不可移植限制）；§8 追溯矩阵 FR-061 更新测试类并标记已实现 |
+| 0.1.17 | 2026-10-22 | GGD-0033：§2.5 FR-021 规则库扩充至 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8），补四类检测器覆盖说明与夹具有效性要求；§8 追溯矩阵标记 40 条规则 |

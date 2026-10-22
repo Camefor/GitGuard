@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/DEV-DIRS（Low）：/opt|/srv|/data 下的部署绝对路径
+[positive]
+root = "/opt/myapp/releases/"
+deploy /srv/www/html/
+data_dir: /data/project/
+
+[negative]
+/optional/app/
+opt/myapp/
+/server/www/
+
+[edge]
+hit: WorkingDirectory=/srv/api/current/
+miss: /opt/

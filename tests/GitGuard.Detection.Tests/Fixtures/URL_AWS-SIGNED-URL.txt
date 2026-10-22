@@ -1,0 +1,14 @@
+﻿; GGD/URL/AWS-SIGNED-URL（High）：查询参数 X-Amz-Signature / X-Amz-Credential
+[positive]
+https://bucket.s3.amazonaws.com/object?X-Amz-Signature={{HEX:16}}
+https://s3.amazonaws.com/bucket/key?X-Amz-Credential={{ALNUM:16}}%2F20261022%2Fus-east-1%2Fs3%2Faws4_request
+url = "https://cdn.example.com/file?X-Amz-Signature={{HEX:8}}&X-Amz-Expires=3600"
+
+[negative]
+https://bucket.s3.amazonaws.com/object?X-Amz-Date=20261022T000000Z
+https://bucket.s3.amazonaws.com/object?x-amz-signature=abcdef1234567890
+X-Amz-Signature={{HEX:16}}
+
+[edge]
+hit: "download": "https://bucket.s3.amazonaws.com/o?X-Amz-Signature={{HEX:16}}"
+miss: https://bucket.s3.amazonaws.com/o?X-Amz-Signature=

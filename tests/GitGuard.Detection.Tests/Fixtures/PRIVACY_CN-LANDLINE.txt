@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/CN-LANDLINE（Medium）：0 开头区号 + 7~8 位号码，同行含 phone / tel / 电话 / 座机
+[positive]
+tel = "010-12345678"
+电话：021-87654321
+座机 0755-1234567
+
+[negative]
+010-12345678
+tel = "010-1234"
+tel = "12345678901"
+
+[edge]
+hit: phone: 0571-88886666
+miss: tel = "010-123456789"

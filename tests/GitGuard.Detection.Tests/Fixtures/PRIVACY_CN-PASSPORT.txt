@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/CN-PASSPORT（High）：E/G + 8 位数字或字母 + 7~8 位数字，同行含 passport / 护照
+[positive]
+passport_no = "E12345678"
+护照号码：G87654321
+passport: P1234567
+
+[negative]
+passport_no = "E123456"
+contact = "E12345678"
+passport_no = "e12345678"
+
+[edge]
+hit: 护照号:E12345678
+miss: passport_no = "E123456789"

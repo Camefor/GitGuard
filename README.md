@@ -6,7 +6,7 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发中，2026-10-22）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all` 与基线文件能力已落地。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件与 40 条内置规则已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -24,7 +24,7 @@
 - 基线文件：`scan --all --baseline <path>` 生成 `gitguard.baseline.v1`，后续全量扫描自动消费 `.gitguard-baseline.json`，历史噪声不阻断但保留在报告中
 - `gitguard audit list` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）与脱敏 JSON / CSV 导出
 - `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
-- 21 条内置规则：Secret 8 / Privacy 5 / LocalPath 4 / Url 4
+- 40 条内置规则：Secret 16 / Privacy 9 / LocalPath 7 / Url 8（每条规则均含正反例夹具）
 - 文本 / JSON 报告、严重度策略、配置文件 + SQLite 白名单、`exclude` 路径排除
 - `--no-verify` 与 `GITGUARD_SKIP=1` 绕过检测及 SQLite 审计落库
 - 中英文输出、Native AOT 单文件发布
@@ -332,7 +332,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1132 用例（1123 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1284 用例（1275 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)

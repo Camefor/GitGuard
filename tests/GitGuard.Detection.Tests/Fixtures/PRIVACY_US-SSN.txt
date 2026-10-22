@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/US-SSN（Medium）：3-2-4 位 SSN，同行含 ssn / social security / 社保号
+[positive]
+ssn = "123-45-6789"
+social_security_number: 456-78-9012
+社保号：321-54-9876
+
+[negative]
+123-45-6789
+ssn = "12-345-6789"
+ssn = "123456789"
+
+[edge]
+hit: {"ssn":"111-22-3333"}
+miss: ssn = "123-45-67890"

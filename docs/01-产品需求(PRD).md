@@ -100,7 +100,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | `FR-011` | `gitguard uninstall` 卸载 Hook | P0 | 3.1 | 仅移除 GitGuard 注册项；原 Hook 恢复可运行 | 已实现（GGD-0008） |
 | `FR-012` | `gitguard status` 查询安装状态 | P0 | 3.1 | 输出 Git 版本、Hook 路径、GitGuard 版本、Hook 分类 | 已实现（状态分类见 3.1） |
 | `FR-020` | 暂存区扫描（`gitguard scan --staged`） | P0 | 3.2 | 严格使用 `git diff --cached`；不包含未暂存内容 | 已实现（GGD-0007） |
-| `FR-021` | 四类检测器 Secret/Privacy/LocalPath/Url | P0 | 3.2 | 命中率符合 §6 验收用例集 | 已实现：21 条内置规则（Secret 8 / Privacy 5 / LocalPath 4 / Url 4） |
+| `FR-021` | 四类检测器 Secret/Privacy/LocalPath/Url | P0 | 3.2 | 命中率符合 §6 验收用例集 | 已实现：40 条内置规则（Secret 16 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 规则升级） |
 | `FR-022` | 策略引擎映射严重度到动作 | P0 | 3.2 | 可通过 `.gitguard.yml` 覆写默认映射 | 已实现（含 `critical` 不可降级为 `allow` 的硬下限） |
 | `FR-023` | 终端报告 | P0 | 3.2 | 包含文件、行号、规则 ID、脱敏片段 | 部分实现：文本 / JSON 报告与脱敏片段可用，无逐规则「建议」文案 |
 | `FR-030` | 推送扫描（`gitguard scan --push`） | P0 | 3.3 | 覆盖推送范围内每个提交；无法确定远程时降级为扫描所有未推送提交 | 已实现（GGD-0007；新分支退化为 `local-sha` 可达提交） |
@@ -172,3 +172,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.7 | 2026-10-22 | GGD-0030：§3.4 白名单落地状态更新为 CLI + SQLite 已实现（`allowlist add/remove/list`、`AllowlistChanged` 审计、双来源合并）；§6 勾选白名单验收项；§7 v0.1 / v0.2 范围同步 |
 | 0.1.8 | 2026-10-22 | GGD-0031：§3.6 / §4 FR-060 标记已实现（HEAD 全量树、`--include-history`、`--since` 续扫、`--max-files` 提交边界截断与 `next_since_sha`）；§4 状态列更名为「实现状态」并同步 FR-040 / FR-041 的 GGD-0030 落地状态 |
 | 0.1.9 | 2026-10-22 | GGD-0032：§3.6 主流程更新为生成当次不抑制、后续默认自动消费；§4 FR-061 标记已实现（基线 schema、`AllowedByBaseline`、13 / 31 错误码、本地盐不可移植） |
+| 0.1.10 | 2026-10-22 | GGD-0033：§4 FR-021 实现状态更新为 40 条内置规则（Secret 16 / Privacy 9 / LocalPath 7 / Url 8） |

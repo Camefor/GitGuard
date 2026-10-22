@@ -1,4 +1,4 @@
-# GitGuard 内置规则集（MVP：21 条）
+# GitGuard 内置规则集（v0.2：40 条）
 # 依据：docs/模块设计/Secret.md §3、Privacy.md §3、LocalPathUrl.md §3；DDD §9 反模式（禁止在检测器代码中写死正则）。
 # 字段说明：
 #   id               规则 ID，必须符合 ^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$（13-开发规范 §4.1）
@@ -63,6 +63,55 @@ rules:
     pattern: '(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])'
     enabled: true
 
+  - id: GGD/SECRET/GOOGLE-API-KEY
+    name: Google API Key
+    severity: High
+    pattern: '\bAIza[0-9A-Za-z_-]{35}\b'
+    enabled: true
+
+  - id: GGD/SECRET/STRIPE-KEY
+    name: Stripe 密钥
+    severity: Critical
+    pattern: '\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{24,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/NPM-TOKEN
+    name: npm Access Token
+    severity: High
+    pattern: '\bnpm_[A-Za-z0-9]{36}\b'
+    enabled: true
+
+  - id: GGD/SECRET/GITLAB-TOKEN
+    name: GitLab PAT
+    severity: Critical
+    pattern: '\bglpat-[A-Za-z0-9_-]{20,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/OPENAI-KEY
+    name: OpenAI API Key
+    severity: Critical
+    pattern: '\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/SENDGRID-KEY
+    name: SendGrid API Key
+    severity: High
+    pattern: '\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b'
+    enabled: true
+
+  - id: GGD/SECRET/HUGGINGFACE-TOKEN
+    name: Hugging Face Token
+    severity: High
+    pattern: '\bhf_[A-Za-z0-9]{34,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/AZURE-STORAGE-KEY
+    name: Azure Storage Account Key
+    severity: High
+    pattern: '(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{86}==(?![A-Za-z0-9+/=])'
+    context_keywords: [accountkey, azure, storage, 存储账户]
+    enabled: true
+
   # ===== Privacy（模块设计 Privacy §3） =====
   - id: GGD/PRIVACY/CN-IDCARD-18
     name: 18 位身份证
@@ -99,6 +148,33 @@ rules:
     pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
     enabled: true
 
+  - id: GGD/PRIVACY/CN-PASSPORT
+    name: 中国护照号
+    severity: High
+    pattern: '(?<![0-9A-Za-z])(?:E[0-9]{8}|G[0-9]{8}|[A-Z][0-9]{7,8})(?![0-9A-Za-z])'
+    context_keywords: [passport, 护照]
+    enabled: true
+
+  - id: GGD/PRIVACY/CN-LANDLINE
+    name: 中国大陆座机号
+    severity: Medium
+    pattern: '(?<![0-9])0[0-9]{2,3}-?[0-9]{7,8}(?![0-9])'
+    context_keywords: [phone, tel, 电话, 座机]
+    enabled: true
+
+  - id: GGD/PRIVACY/US-SSN
+    name: 美国社会安全号（SSN）
+    severity: Medium
+    pattern: '(?<![0-9])[0-9]{3}-[0-9]{2}-[0-9]{4}(?![0-9])'
+    context_keywords: [ssn, social security, social_security, 社保号]
+    enabled: true
+
+  - id: GGD/PRIVACY/CN-NAME-ADDRESS
+    name: 姓名与地址组合
+    severity: Medium
+    pattern: '(?:姓名|住址|地址)\s*[:：]\s*([^\s,，;；]{2,})'
+    enabled: true
+
   # ===== LocalPath（模块设计 LocalPathUrl §3.1） =====
   - id: GGD/LOCALPATH/UNIX-HOME
     name: Unix 用户主目录绝对路径
@@ -124,6 +200,24 @@ rules:
     pattern: '(?:/workspace/volumes/|/mnt/[a-z]/|~/workspace/)'
     enabled: true
 
+  - id: GGD/LOCALPATH/UNC-SHARE
+    name: Windows UNC 共享路径
+    severity: Medium
+    pattern: '\\\\[\w.-]+\\[\w.$-]+(?:\\[\w .$-]+)*'
+    enabled: true
+
+  - id: GGD/LOCALPATH/DEV-DIRS
+    name: POSIX 部署目录绝对路径
+    severity: Low
+    pattern: '(?<![\w.-])/(?:opt|srv|data)/[\w.-]+/'
+    enabled: true
+
+  - id: GGD/LOCALPATH/HOME-TILDE
+    name: 用户主目录 ~ 路径
+    severity: Low
+    pattern: '(?:^|[\s"''=(])(~/[\w.-]+(?:/[\w.-]+)+)'
+    enabled: true
+
   # ===== Url（模块设计 LocalPathUrl §3.2） =====
   - id: GGD/URL/CREDENTIALS-IN-URL
     name: URL 带用户名密码
@@ -147,4 +241,28 @@ rules:
     name: 内网域名
     severity: Medium
     pattern: '\b[\w-]+\.(?:local|internal|corp|lan)(?![\w.])'
+    enabled: true
+
+  - id: GGD/URL/SLACK-WEBHOOK
+    name: Slack Webhook URL
+    severity: High
+    pattern: '\bhttps://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{20,}\b'
+    enabled: true
+
+  - id: GGD/URL/DISCORD-WEBHOOK
+    name: Discord Webhook URL
+    severity: High
+    pattern: '\bhttps://(?:(?:canary|ptb)\.)?discord(?:app)?\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{60,}\b'
+    enabled: true
+
+  - id: GGD/URL/PASSWORD-QUERY
+    name: 查询参数含密码
+    severity: High
+    pattern: '[?&](?:password|passwd|pwd|secret)=([^&\s#]+)'
+    enabled: true
+
+  - id: GGD/URL/AWS-SIGNED-URL
+    name: AWS 预签名 URL
+    severity: High
+    pattern: '[?&]X-Amz-(?:Signature|Credential)=([^&\s]+)'
     enabled: true

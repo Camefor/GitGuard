@@ -30,9 +30,12 @@
 | `GGD/PRIVACY/CN-IDCARD-15` | 15 位身份证 | Medium | 格式匹配 + 上下文 |
 | `GGD/PRIVACY/CN-BANKCARD` | 银行卡号 | High | 符合 Luhn 校验 + 长度 16-19 位 |
 | `GGD/PRIVACY/EMAIL` | 邮箱 | Low | RFC 5322 简化版正则；默认 `warn` |
-| `GGD/PRIVACY/CN-NAME-ADDRESS` | 姓名 + 地址组合（P2） | Medium | NER-like 启发（关键字 `姓名`、`住址` + 具体值） |
+| `GGD/PRIVACY/CN-PASSPORT` | 中国护照号 | High | `E` / `G` + 8 位数字或 `[A-Z]` + 7~8 位数字；上下文含 `passport` / `护照` |
+| `GGD/PRIVACY/CN-LANDLINE` | 中国大陆座机号 | Medium | `0` 开头区号 + 7~8 位号码（分隔符可选）；上下文含 `phone` / `tel` / `电话` / `座机` |
+| `GGD/PRIVACY/US-SSN` | 美国社会安全号（SSN） | Medium | `3-2-4` 位数字；上下文含 `ssn` / `social security` / `社保号` |
+| `GGD/PRIVACY/CN-NAME-ADDRESS` | 姓名 + 地址组合（P2） | Medium | 关键字 `姓名` / `住址` / `地址` + 冒号 + ≥2 字符具体值 |
 
-> MVP 落地 1 ~ 5；`CN-NAME-ADDRESS` 在 P2 启用。
+> v0.2（GGD-0033）在 MVP 5 条基础上新增护照、座机、SSN 与姓名地址组合，共 9 条；`CN-NAME-ADDRESS` 按 P2 计划提前启用。
 
 ## 4. 外部依赖
 
@@ -82,15 +85,16 @@ flowchart LR
 
 ## 9. 测试要点
 
-- [ ] 所有身份证样本必须是合成 + 校验位正确（禁用真实身份证作为测试样本）。
-- [ ] 验证 `require_context = true` 下，裸的 11 位数字不触发手机号命中。
-- [ ] 验证测试文件路径自动降级。
-- [ ] 验证脱敏输出格式稳定（供用户肉眼识别）。
+- [x] 所有身份证样本必须是合成 + 校验位正确（禁用真实身份证作为测试样本）。
+- [x] 验证 `require_context = true` 下，裸的 11 位数字不触发手机号命中。
+- [x] 验证测试文件路径自动降级。
+- [x] 验证脱敏输出格式稳定（供用户肉眼识别）。
+- [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，9 条 Privacy 规则全覆盖）。
 
 ## 10. 演进与扩展位
 
-- `CN-NAME-ADDRESS`：P2 启用。
-- 国际化隐私数据（美国 SSN、欧盟 IBAN）：三期按需。
+- `CN-NAME-ADDRESS`：已于 v0.2（GGD-0033）提前启用。
+- 国际化隐私数据（欧盟 IBAN 等）：三期按需；美国 SSN 已于 v0.2 启用。
 - NER 模型：**不**引入，保持纯规则（避免模型依赖和 DR-01 风险）。
 
 ## 11. 变更记录
@@ -99,3 +103,4 @@ flowchart LR
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：5 条 MVP 规则 + 测试文件自动降级策略 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；CN-MOBILE 正则改用 ASCII `[0-9]`（防全角数字误报）、移除 `fake` 标签语义（改为测试文件路径降一级）；脱敏统一由 Core `Masker` 承担；`test_file_patterns` 明确为路径子串（大小写不敏感） |
+| 0.1.2 | 2026-10-22 | GGD-0033：规则库扩充至 9 条（新增 CN-PASSPORT / CN-LANDLINE / US-SSN / CN-NAME-ADDRESS）；§10 同步 P2 规则启用状态；§9 勾选样本覆盖项 |

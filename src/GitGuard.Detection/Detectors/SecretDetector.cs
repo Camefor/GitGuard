@@ -5,7 +5,7 @@ using GitGuard.Detection.Validation;
 namespace GitGuard.Detection.Detectors;
 
 /// <summary>
-/// Secret 检测器（模块设计 Secret）：扫描凭据与密钥泄漏，承载 <c>GGD/SECRET/*</c> 8 条内置规则。
+/// Secret 检测器（模块设计 Secret）：扫描凭据与密钥泄漏，承载 <c>GGD/SECRET/*</c> 16 条内置规则。
 /// 类别特有语义：压缩 / 锁文件整文件跳过；超长行（疑似 minified）仅保留高置信度规则；
 /// AWS-SECRET 经 Shannon 熵判定。
 /// </summary>
@@ -30,6 +30,13 @@ public sealed class SecretDetector : RegexRuleDetector
         "GGD/SECRET/GITHUB-TOKEN",
         "GGD/SECRET/SLACK-TOKEN",
         "GGD/SECRET/PRIVATE-KEY",
+        "GGD/SECRET/GOOGLE-API-KEY",
+        "GGD/SECRET/STRIPE-KEY",
+        "GGD/SECRET/NPM-TOKEN",
+        "GGD/SECRET/GITLAB-TOKEN",
+        "GGD/SECRET/OPENAI-KEY",
+        "GGD/SECRET/SENDGRID-KEY",
+        "GGD/SECRET/HUGGINGFACE-TOKEN",
     };
 
     /// <summary>初始化 Secret 检测器。</summary>

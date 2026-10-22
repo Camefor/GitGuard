@@ -24,7 +24,7 @@
 | --- | --- | --- | --- |
 | `PolicyEvaluator` | `IAsyncEnumerable<Finding>`（ADR-0003 流式契约） | Finding | 抛 `DetectionException` 由上层 FailClosed |
 
-## 3. 核心规则（内置清单，MVP）
+## 3. 核心规则（内置清单，16 条）
 
 | RuleId | 名称 | 严重度 | 判定要点 |
 | --- | --- | --- | --- |
@@ -36,8 +36,16 @@
 | `GGD/SECRET/PRIVATE-KEY` | PEM 私钥块 | Critical | 匹配 `-----BEGIN [A-Z ]*PRIVATE KEY-----` |
 | `GGD/SECRET/GENERIC-PASSWORD` | 代码中硬编码密码 | High | 关键字 `(password|passwd|pwd)` + `=` + 引号包裹的 ≥ 6 字符值；排除 `password = args.password` 等变量赋值 |
 | `GGD/SECRET/DB-CONN-STRING` | 带密码的连接串 | High | `(Server|Host|Data Source)=...;Password=\S+` |
+| `GGD/SECRET/GOOGLE-API-KEY` | Google API Key | High | `AIza` + 35 位 Base64Url 字符（`\bAIza[0-9A-Za-z_-]{35}\b`） |
+| `GGD/SECRET/STRIPE-KEY` | Stripe 密钥 | Critical | `sk` / `rk` + `live` / `test` + ≥ 24 位字母数字（`\b(?:sk\|rk)_(?:live\|test)_[0-9A-Za-z]{24,}\b`） |
+| `GGD/SECRET/NPM-TOKEN` | npm Access Token | High | `npm_` + 36 位字母数字 |
+| `GGD/SECRET/GITLAB-TOKEN` | GitLab PAT | Critical | `glpat-` + ≥ 20 位字母数字 / `_` / `-` |
+| `GGD/SECRET/OPENAI-KEY` | OpenAI API Key | Critical | `sk-` / `sk-proj-` / `sk-svcacct-` + ≥ 20 位密钥字符 |
+| `GGD/SECRET/SENDGRID-KEY` | SendGrid API Key | High | `SG.` + 22 位 + `.` + 43 位字母数字 / `_` / `-` |
+| `GGD/SECRET/HUGGINGFACE-TOKEN` | Hugging Face Token | High | `hf_` + ≥ 34 位字母数字 |
+| `GGD/SECRET/AZURE-STORAGE-KEY` | Azure Storage Account Key | High | 86 位 Base64 + `==`，且同行含 `accountkey` / `azure` / `storage` / `存储账户` 上下文 |
 
-> MVP 阶段先聚焦以上 8 条高置信度规则；二期通过 GitleaksAdapter 大幅扩展覆盖。
+> v0.2 规则升级（GGD-0033）在 MVP 8 条基础上新增 8 条高置信度平台 Token 规则；Azure 存储密钥依赖上下文关键字控制误报。GitleaksAdapter 仍作为后续补充召回率的扩展位。
 
 ## 4. 外部依赖
 
@@ -67,7 +75,7 @@ flowchart LR
 **关键细节**：
 
 - 文件后缀过滤：`.lock`、`.min.js`、`.min.css` 整文件跳过；二进制文件过滤由上游差异收集（`FR-020`）承担。
-- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY`；跳过 `GENERIC-PASSWORD` 这类低置信度规则）。
+- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY` 及新增的 Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face 平台 Token 规则；跳过 `GENERIC-PASSWORD` / `AWS-SECRET` / `AZURE-STORAGE-KEY` 这类低置信度或依赖上下文的规则）。
 - 熵值用来辅助判定 `AWS-SECRET`：仅在 Shannon 熵 > 4.0 时命中。
 
 ## 7. 配置项
@@ -90,8 +98,8 @@ flowchart LR
 
 ## 9. 测试要点
 
-- [ ] 每条规则 ≥ 3 条 positive + 3 条 negative。
-- [ ] `TC-FR-021-S-*` 测试全部通过。
+- [x] 每条规则 ≥ 3 条 positive + 3 条 negative（`BuiltinRuleFixtureTests`，16 条 Secret 规则全覆盖）。
+- [x] `TC-FR-021-S-*` 测试全部通过。
 - [ ] ReDoS 用例集对正则进行回溯测试。
 - [ ] GitleaksAdapter（P2）在 Mock 模式下的契约测试。
 - [ ] 金丝雀 Token 自检（DR-02）。
@@ -113,3 +121,4 @@ flowchart LR
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003 流式）；AWS-AKID 移除「行长 ≤ 256」表述（长行策略统一见 §6）；JWT 正则改为边界断言式（规则按行匹配、无 Multiline，`^`/`$` 不适用）；整文件跳过后缀定为 `.lock` / `.min.js` / `.min.css`；脱敏统一由 Core `Masker` 承担 |
 | 0.1.2 | 2026-10-16 | 与 GGD-0007 实现同步：上游差异解析落地（`UnifiedDiffParser` 将 `git diff --cached -U0` / `git diff-tree -p -U0` 输出按行号展开为逐文件变更）；§2.1 输入格式修正为 `FileChange { Path, Lines[ChangedLine] }` |
 | 0.1.3 | 2026-10-21 | GGD-0020：§8 单规则耗时测量方式改为 `--verbose` 的 `Scan.RuleTiming`（`duration_us`），替换未落地的 BenchmarkDotNet 引用 |
+| 0.1.4 | 2026-10-22 | GGD-0033：规则库扩充至 16 条 Secret 规则（新增 Google API Key / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face / Azure Storage Key）；§6 长行高置信度规则集同步扩充；§9 勾选样本覆盖项 |

@@ -1,5 +1,10 @@
 version: 1
 
+# 检测规则夹具中刻意构造了假密钥、假路径等命中样例，仅用于自动化测试，不参与本仓库自扫描。
+exclude:
+  paths:
+    - "tests/**/Fixtures/**"
+
 allowlist:
   entries:
     - rule_id: GGD/SECRET/AWS-AKID

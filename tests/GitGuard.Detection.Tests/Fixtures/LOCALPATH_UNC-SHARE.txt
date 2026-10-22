@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/UNC-SHARE（Medium）：\\<主机>\<共享>[\\<子路径>...]
+[positive]
+share = "\\fileserver\projects\app"
+copy \\nas01\team$\release\build.zip
+path: \\devbox\c$\work
+
+[negative]
+https://fileserver/projects/app
+\fileserver\projects\app
+\\fileserver
+
+[edge]
+hit: net use Z: \\backup\share$
+miss: \\fileserver\

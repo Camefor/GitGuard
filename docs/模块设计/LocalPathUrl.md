@@ -24,6 +24,9 @@
 | `GGD/LOCALPATH/WIN-USER` | Windows 用户目录绝对路径 | Low | `[A-Z]:\\Users\\[\w.-]+\\` |
 | `GGD/LOCALPATH/WIN-DRIVE` | Windows 驱动器盘符 | Low | 行首 `[A-Z]:\\` 后跟路径分隔 |
 | `GGD/LOCALPATH/TEMP-WORK` | 常见临时/工作区绝对路径 | Low | `/workspace/volumes/`、`/mnt/d/`、`~/workspace/` |
+| `GGD/LOCALPATH/UNC-SHARE` | Windows UNC 共享路径 | Medium | `\\<server>\<share>` 及任意深度子路径（共享名支持 `$` 管理共享） |
+| `GGD/LOCALPATH/DEV-DIRS` | POSIX 部署目录绝对路径 | Low | `/opt/<目录>/`、`/srv/<目录>/`、`/data/<目录>/` |
+| `GGD/LOCALPATH/HOME-TILDE` | 用户主目录 `~` 路径 | Low | `~/<目录>/<子目录>`（可出现在引号、空格或 `=` 之后） |
 
 **降级策略**：
 
@@ -38,6 +41,10 @@
 | `GGD/URL/TOKEN-IN-QUERY` | 查询参数含 token/apikey | High | `[?&](token\|apikey\|access_token\|api_key)=[^&\s]+` |
 | `GGD/URL/PRIVATE-IP` | 私有 / 环回 IP | Medium | `10.\d+.\d+.\d+`、`172.(1[6-9]\|2[0-9]\|3[0-1]).\d+.\d+`、`192.168.\d+.\d+`、`127.\d+.\d+.\d+` |
 | `GGD/URL/LOCAL-HOSTNAME` | 内网域名 | Medium | `*.local`、`*.internal`、`*.corp`、`*.lan`（在非文档上下文） |
+| `GGD/URL/SLACK-WEBHOOK` | Slack Webhook URL | High | `https://hooks.slack.com/services/T.../B.../<secret>` |
+| `GGD/URL/DISCORD-WEBHOOK` | Discord Webhook URL | High | `https://discord.com` / `discordapp.com` / `canary` / `ptb` 的 `/api/webhooks/<id>/<token>` |
+| `GGD/URL/PASSWORD-QUERY` | 查询参数含密码 | High | 查询参数 `password` / `passwd` / `pwd` / `secret` 且值非空 |
+| `GGD/URL/AWS-SIGNED-URL` | AWS 预签名 URL | High | `X-Amz-Signature=` 或 `X-Amz-Credential=` 查询参数 |
 
 **降级策略**：
 
@@ -90,9 +97,10 @@ flowchart LR
 
 ## 9. 测试要点
 
-- [ ] Windows / Unix 路径分别覆盖。
-- [ ] 文档文件（`.gitignore` / `README.md` / `docs/**`）中 Low 规则不命中。
-- [ ] URL 带 Token 的脱敏输出不含原 Token。
+- [x] Windows / Unix 路径分别覆盖。
+- [x] 文档文件（`.gitignore` / `README.md` / `docs/**`）中 Low 规则不命中。
+- [x] URL 带 Token 的脱敏输出不含原 Token。
+- [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，7 条 LocalPath + 8 条 Url 规则全覆盖）。
 - [ ] （P2）Markdown 代码块感知与公共 URL 主机白名单。
 
 ## 10. 演进与扩展位
@@ -106,3 +114,4 @@ flowchart LR
 | --- | --- | --- |
 | 0.1.0 | 2026-10-15 | 初始化：4 条 LocalPath + 4 条 Url 规则 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；文档文件降级明确为 glob（`.gitignore` / `README.md` / `docs/**`）+ Low 丢弃；示例文件降级明确为文件名前缀匹配；脱敏统一由 Core `Masker` 承担（§5 示例对齐）；公开 URL 主机白名单与 Markdown 代码块感知记为 P2（本版本未实现） |
+| 0.1.2 | 2026-10-22 | GGD-0033：LocalPath 扩充至 7 条（UNC-SHARE / DEV-DIRS / HOME-TILDE），Url 扩充至 8 条（Slack / Discord Webhook、密码查询参数、AWS 预签名 URL）；§9 勾选样本覆盖项 |

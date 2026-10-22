@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/HOME-TILDE（Low）：~/<目录>/<子目录> 形式的用户主目录路径
+[positive]
+~/projects/secret-app
+cd ~/dev/repo
+PATH=~/tools/bin
+
+[negative]
+~user/project
+~/
+http://example.com/~/path
+
+[edge]
+hit: "path": "~/src/app"
+miss: ~ /projects/app

@@ -1,0 +1,14 @@
+﻿; GGD/URL/SLACK-WEBHOOK（High）：hooks.slack.com/services/T.../B.../<secret>
+[positive]
+https://hooks.slack.com/services/T{{UPPERALNUM:10}}/B{{UPPERALNUM:10}}/{{ALNUM:24}}
+webhook = "https://hooks.slack.com/services/T{{UPPERALNUM:9}}/B{{UPPERALNUM:9}}/{{ALNUM:24}}"
+SLACK_WEBHOOK=https://hooks.slack.com/services/T{{UPPERALNUM:8}}/B{{UPPERALNUM:8}}/{{ALNUM:24}}
+
+[negative]
+https://hooks.slack.com/services/T0123456789/B0123456789
+http://hooks.slack.com/services/T{{UPPERALNUM:10}}/B{{UPPERALNUM:10}}/{{ALNUM:24}}
+https://hooks.slack.com/services/T{{UPPERALNUM:6}}/B{{UPPERALNUM:10}}/{{ALNUM:24}}
+
+[edge]
+hit: curl -X POST https://hooks.slack.com/services/T{{UPPERALNUM:8}}/B{{UPPERALNUM:8}}/{{ALNUM:24}}
+miss: https://hooks.slack.com/services/T{{UPPERALNUM:10}}/B{{UPPERALNUM:10}}/{{ALNUM:5}}

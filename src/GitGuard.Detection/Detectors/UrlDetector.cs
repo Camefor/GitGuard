@@ -5,7 +5,7 @@ namespace GitGuard.Detection.Detectors;
 
 /// <summary>
 /// Url 检测器（模块设计 LocalPathUrl §3.2）：扫描 URL 中的凭据 / Token 与内网地址泄漏，
-/// 承载 <c>GGD/URL/*</c> 4 条规则。类别特有语义：示例文件（example / sample / demo 开头）中严重度降一级。
+/// 承载 <c>GGD/URL/*</c> 8 条规则。类别特有语义：示例文件（example / sample / demo 开头）中严重度降一级。
 /// </summary>
 public sealed class UrlDetector : RegexRuleDetector
 {

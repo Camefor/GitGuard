@@ -8,7 +8,7 @@ using GitGuard.Detection.Rules;
 namespace GitGuard.Detection.Tests;
 
 /// <summary>
-/// 内置规则加载器测试：覆盖 GGD-0006 验收项——21 条规则完整载入、ID 契约、严重度映射、
+/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 验收项——40 条规则完整载入、ID 契约、严重度映射、
 /// 版本 / 重复 ID / 必填字段 / 正则编译等 FailClosed 行为。
 /// </summary>
 public sealed class BuiltinRuleLoaderTests
@@ -24,19 +24,38 @@ public sealed class BuiltinRuleLoaderTests
         ("GGD/SECRET/GENERIC-PASSWORD", Severity.High),
         ("GGD/SECRET/DB-CONN-STRING", Severity.High),
         ("GGD/SECRET/JWT", Severity.Medium),
+        ("GGD/SECRET/GOOGLE-API-KEY", Severity.High),
+        ("GGD/SECRET/STRIPE-KEY", Severity.Critical),
+        ("GGD/SECRET/NPM-TOKEN", Severity.High),
+        ("GGD/SECRET/GITLAB-TOKEN", Severity.Critical),
+        ("GGD/SECRET/OPENAI-KEY", Severity.Critical),
+        ("GGD/SECRET/SENDGRID-KEY", Severity.High),
+        ("GGD/SECRET/HUGGINGFACE-TOKEN", Severity.High),
+        ("GGD/SECRET/AZURE-STORAGE-KEY", Severity.High),
         ("GGD/PRIVACY/CN-IDCARD-18", Severity.High),
         ("GGD/PRIVACY/CN-BANKCARD", Severity.High),
         ("GGD/PRIVACY/CN-MOBILE", Severity.Medium),
         ("GGD/PRIVACY/CN-IDCARD-15", Severity.Medium),
         ("GGD/PRIVACY/EMAIL", Severity.Low),
+        ("GGD/PRIVACY/CN-PASSPORT", Severity.High),
+        ("GGD/PRIVACY/CN-LANDLINE", Severity.Medium),
+        ("GGD/PRIVACY/US-SSN", Severity.Medium),
+        ("GGD/PRIVACY/CN-NAME-ADDRESS", Severity.Medium),
         ("GGD/LOCALPATH/UNIX-HOME", Severity.Low),
         ("GGD/LOCALPATH/WIN-USER", Severity.Low),
         ("GGD/LOCALPATH/WIN-DRIVE", Severity.Low),
         ("GGD/LOCALPATH/TEMP-WORK", Severity.Low),
+        ("GGD/LOCALPATH/UNC-SHARE", Severity.Medium),
+        ("GGD/LOCALPATH/DEV-DIRS", Severity.Low),
+        ("GGD/LOCALPATH/HOME-TILDE", Severity.Low),
         ("GGD/URL/CREDENTIALS-IN-URL", Severity.High),
         ("GGD/URL/TOKEN-IN-QUERY", Severity.High),
         ("GGD/URL/PRIVATE-IP", Severity.Medium),
         ("GGD/URL/LOCAL-HOSTNAME", Severity.Medium),
+        ("GGD/URL/SLACK-WEBHOOK", Severity.High),
+        ("GGD/URL/DISCORD-WEBHOOK", Severity.High),
+        ("GGD/URL/PASSWORD-QUERY", Severity.High),
+        ("GGD/URL/AWS-SIGNED-URL", Severity.High),
     ];
 
     [Fact]
@@ -76,10 +95,11 @@ public sealed class BuiltinRuleLoaderTests
     {
         var rules = BuiltinRuleLoader.LoadEmbedded();
 
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "SECRET").Should().HaveCount(8);
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "PRIVACY").Should().HaveCount(5);
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "LOCALPATH").Should().HaveCount(4);
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "URL").Should().HaveCount(4);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "SECRET").Should().HaveCount(16);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "PRIVACY").Should().HaveCount(9);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "LOCALPATH").Should().HaveCount(7);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "URL").Should().HaveCount(8);
+        rules.Should().HaveCount(40);
     }
 
     [Fact]

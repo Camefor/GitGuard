@@ -45,11 +45,23 @@ internal sealed class FixtureFile
 /// <summary>
 /// Fixtures 解析器：<c>;</c> 注释与空行跳过；<c>[positive]</c> / <c>[negative]</c> 段整行即扫描文本；
 /// <c>[edge]</c> 段要求 <c>hit: </c> / <c>miss: </c> 前缀显式声明期望。
+/// 样本中的 <c>{{ALNUM:n}}</c> 等模板占位符在解析时展开：仓库只保存占位符，完整密钥形态仅在测试运行时生成，
+/// 避免 GitHub Push Protection 等远端 secret scanning 把构造的测试数据误判为真实凭据。
 /// </summary>
 internal static class FixtureParser
 {
     private const string HIT_PREFIX = "hit: ";
     private const string MISS_PREFIX = "miss: ";
+
+    private static readonly Dictionary<string, string> _templateAlphabets = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["ALNUM"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+        ["ALPHA"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+        ["DIGIT"] = "0123456789",
+        ["HEX"] = "0123456789abcdef",
+        ["BASE64"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+        ["UPPERALNUM"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+    };
 
     /// <summary>Fixtures 目录（随测试输出复制到运行目录）。</summary>
     public static string Directory => Path.Combine(AppContext.BaseDirectory, "Fixtures");
@@ -119,10 +131,64 @@ internal static class FixtureParser
                 text = line;
             }
 
-            cases.Add(new FixtureCase(section, index + 1, text, expectHit));
+            cases.Add(new FixtureCase(section, index + 1, ExpandTemplates(text), expectHit));
         }
 
         return new FixtureFile(ruleId, cases);
+    }
+
+    private static string ExpandTemplates(string text)
+    {
+        if (!text.Contains("{{", StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length + 32);
+        int cursor = 0;
+        int sequence = 0;
+        while (cursor < text.Length)
+        {
+            int start = text.IndexOf("{{", cursor, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                builder.Append(text, cursor, text.Length - cursor);
+                break;
+            }
+
+            int end = text.IndexOf("}}", start + 2, StringComparison.Ordinal);
+            if (end < 0)
+            {
+                throw new InvalidOperationException($"样本模板占位符缺少结束标记：{text}");
+            }
+
+            builder.Append(text, cursor, start - cursor);
+            builder.Append(ExpandToken(text.Substring(start + 2, end - start - 2), sequence++));
+            cursor = end + 2;
+        }
+
+        return builder.ToString();
+    }
+
+    private static string ExpandToken(string token, int sequence)
+    {
+        int separator = token.IndexOf(':');
+        if (separator <= 0
+            || !int.TryParse(token.AsSpan(separator + 1), out int length)
+            || length <= 0
+            || length > 4096
+            || !_templateAlphabets.TryGetValue(token.Substring(0, separator), out string? alphabet))
+        {
+            throw new InvalidOperationException($"样本模板占位符格式无效：{{{{{token}}}}}");
+        }
+
+        var builder = new StringBuilder(length);
+        for (int index = 0; index < length; index++)
+        {
+            builder.Append(alphabet[((index * 7) + (sequence * 11)) % alphabet.Length]);
+        }
+
+        return builder.ToString();
     }
 
     private static string RuleIdOf(string fileName)
