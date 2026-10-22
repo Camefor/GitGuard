@@ -331,6 +331,37 @@ public sealed class GitGuardConfigLoaderTests
         config.LogFile.MaxFiles.Should().Be(2);
     }
 
+    [Fact]
+    public void Load_LogFileWithoutPath_UsesInjectedPlatformDefault()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            logging:
+              file:
+                enabled: true
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+        string defaultPath = Path.Combine(project.Root, "data", "logs", "gitguard.log");
+
+        GitGuardConfig config = CreateLoader(project.Root, defaultLogFilePath: defaultPath).Load();
+
+        config.LogFile.Enabled.Should().BeTrue();
+        config.LogFile.Path.Should().Be(defaultPath, "缺省 path 必须跟随注入的平台数据目录，而不是固定 XDG 路径");
+    }
+
+    [Fact]
+    public void Load_NoConfigFiles_UsesInjectedDefaultLogPath()
+    {
+        using var project = new TempDirectory();
+        string defaultPath = Path.Combine(project.Root, "data", "logs", "gitguard.log");
+
+        GitGuardConfig config = CreateLoader(project.Root, defaultLogFilePath: defaultPath).Load();
+
+        config.LogFile.Enabled.Should().BeFalse();
+        config.LogFile.Path.Should().Be(defaultPath);
+    }
+
     [Theory]
     [InlineData("scan:\n  max_file_bytes: 0\n", "scan.max_file_bytes")]
     [InlineData("scan:\n  timeout_ms: 0\n", "scan.timeout_ms")]
@@ -380,12 +411,16 @@ public sealed class GitGuardConfigLoaderTests
     private static string ProjectConfigPath(TempDirectory project) =>
         Path.Combine(project.Root, GitGuardConfigLoader.PROJECT_CONFIG_FILE_NAME);
 
-    private static GitGuardConfigLoader CreateLoader(string projectDirectory, string? userConfigPath = null) =>
+    private static GitGuardConfigLoader CreateLoader(
+        string projectDirectory,
+        string? userConfigPath = null,
+        string? defaultLogFilePath = null) =>
         new GitGuardConfigLoader(
             projectDirectory,
             userConfigPath,
             new FixedClock(FixedNow),
-            createdBy: "tester");
+            createdBy: "tester",
+            defaultLogFilePath: defaultLogFilePath);
 
     /// <summary>真实临时目录夹具（配置加载全部经真实文件系统）。</summary>
     private sealed class TempDirectory : IDisposable

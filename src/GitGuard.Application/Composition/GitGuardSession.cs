@@ -292,7 +292,11 @@ public sealed class GitGuardSession
     }
 
     private GitGuardConfig LoadConfig() =>
-        new GitGuardConfigLoader(_options.WorkingDirectory, _paths.UserConfigPath, _clock).Load();
+        new GitGuardConfigLoader(
+            _options.WorkingDirectory,
+            _paths.UserConfigPath,
+            _clock,
+            defaultLogFilePath: _paths.LogFilePath).Load();
 
     private GitAccess CreateGitAccess() => new GitAccess(_options.WorkingDirectory, _options.GitExecutable);
 

@@ -67,14 +67,24 @@ public sealed class GitGuardConfigLoader
     private readonly string _userConfigPath;
     private readonly IClock _clock;
     private readonly string _createdBy;
+    private readonly string _defaultLogFilePath;
 
     /// <summary>初始化配置加载器。</summary>
     /// <param name="projectDirectory">项目配置所在目录（通常为仓库工作区根目录；非仓库场景为当前工作目录）。</param>
     /// <param name="userConfigPath">用户级配置文件路径；<see langword="null"/> 取 <c>~/.config/gitguard/config.yml</c>。</param>
     /// <param name="clock">时钟抽象（为配置声明的白名单条目生成 <c>created_at</c>）。</param>
     /// <param name="createdBy">白名单条目的登记人；<see langword="null"/> 取当前 OS 用户名。</param>
+    /// <param name="defaultLogFilePath">
+    /// <c>logging.file.path</c> 缺省时的默认日志路径；<see langword="null"/> 取 <see cref="LogFileSettings.Default"/> 的平台路径。
+    /// 组合根注入 <c>&lt;data&gt;/logs/gitguard.log</c>，确保测试 / 自定义数据目录下日志落在同一数据根。
+    /// </param>
     /// <exception cref="ArgumentException"><paramref name="projectDirectory"/> 为空或全空白。</exception>
-    public GitGuardConfigLoader(string projectDirectory, string? userConfigPath = null, IClock? clock = null, string? createdBy = null)
+    public GitGuardConfigLoader(
+        string projectDirectory,
+        string? userConfigPath = null,
+        IClock? clock = null,
+        string? createdBy = null,
+        string? defaultLogFilePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
 
@@ -82,6 +92,9 @@ public sealed class GitGuardConfigLoader
         _userConfigPath = Path.GetFullPath(userConfigPath ?? ResolveDefaultUserConfigPath());
         _clock = clock ?? SystemClockFallback.Instance;
         _createdBy = string.IsNullOrWhiteSpace(createdBy) ? Environment.UserName : createdBy;
+        _defaultLogFilePath = string.IsNullOrWhiteSpace(defaultLogFilePath)
+            ? LogFileSettings.Default.Path
+            : defaultLogFilePath;
     }
 
     /// <summary>项目级配置文件路径（<c>&lt;projectDirectory&gt;/.gitguard.yml</c>）。</summary>
@@ -104,7 +117,7 @@ public sealed class GitGuardConfigLoader
         GitGuardConfigDocument? project = ReadIfExists(_projectConfigPath, loadedFiles, warnings);
         GitGuardConfigDocument merged = Merge(user, project);
 
-        return Build(merged, loadedFiles, warnings, _clock.UtcNow, _createdBy);
+        return Build(merged, loadedFiles, warnings, _clock.UtcNow, _createdBy, _defaultLogFilePath);
     }
 
     private static string ResolveDefaultUserConfigPath()
@@ -293,7 +306,8 @@ public sealed class GitGuardConfigLoader
         List<string> loadedFiles,
         List<string> warnings,
         DateTimeOffset now,
-        string createdBy)
+        string createdBy,
+        string defaultLogFilePath)
     {
         ScanSectionDto scan = merged.Scan ?? new ScanSectionDto();
         if (scan.FailClosed == false)
@@ -315,7 +329,7 @@ public sealed class GitGuardConfigLoader
         SecretRulesSettings secrets = BuildSecrets(rules.Secrets, warnings);
         PrivacyRulesSettings privacy = BuildPrivacy(rules.Privacy);
 
-        LogFileSettings logFile = BuildLogFile(merged.Logging);
+        LogFileSettings logFile = BuildLogFile(merged.Logging, defaultLogFilePath);
         if (merged.Logging?.Verbose == true)
         {
             warnings.Add("logging.verbose 已启用：默认以 Debug 级输出（等价于常带 --verbose）。");
@@ -408,13 +422,13 @@ public sealed class GitGuardConfigLoader
         DisabledRules = NormalizeList(dto?.DisabledRules, "rules.*.disabled_rules"),
     };
 
-    private static LogFileSettings BuildLogFile(LoggingSectionDto? logging)
+    private static LogFileSettings BuildLogFile(LoggingSectionDto? logging, string defaultLogFilePath)
     {
         LogFileSectionDto? dto = logging?.File;
         var settings = new LogFileSettings
         {
             Enabled = dto?.Enabled ?? LogFileSettings.Default.Enabled,
-            Path = string.IsNullOrWhiteSpace(dto?.Path) ? LogFileSettings.Default.Path : dto.Path,
+            Path = string.IsNullOrWhiteSpace(dto?.Path) ? defaultLogFilePath : dto.Path,
             MaxBytes = dto?.MaxBytes ?? LogFileSettings.Default.MaxBytes,
             MaxFiles = dto?.MaxFiles ?? LogFileSettings.Default.MaxFiles,
         };

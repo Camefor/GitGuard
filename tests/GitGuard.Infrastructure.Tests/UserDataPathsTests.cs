@@ -22,6 +22,7 @@ public sealed class UserDataPathsTests
         paths.CacheDirectory.Should().Be(Path.Combine(data, "cache"));
         paths.FingerprintSaltPath.Should().Be(Path.Combine(data, "cache", "fingerprint.salt"));
         paths.LogDirectory.Should().Be(Path.Combine(data, "logs"));
+        paths.LogFilePath.Should().Be(Path.Combine(data, "logs", "gitguard.log"));
         paths.CrashDirectory.Should().Be(Path.Combine(data, "crash"));
         paths.UserConfigDirectory.Should().Be(Path.GetFullPath(config));
         paths.UserConfigPath.Should().Be(Path.Combine(config, "config.yml"));
@@ -48,6 +49,55 @@ public sealed class UserDataPathsTests
         Path.IsPathFullyQualified(paths.DataDirectory).Should().BeTrue();
         paths.AuditDatabasePath.Should().StartWith(paths.DataDirectory);
         paths.UserConfigPath.Should().EndWith("config.yml");
+    }
+
+    [Fact]
+    public void Default_OnWindows_PlacesLogUnderLocalAppDataGitGuard()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Windows 默认路径断言仅在 Windows 运行（09-日志设计 §7）");
+        }
+
+        string? localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+        string root = string.IsNullOrWhiteSpace(localAppData)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            : localAppData;
+
+        UserDataPaths.Default.LogFilePath.Should().Be(
+            Path.Combine(root, "GitGuard", "logs", "gitguard.log"));
+    }
+
+    [Fact]
+    public void Default_OnMacOS_PlacesLogUnderApplicationSupport()
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            Assert.Skip("macOS 默认路径断言仅在 macOS 运行（09-日志设计 §7）");
+        }
+
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        UserDataPaths.Default.LogFilePath.Should().Be(
+            Path.Combine(home, "Library", "Application Support", "GitGuard", "logs", "gitguard.log"));
+    }
+
+    [Fact]
+    public void Default_OnLinux_PlacesLogUnderXdgDataHome()
+    {
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        {
+            Assert.Skip("Linux 默认路径断言仅在 Linux 运行（09-日志设计 §7）");
+        }
+
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string? xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        string dataRoot = string.IsNullOrWhiteSpace(xdgDataHome)
+            ? Path.Combine(home, ".local", "share")
+            : Path.GetFullPath(xdgDataHome);
+
+        UserDataPaths.Default.LogFilePath.Should().Be(
+            Path.Combine(dataRoot, "gitguard", "logs", "gitguard.log"));
     }
 
     [Fact]

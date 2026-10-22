@@ -37,6 +37,9 @@ public sealed class UserDataPaths
     /// <summary>日志目录名（09-日志设计 §7）。</summary>
     private const string LOG_DIRECTORY_NAME = "logs";
 
+    /// <summary>文件日志名（09-日志设计 §7）。</summary>
+    private const string LOG_FILE_NAME = "gitguard.log";
+
     /// <summary>崩溃日志目录名（10-异常处理设计 §8）。</summary>
     private const string CRASH_DIRECTORY_NAME = "crash";
 
@@ -86,6 +89,9 @@ public sealed class UserDataPaths
 
     /// <summary>日志目录（09-日志设计 §7：<c>&lt;data&gt;/logs</c>）。</summary>
     public string LogDirectory => Path.Combine(DataDirectory, LOG_DIRECTORY_NAME);
+
+    /// <summary>默认文件日志路径（09-日志设计 §7：<c>&lt;data&gt;/logs/gitguard.log</c>）。</summary>
+    public string LogFilePath => Path.Combine(LogDirectory, LOG_FILE_NAME);
 
     /// <summary>崩溃日志目录（10-异常处理设计 §8：<c>&lt;data&gt;/crash</c>）。</summary>
     public string CrashDirectory => Path.Combine(DataDirectory, CRASH_DIRECTORY_NAME);

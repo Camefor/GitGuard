@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using GitGuard.Application.Scanning;
 using GitGuard.Core.Policy;
+using GitGuard.Infrastructure.FileSystem;
 
 namespace GitGuard.Application.Configuration;
 
@@ -179,14 +180,14 @@ public sealed record PrivacyRulesSettings
 /// <summary>文件日志设置（<c>logging.file</c>，09-日志设计 §7）。</summary>
 public sealed record LogFileSettings
 {
-    /// <summary>默认设置：关闭；路径与滚动阈值取 Policy.md §7 默认值。</summary>
+    /// <summary>默认设置：关闭；路径取平台数据目录（<see cref="UserDataPaths.LogFilePath"/>），滚动阈值取 Policy.md §7 默认值。</summary>
     public static LogFileSettings Default { get; } = new LogFileSettings();
 
     /// <summary>是否启用文件日志（09-日志设计 §7：默认不写日志文件）。</summary>
     public bool Enabled { get; init; }
 
-    /// <summary>日志文件路径；<c>~</c> 前缀由日志 Sink 展开为用户主目录。</summary>
-    public string Path { get; init; } = "~/.local/share/gitguard/logs/gitguard.log";
+    /// <summary>日志文件路径；默认 <c>&lt;data&gt;/logs/gitguard.log</c>，<c>~</c> 前缀由日志 Sink 展开为用户主目录。</summary>
+    public string Path { get; init; } = UserDataPaths.Default.LogFilePath;
 
     /// <summary>单文件滚动阈值（字节），默认 10 MiB。</summary>
     public long MaxBytes { get; init; } = 10L * 1024 * 1024;

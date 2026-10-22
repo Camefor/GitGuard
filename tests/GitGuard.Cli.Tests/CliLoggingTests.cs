@@ -58,6 +58,26 @@ public sealed class CliLoggingTests
     }
 
     [Fact]
+    public async Task ConfiguredLogFileWithoutPath_WritesUnderPlatformDataDirectory()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig(
+            """
+            version: 1
+            logging:
+              file:
+                enabled: true
+            """);
+        string logPath = Path.Combine(harness.DataDirectory, "logs", "gitguard.log");
+
+        (await harness.RunAsync("version", "--verbose")).Should().Be(ExitCodes.SUCCESS);
+
+        File.Exists(logPath).Should().BeTrue("缺省 logging.file.path 必须落在注入的数据目录下");
+        using var document = JsonDocument.Parse(File.ReadLines(logPath).First());
+        document.RootElement.GetProperty("category").GetString().Should().Be("Cli");
+    }
+
+    [Fact]
     public void ExpandUserPath_ExpandsTildePrefixOnly()
     {
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
