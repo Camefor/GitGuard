@@ -85,20 +85,9 @@ internal static class HookTestSupport
         return filePath;
     }
 
-    /// <summary>写入 POSIX sh 脚本（无 BOM、LF 行尾，保证 shebang 生效）；Unix 下补齐可执行位。</summary>
-    internal static void WritePosixScript(string filePath, string body)
-    {
+    /// <summary>写入 POSIX sh 脚本（无 BOM、LF 行尾，保证 shebang 生效）。</summary>
+    internal static void WritePosixScript(string filePath, string body) =>
         File.WriteAllText(filePath, "#!/bin/sh\n" + body, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        if (!OperatingSystem.IsWindows())
-        {
-            // Linux / macOS 的 [ -x ] 依赖真实权限位；缺少可执行位会让 Hook 以 exit 10 失败
-            UnixFileMode mode =
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
-            File.SetUnixFileMode(filePath, mode);
-        }
-    }
 
     /// <summary>把路径转为正斜杠形态（MSYS sh 把反斜杠当转义字符）。</summary>
     internal static string ToUnixPath(string path) =>

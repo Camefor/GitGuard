@@ -91,7 +91,7 @@ GitGuard 需要在开发者本机（Windows / macOS / Linux）作为 CLI 高频�
 
 - [x] 验证 `Microsoft.Data.Sqlite` 在 Native AOT 下的可用性（`GGD-0005` 已完成）：`dotnet publish -c Release -r win-x64 -p:PublishAot=true` 无 trim/AOT 警告（IL2026/IL3050 等），原生产物自动携带 `e_sqlite3.dll`；探针实测迁移 / 写入 / 读取 / 查询全部通过。环境注记：Windows 链接阶段要求 `vswhere.exe` 可见（将 VS Installer 目录加入 PATH）。
 - [x] 验证 `YamlDotNet` 的 trim-safe 配置或预编译模型（`GGD-0006` 已完成）：采用 `Vecc.YamlDotNet.Analyzers.StaticGenerator`（MIT）源生成静态上下文（`[YamlStaticContext]` + `[YamlSerializable]`，见 `GitGuard.Detection/Rules/BuiltinRulesDocument.cs`），以生成代码替代反射式类型解析；`dotnet publish -c Release -r win-x64 -p:PublishAot=true` 无 trim/AOT 警告（IL2026/IL3050 等），原生产物运行加载 21 条内置规则全部通过。探针实测动态 Regex（`RegexOptions.Compiled | CultureInvariant` + 200ms 超时）在 AOT 下可用。环境注记：生成器仅编译期参与（`PrivateAssets="all"`），不随产物分发。
-- [ ] 建立 CI 多平台构建矩阵（`GGD-0011`）。
+- [ ] 建立 CI 多平台构建矩阵（`GGD-0011`；当前收敛为 Windows 单平台，macOS / Ubuntu 暂缓 `GGD-0028`）。
 - [ ] P3 启动时锁定 Avalonia 具体 LTS 版本。
 
 ## 备注

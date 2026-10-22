@@ -206,14 +206,14 @@ CLI 命令细节见 `06-API接口设计.md`。
 
 | 编号 | 指标 | 目标值 | 测量方式 | v0.1 状态 |
 | --- | --- | --- | --- | --- |
-| `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` | 已覆盖：`TC-COMPAT-01~04` 在真实安装的 Husky v9 / lefthook v2 / pre-commit 仓库中验证安装包裹、真实 `git commit` 链式执行、阻断语义与卸载逐字节还原；CI `hook-compat` 作业（Ubuntu / Windows）执行（`GGD-0021`） |
-| `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 | 已覆盖：`.github/workflows/ci.yml` 三平台矩阵（`GGD-0011`） |
+| `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` | 已覆盖：`TC-COMPAT-01~04` 在真实安装的 Husky v9 / lefthook v2 / pre-commit 仓库中验证安装包裹、真实 `git commit` 链式执行、阻断语义与卸载逐字节还原；CI `hook-compat` 作业（Windows）执行（`GGD-0021`）；macOS / Ubuntu 矩阵暂缓（`GGD-0028`） |
+| `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 | 部分覆盖：当前 `.github/workflows/ci.yml` 仅 Windows（`GGD-0027`）；macOS / Ubuntu 矩阵暂缓（`GGD-0028`），`release.yml` 仍产出三平台 AOT 发行物 |
 
 ### 5.3 安全
 
 | 编号 | 要求 | 验证方式 | v0.1 状态 |
 | --- | --- | --- | --- |
-| `NFR-S-001` | 本地化：无出站网络请求 | 单元测试 + CI 下 `strace`/`netstat` 验证 | 已覆盖：CI Linux `strace -e trace=network` 作业（TC-DR-01-01，`GGD-0011`） |
+| `NFR-S-001` | 本地化：无出站网络请求 | 单元测试 + CI 下 `strace`/`netstat` 验证 | 部分覆盖：编译期 `BannedSymbols` 封禁与本地验证仍生效；CI Linux `strace -e trace=network` 作业暂缓（TC-DR-01-01，`GGD-0028`） |
 | `NFR-S-002` | SQLite / 日志 / 临时文件无明文敏感原文 | 代码审查 + 测试用「金丝雀 Token」注入后扫文件 | 已覆盖：TC-DR-02-01(审计库 / 日志 / 终端输出)；崩溃日志经同一脱敏流水线但无独立金丝雀用例 |
 | `NFR-S-003` | FailClosed：所有异常路径默认阻断 | 故障注入测试 `TC-FAILCLOSED-*` | 已覆盖：TC-DR-03-01~04（Git / 检测器 / 超时 / 配置） |
 | `NFR-S-004` | 绕过事件可追溯 | 审计表查询 | 已覆盖：TC-FR-050-01 / TC-DR-06-01（`scan_runs` + `audit_logs` 直读断言；E2E S8 覆盖 `--no-verify` / `GITGUARD_SKIP=1` / 两者并用） |
@@ -307,3 +307,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.9 | 2026-10-21 | GGD-0023：§2.8 / §4 推送差异来源改为一次批量 `git log --no-walk=unsorted --stdin`；§5.1 P-003 回填复测 P95 669.78 ms 达标（较 4687.07 ms 下降约 86%），P-001 / P-002 / P-004 同步最新实测 |
 | 0.1.10 | 2026-10-21 | GGD-0022：§4 审计查询 / 导出接口标记已实现（`audit list` 分页 / 筛选，`audit export` 仅脱敏字段；`audit view` 仍为 v0.2） |
 | 0.1.11 | 2026-10-21 | GGD-0021：§5.2 NFR-A-001 标记已覆盖（Husky / lefthook / pre-commit 真实安装矩阵 `TC-COMPAT-01~04` + CI `hook-compat`） |
+| 0.1.12 | 2026-10-22 | GGD-0027：§5.2 NFR-A-002 改为部分覆盖（CI 收敛为 Windows 单平台，macOS / Ubuntu 矩阵暂缓 `GGD-0028`）；NFR-A-001 的 CI 作业范围同步为 Windows；§5.3 NFR-S-001 标注 Linux `strace` 作业暂缓，编译期封禁仍生效 |

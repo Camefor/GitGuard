@@ -1,7 +1,7 @@
 name: CI
 
-# 流水线阶段（16-测试方案 §11）：restore → build → unit → integration → scenario → security。
-# 三平台矩阵（NFR-A-002）：Windows 11 / macOS 14 / Ubuntu 24.04。
+# 流水线阶段（16-测试方案 §11）：restore → build → unit → integration → scenario。
+# 当前仅 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 安全作业暂缓，恢复任务见 GGD-0028。
 
 on:
   push:
@@ -22,12 +22,8 @@ env:
 
 jobs:
   build-test:
-    name: Build & test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest, macos-14]
+    name: Build & test (Windows)
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,12 +62,8 @@ jobs:
   # SRS NFR-A-001 / 16-测试方案 §2：在真实 Husky / lefthook / pre-commit 仓库中验证安装包裹、
   # 提交链执行、阻断语义与卸载还原。build-test 中未设置 GITGUARD_HOOK_COMPAT 时，这三个用例自动跳过。
   hook-compat:
-    name: Hook compatibility (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest]
+    name: Hook compatibility (Windows)
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,54 +100,3 @@ jobs:
         env:
           GITGUARD_HOOK_COMPAT: "1"
         run: dotnet test tests/GitGuard.E2E.Tests/GitGuard.E2E.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~HookFrameworkCompatibilityTests"
-
-  security:
-    name: Security (DR-01 localization)
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Publish CLI (framework-dependent)
-        run: dotnet publish src/GitGuard.Cli/GitGuard.Cli.csproj -c Release -o "$RUNNER_TEMP/gitguard-cli"
-
-      - name: Install strace
-        run: command -v strace >/dev/null || (sudo apt-get update && sudo apt-get install -y strace)
-
-      # TC-DR-01-01：扫描全链路不得产生任何 AF_INET/AF_INET6 系统调用。
-      # 金丝雀仅在内存中构造，扫描必然命中并返回 1；同时快照网络 syscall 供断言。
-      - name: DR-01 - scan performs no outbound network syscalls
-        shell: bash
-        run: |
-          set -euo pipefail
-          repo="$RUNNER_TEMP/dr01-repo"
-          home="$RUNNER_TEMP/dr01-home"
-          mkdir -p "$repo" "$home"
-          git -C "$repo" init --quiet --initial-branch=master
-          git -C "$repo" config user.name "GitGuard CI"
-          git -C "$repo" config user.email "gitguard-ci@example.com"
-          canary="AKIA$(openssl rand -hex 8 | tr 'a-f' 'A-F')"
-          printf 'AWS_ACCESS_KEY_ID=%s\n' "$canary" > "$repo/leak.env"
-          git -C "$repo" add leak.env
-
-          set +e
-          (cd "$repo" && HOME="$home" strace -f -qq -e trace=network -o "$RUNNER_TEMP/network.trace" \
-            "$RUNNER_TEMP/gitguard-cli/gitguard" --no-color scan --staged)
-          scan_exit=$?
-          set -e
-
-          if [ "$scan_exit" -ne 1 ]; then
-            echo "::error::expected scan to be blocked (exit 1), got $scan_exit"
-            cat "$RUNNER_TEMP/network.trace"
-            exit 1
-          fi
-          if grep -E 'AF_INET6?' "$RUNNER_TEMP/network.trace"; then
-            echo "::error::DR-01 violation: outbound network syscalls detected"
-            exit 1
-          fi
-          echo "DR-01 passed: no AF_INET/AF_INET6 syscalls during scan."

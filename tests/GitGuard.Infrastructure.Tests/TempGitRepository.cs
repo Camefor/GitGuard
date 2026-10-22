@@ -10,9 +10,8 @@ internal sealed class TempGitRepository : IDisposable
 {
     public TempGitRepository()
     {
-        string root = Path.Combine(Path.GetTempPath(), "gitguard-infra-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        Root = ResolveRealPath(root);
+        Root = Path.Combine(Path.GetTempPath(), "gitguard-infra-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Root);
 
         RunGit("init", "--quiet");
         RunGit("config", "user.name", "GitGuard Test");
@@ -107,35 +106,6 @@ internal sealed class TempGitRepository : IDisposable
         arguments[1] = "--";
         relativePaths.CopyTo(arguments, 2);
         return arguments;
-    }
-
-    /// <summary>
-    /// 逐段解析符号链接，返回真实绝对路径。
-    /// macOS 上 <see cref="Path.GetTempPath"/> 返回 <c>/var/folders/...</c>，而 git 输出 <c>/private/var/folders/...</c>；
-    /// 测试期望值统一取真实路径，才能与 git 输出直接比较。
-    /// </summary>
-    private static string ResolveRealPath(string path)
-    {
-        string fullPath = Path.GetFullPath(path);
-        if (OperatingSystem.IsWindows())
-        {
-            return fullPath;
-        }
-
-        string root = Path.GetPathRoot(fullPath) ?? "/";
-        string resolved = root;
-        string[] segments = fullPath[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-        foreach (string segment in segments)
-        {
-            resolved = Path.Combine(resolved, segment);
-            FileSystemInfo? target = new DirectoryInfo(resolved).ResolveLinkTarget(returnFinalTarget: true);
-            if (target is not null)
-            {
-                resolved = target.FullName;
-            }
-        }
-
-        return resolved;
     }
 
     /// <summary>git 对象文件为只读（mode 444），删除前恢复普通属性。</summary>

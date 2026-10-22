@@ -280,7 +280,7 @@ flowchart LR
 | --- | --- | --- |
 | 性能 | Native AOT；按文件/Hunk 流式扫描；规则正则编译缓存；大文件早停跳过 | NFR-P-001 ~ 004 |
 | 安全 | 严禁明文落日志；Logging Sink 内置掩码；SQLite 字段 Schema 不含原文列 | NFR-S-001 ~ 004 |
-| 可用性 | 跨平台单源；CI 多平台矩阵；Hook 分发器单元/集成测试覆盖 | NFR-A-001, 002 |
+| 可用性 | 跨平台单源；CI 当前为 Windows 单平台（macOS / Ubuntu 矩阵暂缓，`GGD-0028`）；Hook 分发器单元/集成测试覆盖 | NFR-A-001, 002 |
 | 可维护性 | 模块化单体 + Analyzer 边界检查；规则在配置声明；文档 SSOT | NFR-M-001, 002 |
 | 可演化性 | `IDetector` 适配器插槽；Avalonia 复用 `Application` | - |
 
