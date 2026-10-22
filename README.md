@@ -288,7 +288,7 @@ dotnet test GitGuard.sln
 ```
 
 - 全量测试：1044 用例（1035 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
-- CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
+- CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
 
@@ -297,7 +297,7 @@ dotnet test GitGuard.sln
 - Hook 兼容性：Husky v9 / lefthook v2 / pre-commit 4.x 的安装包裹、真实提交链式执行、阻断语义与卸载还原已在真实安装仓库中验证（`TC-COMPAT-01~04`）；CI `hook-compat` 作业当前仅覆盖 Windows，macOS / Ubuntu 矩阵暂缓（`GGD-0028`）。
 - CI 当前仅运行 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 `strace` 作业暂缓（`GGD-0028`）。
 - Windows 下审计库目前依赖用户目录默认 ACL，显式收紧计划中。
-- Git 2.9 / 2.40 兼容矩阵尚未在 CI 覆盖，当前以最新稳定版 Git 验证。
+- Git 2.9.3 / 2.40.1 / 最新稳定版已由 CI `git-compat` 矩阵覆盖；更老版本未验证。
 - `scan --staged` 只扫描暂存区，不读取未暂存内容；全量历史扫描尚未实现。
 
 ## 文档入口

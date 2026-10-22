@@ -394,9 +394,10 @@ public sealed class GitAccess : IGitAccess
     /// <summary>解析当前工作树专属 Git 目录（linked worktree 下为 .git/worktrees/&lt;name&gt;）。</summary>
     private string ResolveGitDirectory()
     {
-        var result = RunGit("rev-parse", "--absolute-git-dir");
-        EnsureGitSucceeded(result, "rev-parse --absolute-git-dir");
-        return Path.GetFullPath(result.StandardOutput.Trim());
+        // 不用 --absolute-git-dir（Git ≥ 2.13）：--git-dir 在 Git 2.9 起可用，相对路径统一基于工作区根目录绝对化
+        var result = RunGit("rev-parse", "--git-dir");
+        EnsureGitSucceeded(result, "rev-parse --git-dir");
+        return Path.GetFullPath(Path.Combine(_repositoryRoot, result.StandardOutput.Trim()));
     }
 
     /// <summary>读取 core.hooksPath；未设置（git 退出码 1）或显式置空时返回 null（调用方回退 .git/hooks）。</summary>

@@ -30,7 +30,8 @@ public sealed class GitAccessBypassTests
         string worktreePath = Path.Combine(Path.GetTempPath(), "gitguard-infra-tests", Guid.NewGuid().ToString("N"));
         try
         {
-            repo.RunGit("worktree", "add", "--quiet", worktreePath, "-b", "linked");
+            // 不加 --quiet（Git 2.9 的 worktree add 尚不支持该选项）
+            repo.RunGit("worktree", "add", worktreePath, "-b", "linked");
 
             var access = new GitAccess(worktreePath);
 

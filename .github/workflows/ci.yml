@@ -152,3 +152,54 @@ jobs:
           path: artifacts/test-results/
           if-no-files-found: warn
           retention-days: 30
+
+  # 16-测试方案 §6 / GGD-0017：Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵。
+  # 托管 runner 只预装最新 Git，旧版本从 git-for-windows/git 官方 release 下载 PortableGit 后注入 PATH。
+  git-compat:
+    name: Git compatibility (${{ matrix.git }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - git: "2.9.3"
+            legacy: true
+          - git: "2.40.1"
+            legacy: true
+          - git: "latest"
+            legacy: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Git ${{ matrix.git }}
+        if: matrix.legacy
+        shell: pwsh
+        run: ./.github/scripts/install-git-version.ps1 -Version "${{ matrix.git }}"
+
+      - name: Verify toolchain
+        run: git --version
+
+      - name: Build (Release)
+        run: dotnet build GitGuard.sln -c Release
+
+      - name: E2E tests - Git ${{ matrix.git }}
+        run: >
+          dotnet test tests/GitGuard.E2E.Tests/GitGuard.E2E.Tests.csproj -c Release --no-build
+          --report-xunit-trx --report-xunit-trx-filename git-compat.trx
+          --results-directory artifacts/test-results/git-compat
+          --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-git-compat-${{ matrix.git }}
+          path: artifacts/test-results/
+          if-no-files-found: warn
+          retention-days: 30

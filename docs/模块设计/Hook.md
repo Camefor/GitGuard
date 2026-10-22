@@ -62,7 +62,7 @@
 - 模板以 **EmbeddedResource 嵌入主程序集**（ADR-0004：单文件发行不做外部文件依赖），渲染时从资源流读取。
   - `<EmbeddedResource>` 必须声明 `WithCulture="false"`：MSBuild 会把文件名中的 `.sh` 段识别为区域代码（Serbo-Croatian），否则资源名被剥离并改派到附属程序集，主程序集取不到（GGD-0008 实测踩坑）。
   - 仓库内按 13-开发规范存储（UTF-8 with BOM + CRLF），渲染时归一化为 LF + 无 BOM（POSIX sh 拒绝 BOM / CR）。
-- 待提交标记（FR-050）：`<git-dir>/gitguard/pending-scan.json`（组合根经 `git rev-parse --absolute-git-dir` 解析，每个 worktree 独立）。
+- 待提交标记（FR-050）：`<git-dir>/gitguard/pending-scan.json`（组合根经 `git rev-parse --git-dir` 解析并绝对化，每个 worktree 独立）。
   - 内容：`{ "parent_sha": string|null, "tree_sha": string, "skipped": bool, "recorded_at": int(epoch ms) }`（snake_case）。
   - 写入：同目录临时文件 + 原子改名；UTF-8 无 BOM；Unix 目录 `0700` / 文件 `0600`。
   - 读取失败或 JSON / SHA 非法 → 删除并按「无标记」处理，post-commit 退化为 `NoVerify` 登记。
@@ -280,3 +280,4 @@ GUARD_EXIT=0
 | 0.1.2 | 2026-10-16 | 与 GGD-0008 实现同步：§2.2 输出限定 POSIX sh（撤销 PowerShell 变体）；§3 核心规则补全托管识别 / 复制备份 / 退出码规则 / 冲突拒绝边界 / 并发锁 / 卸载判定；§5 记录 EmbeddedResource `WithCulture=false` 陷阱、post-commit 推迟 GGD-0013、upsert 语义；§6 流程补锁与三阶段安装；§6.2/6.3 退出码规则取代 `max(...)`；§7 替换为实际交付模板；§10 勾选已完成测试项 |
 | 0.1.3 | 2026-10-21 | 与 GGD-0013 实现同步：§2.1/§2.2 补 post-commit 输入与 Bypass 审计输出；§3 补绕过判定与原因优先级；§5 新增 `post-commit.sh.template` 与待提交标记文件语义；§6.2 更新为 `scan --staged --record-pending`，新增 §6.4 PostCommit 流程；§7 模板片段更新并补 post-commit 调用；§8 标注 `hooks.*` 配置未接线；§10 勾选 TC-DR-06-01 / TC-FR-050-01 |
 | 0.1.4 | 2026-10-21 | 与 GGD-0021 实现同步：§7 模板新增 POSIX sh 备份的 `$0` 保留执行（Husky `.husky/_/h` 按 `$0` 推导目标 Hook），要点表补对应说明；§10 勾选 TC-COMPAT-01~04（Husky / lefthook / pre-commit 真实安装矩阵） |
+| 0.1.5 | 2026-10-22 | GGD-0017：§5 待提交标记的 Git 目录解析由 `rev-parse --absolute-git-dir`（Git ≥ 2.13）改为 `rev-parse --git-dir` + 绝对化，兼容 Git 2.9 起版本 |

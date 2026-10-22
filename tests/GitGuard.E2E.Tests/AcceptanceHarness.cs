@@ -59,7 +59,9 @@ internal sealed class AcceptanceHarness : IDisposable
         UserConfigDirectory = Path.Combine(_homeDirectory, ".config", "gitguard");
         AuditDatabasePath = Path.Combine(DataDirectory, "audit.db");
 
-        RunGitOrThrow("init", "--quiet", "--initial-branch=master");
+        // 不用 --initial-branch（Git ≥ 2.28）：symbolic-ref 在 Git 2.9 ~ 最新版本上语义一致，支撑版本兼容矩阵
+        RunGitOrThrow("init", "--quiet");
+        RunGitOrThrow("symbolic-ref", "HEAD", "refs/heads/master");
         RunGitOrThrow("config", "user.name", "GitGuard E2E");
         RunGitOrThrow("config", "user.email", "gitguard-e2e@example.com");
         RunGitOrThrow("config", "commit.gpgsign", "false");

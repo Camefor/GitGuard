@@ -20,7 +20,7 @@ public interface IGitAccess
     /// <exception cref="GitException">git 命令失败时抛出（FailClosed）。</exception>
     string GetGitCommonDirectory();
 
-    /// <summary>获取当前工作树专属的 Git 目录（<c>git rev-parse --absolute-git-dir</c>）。</summary>
+    /// <summary>获取当前工作树专属的 Git 目录（<c>git rev-parse --git-dir</c>）。</summary>
     /// <remarks>linked worktree 场景下与 <see cref="GetGitCommonDirectory"/> 不同；FR-050 的待提交标记按工作树隔离。</remarks>
     /// <returns>绝对路径（普通仓库即工作区根目录下的 <c>.git</c>）。</returns>
     /// <exception cref="GitException">git 命令失败时抛出（FailClosed）。</exception>

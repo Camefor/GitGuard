@@ -105,7 +105,10 @@ internal sealed class BenchmarkWorkspace : IDisposable
     internal static string CreateRepository(string path)
     {
         Directory.CreateDirectory(path);
-        RunGit(path, "init", "--quiet", "--initial-branch=master");
+
+        // 不用 --initial-branch（Git ≥ 2.28）：symbolic-ref 兼容 Git 2.9 ~ 最新版本
+        RunGit(path, "init", "--quiet");
+        RunGit(path, "symbolic-ref", "HEAD", "refs/heads/master");
         RunGit(path, "config", "user.name", "GitGuard Benchmarks");
         RunGit(path, "config", "user.email", "benchmarks@example.com");
         RunGit(path, "config", "commit.gpgsign", "false");
