@@ -63,7 +63,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - **成功指标**：误报被豁免，但不等于规则失效；别的真实命中仍能拦截。
 - **失败分支**：缺少 `--reason` → 拒绝写入，白名单变更必须留言。
 - **对应功能需求**：`FR-040, FR-041, FR-042`
-- **v0.1 落地状态**：匹配引擎（规则 / 路径 / 指纹三粒度）与扫描汇总已可用，白名单来源为 `.gitguard.yml` 的 `allowlist.entries`；`gitguard allowlist add/remove/list` CLI 与 SQLite 白名单管理未实现，随 v0.2 交付。
+- **v0.1 落地状态**：已实现（`GGD-0030`）。匹配引擎（规则 / 路径 / 指纹三粒度）与扫描汇总可用；白名单来源为 `.gitguard.yml` 的 `allowlist.entries` 与 SQLite `allowlist` 表，`gitguard allowlist add/remove/list` 管理并写 `AllowlistChanged` 审计事件；扫描时合并两个来源。
 
 ### 3.5 场景「开发者显式绕过（`--no-verify` 或 `GITGUARD_SKIP`）」
 
@@ -138,15 +138,15 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - [x] 已存在的文本 Hook 在安装后仍能被触发，退出码正确传播（DR-05；E2E S6）。
 - [x] 扫描器崩溃 / 超时时默认阻断（DR-03；E2E S7a / S7b + TC-DR-03）。
 - [x] `--no-verify` 与 `GITGUARD_SKIP=1` 本地绕过被记录为独立审计事件（DR-06；E2E S8、TC-DR-06-01）。
-- [ ] 白名单登记必填 reason，可按规则 / 路径 / 指纹豁免（配置文件 `allowlist.entries` 已可用；CLI / SQLite 登记随 v0.2）。
+- [x] 白名单登记必填 reason，可按规则 / 路径 / 指纹豁免（配置文件 `allowlist.entries` 与 SQLite `allowlist` 表均可用，CLI 见 `GGD-0030`）。
 - [x] SQLite 中无任何 Token / 密码 / 完整敏感行原文（DR-02；TC-DR-02-01）。
 - [x] Husky / lefthook / pre-commit 真实框架兼容矩阵（NFR-A-001；`GGD-0021`；TC-COMPAT-01~04，CI `hook-compat`）。
 - [x] NFR-P-001~004 性能基准已落地（`GGD-0020`，工具与结果见 `benchmarks/README.md`）：P-002 / P-004 达标；P-001 / P-003 在本机受进程创建基线影响未达标，待正常宿主复测 / `GGD-0023`。
 
 ## 7. 产品路线与版本计划
 
-- **v0.1 MVP**：场景 3.1-3.3 + 3.5；FR-010 ~ FR-032、FR-050、FR-070、FR-071；配置文件级白名单匹配（`allowlist.entries`）可用。FR-040 ~ FR-042 的 CLI / SQLite 管理、FR-060 / FR-061 全量扫描不在 v0.1 范围；无 GitleaksAdapter；无桌面端。
-- **v0.2**：场景 3.4 和 3.6；FR-040 ~ FR-061、FR-080、FR-090；全历史扫描与基线。
+- **v0.1 MVP**：场景 3.1-3.5；FR-010 ~ FR-032、FR-040 ~ FR-042、FR-050、FR-070、FR-071；白名单支持配置文件与 SQLite（`gitguard allowlist` CLI）。FR-060 / FR-061 全量扫描不在 v0.1 范围；无 GitleaksAdapter；无桌面端。
+- **v0.2**：场景 3.6；FR-042 增强、FR-060 / FR-061、FR-080、FR-090；全历史扫描与基线。
 - **v0.3**：Avalonia 桌面端 FR-100；组织级配置。
 
 详细交付节奏见 `17-开发RoadMap.md`。
@@ -169,3 +169,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.4 | 2026-10-21 | GGD-0014：§5 可访问性更新 CLI 中英切换为已实现（`--language` / `GITGUARD_LANG`，命令行优先） |
 | 0.1.5 | 2026-10-21 | GGD-0020：§6 勾选 NFR-P-001~004 基准验收，并标注实测达标情况（P-002 / P-004 达标；P-001 / P-003 受宿主进程创建开销影响未达标） |
 | 0.1.6 | 2026-10-21 | GGD-0021：§6 勾选 Husky / lefthook / pre-commit 真实框架兼容矩阵验收（TC-COMPAT-01~04，CI `hook-compat`） |
+| 0.1.7 | 2026-10-22 | GGD-0030：§3.4 白名单落地状态更新为 CLI + SQLite 已实现（`allowlist add/remove/list`、`AllowlistChanged` 审计、双来源合并）；§6 勾选白名单验收项；§7 v0.1 / v0.2 范围同步 |
