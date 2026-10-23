@@ -1,0 +1,408 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GitGuard.Desktop.ViewModels"
+             x:Class="GitGuard.Desktop.Views.ScanHistoryView"
+             x:DataType="vm:ScanHistoryViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.sectionTitle">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.fieldValue">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#C62828" />
+    </Style>
+    <Style Selector="TextBlock.timelineTitle">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.timelineMeta">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected TextBlock.timelineTitle">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarTextBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected TextBlock.timelineMeta">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarMutedBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected TextBlock.findingTitle">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarTextBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected TextBlock.findingMeta">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.findingTitle">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.findingMeta">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarTextBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSidebarHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="32" RowSpacing="16">
+
+    <!-- 顶部：返回、仓库标识与刷新 -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+      <Button Grid.Column="0"
+              Content="{Binding BackButtonText}"
+              Command="{Binding BackCommand}"
+              CornerRadius="8"
+              VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Spacing="3">
+        <TextBlock Text="{Binding HistoryTitle}"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+        <TextBlock Text="{Binding RepositoryName}"
+                   FontSize="13"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+        <TextBlock Text="{Binding RepositoryPath}"
+                   FontSize="11"
+                   Classes="secondary"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+      <Button Grid.Column="2"
+              Content="{Binding RefreshButtonText}"
+              Command="{Binding RefreshCommand}"
+              IsEnabled="{Binding !IsLoadingPage}"
+              CornerRadius="8"
+              VerticalAlignment="Center" />
+    </Grid>
+
+    <!-- 页面级消息与加载提示 -->
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding Message}"
+                 IsVisible="{Binding HasMessage}"
+                 Classes="error"
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  IsVisible="{Binding IsLoadingPage}">
+        <ProgressBar IsIndeterminate="True" Width="96" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding LoadingText}"
+                   Classes="secondary"
+                   FontSize="12"
+                   VerticalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+
+    <!-- 三栏：时间线 / 发现项列表 / 发现项详情 -->
+    <Grid Grid.Row="2" ColumnDefinitions="300,330,*" ColumnSpacing="16">
+
+      <!-- 扫描时间线 -->
+      <Border Grid.Column="0"
+              Background="{DynamicResource GitGuardSurfaceBrush}"
+              BorderBrush="{DynamicResource GitGuardBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+          <TextBlock Grid.Row="0"
+                     Text="{Binding TimelineTitle}"
+                     Classes="sectionTitle" />
+
+          <Grid Grid.Row="1" Margin="0,12,0,0">
+            <ListBox ItemsSource="{Binding Runs}"
+                     SelectedItem="{Binding SelectedRun}"
+                     Background="Transparent"
+                     BorderThickness="0">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="10,8" />
+                  <Setter Property="Margin" Value="0,1" />
+                  <Setter Property="CornerRadius" Value="8" />
+                </Style>
+                <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ScanRunItemViewModel">
+                  <StackPanel Spacing="3">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding TimestampText}"
+                                 Classes="timelineTitle"
+                                 FontSize="12"
+                                 FontWeight="SemiBold" />
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding ResultText}"
+                                 Classes="timelineMeta"
+                                 FontSize="10"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="{Binding ScanTypeText}"
+                               Classes="timelineMeta"
+                               FontSize="11" />
+                    <TextBlock Text="{Binding MetaText}"
+                               Classes="timelineMeta"
+                               FontSize="10"
+                               TextWrapping="Wrap" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <TextBlock Text="{Binding EmptyText}"
+                       IsVisible="{Binding IsEmpty}"
+                       Classes="hint"
+                       Margin="8,12"
+                       VerticalAlignment="Top" />
+          </Grid>
+
+          <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" Margin="0,12,0,0">
+            <Button Grid.Column="0"
+                    Content="{Binding PreviousPageText}"
+                    Command="{Binding PreviousPageCommand}"
+                    IsEnabled="{Binding CanGoPrevious}"
+                    CornerRadius="8"
+                    Padding="10,4"
+                    FontSize="11" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding PageText}"
+                       Classes="secondary"
+                       FontSize="10"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="2"
+                    Content="{Binding NextPageText}"
+                    Command="{Binding NextPageCommand}"
+                    IsEnabled="{Binding CanGoNext}"
+                    CornerRadius="8"
+                    Padding="10,4"
+                    FontSize="11" />
+          </Grid>
+
+        </Grid>
+      </Border>
+
+      <!-- 发现项列表 -->
+      <Border Grid.Column="1"
+              Background="{DynamicResource GitGuardSurfaceBrush}"
+              BorderBrush="{DynamicResource GitGuardBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <Grid RowDefinitions="Auto,*">
+
+          <TextBlock Grid.Row="0"
+                     Text="{Binding FindingsTitle}"
+                     Classes="sectionTitle" />
+
+          <Grid Grid.Row="1" Margin="0,12,0,0">
+            <ListBox ItemsSource="{Binding Findings}"
+                     SelectedItem="{Binding SelectedFinding}"
+                     Background="Transparent"
+                     BorderThickness="0">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="10,8" />
+                  <Setter Property="Margin" Value="0,1" />
+                  <Setter Property="CornerRadius" Value="8" />
+                </Style>
+                <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:FindingItemViewModel">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="{Binding RuleId}"
+                               Classes="findingTitle"
+                               FontFamily="Consolas"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding LocationText}"
+                                 Classes="findingMeta"
+                                 FontSize="10"
+                                 TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding SeverityText}"
+                                 Classes="findingMeta"
+                                 FontSize="10" />
+                    </Grid>
+                    <TextBlock Text="{Binding CommitShortText}"
+                               Classes="findingMeta"
+                               FontFamily="Consolas"
+                               FontSize="10" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <TextBlock Text="{Binding RunLoadingText}"
+                       IsVisible="{Binding IsLoadingRun}"
+                       Classes="hint"
+                       Margin="8,12"
+                       VerticalAlignment="Top" />
+            <TextBlock Text="{Binding NoFindingsText}"
+                       IsVisible="{Binding IsNoFindingsVisible}"
+                       Classes="hint"
+                       Margin="8,12"
+                       VerticalAlignment="Top" />
+            <TextBlock Text="{Binding SelectFindingPromptText}"
+                       IsVisible="{Binding IsSelectFindingPromptVisible}"
+                       Classes="hint"
+                       Margin="8,12"
+                       VerticalAlignment="Top" />
+          </Grid>
+
+        </Grid>
+      </Border>
+
+      <!-- 发现项详情（只展示脱敏片段与指纹） -->
+      <Border Grid.Column="2"
+              Background="{DynamicResource GitGuardSurfaceBrush}"
+              BorderBrush="{DynamicResource GitGuardBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="20">
+        <Grid RowDefinitions="Auto,*">
+
+          <TextBlock Grid.Row="0"
+                     Text="{Binding FindingDetailTitle}"
+                     Classes="sectionTitle" />
+
+          <Grid Grid.Row="1" Margin="0,12,0,0">
+
+            <ScrollViewer IsVisible="{Binding HasSelectedFinding}">
+              <StackPanel Spacing="14">
+
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding RuleLabel}" Classes="fieldLabel" />
+                  <TextBlock Text="{Binding SelectedFinding.RuleId}"
+                             Classes="fieldValue"
+                             FontFamily="Consolas"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                  <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="{Binding SeverityLabel}" Classes="fieldLabel" />
+                    <TextBlock Text="{Binding SelectedFinding.SeverityText}"
+                               Classes="fieldValue" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="{Binding CommitLabel}" Classes="fieldLabel" />
+                    <TextBlock Text="{Binding SelectedFinding.CommitText}"
+                               Classes="fieldValue"
+                               FontFamily="Consolas"
+                               FontSize="11"
+                               TextWrapping="Wrap" />
+                  </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding LocationLabel}" Classes="fieldLabel" />
+                  <TextBlock Text="{Binding SelectedFinding.LocationText}"
+                             Classes="fieldValue"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding SnippetLabel}" Classes="fieldLabel" />
+                  <Border Background="{DynamicResource GitGuardContentBrush}"
+                          BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="6"
+                          Padding="10">
+                    <TextBlock Text="{Binding SelectedFinding.MaskedSnippetText}"
+                               FontFamily="Consolas"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                  </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding FingerprintLabel}" Classes="fieldLabel" />
+                  <Border Background="{DynamicResource GitGuardContentBrush}"
+                          BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="6"
+                          Padding="10">
+                    <TextBlock Text="{Binding SelectedFinding.FingerprintText}"
+                               FontFamily="Consolas"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                  </Border>
+                </StackPanel>
+
+                <Button Content="{Binding OpenInEditorText}"
+                        Command="{Binding OpenInEditorCommand}"
+                        IsEnabled="{Binding CanOpenInEditor}"
+                        Classes="primary"
+                        HorizontalAlignment="Left" />
+
+              </StackPanel>
+            </ScrollViewer>
+
+            <TextBlock Text="{Binding RunLoadingText}"
+                       IsVisible="{Binding IsLoadingRun}"
+                       Classes="hint"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+            <TextBlock Text="{Binding SelectRunPromptText}"
+                       IsVisible="{Binding IsSelectRunPromptVisible}"
+                       Classes="hint"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       MaxWidth="320"
+                       TextAlignment="Center" />
+            <TextBlock Text="{Binding SelectFindingPromptText}"
+                       IsVisible="{Binding IsSelectFindingPromptVisible}"
+                       Classes="hint"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       MaxWidth="320"
+                       TextAlignment="Center" />
+            <TextBlock Text="{Binding NoFindingsText}"
+                       IsVisible="{Binding IsNoFindingsVisible}"
+                       Classes="hint"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       MaxWidth="320"
+                       TextAlignment="Center" />
+
+          </Grid>
+        </Grid>
+      </Border>
+
+    </Grid>
+  </Grid>
+</UserControl>

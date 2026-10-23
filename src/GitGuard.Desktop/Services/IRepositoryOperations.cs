@@ -63,4 +63,22 @@ public interface IRepositoryOperations
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>扫描后的仓库详情快照（<see cref="RepositoryDetail.LatestScan"/> 为本次运行）。</returns>
     Task<RepositoryDetail> ScanAsync(string repoPath, CancellationToken cancellationToken = default);
+
+    /// <summary>按仓库分页读取扫描历史摘要（开始时间倒序，不含 Finding 明细）。</summary>
+    /// <param name="repoPath">仓库工作区根目录绝对路径。</param>
+    /// <param name="limit">每页条数（1..1000）。</param>
+    /// <param name="offset">跳过的记录数（≥ 0）。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>当前页扫描摘要与仓库内的总记录数。</returns>
+    Task<AuditRunPage> QueryScanHistoryAsync(
+        string repoPath,
+        int limit,
+        int offset,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>按运行标识读取单次扫描的完整 Finding 明细（脱敏片段与指纹，不含原文）。</summary>
+    /// <param name="runId">扫描运行身份标识。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>扫描运行聚合；记录不存在时为 <see langword="null"/>。</returns>
+    Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default);
 }

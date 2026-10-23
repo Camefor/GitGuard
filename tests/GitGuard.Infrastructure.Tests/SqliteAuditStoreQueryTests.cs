@@ -65,6 +65,31 @@ public sealed class SqliteAuditStoreQueryTests
     }
 
     [Fact]
+    public void QueryScanRuns_FiltersRepoPathAndKeepsPaginationTotalWithinRepo()
+    {
+        using var directory = new TempDirectory();
+        var store = CreateStore(directory);
+        string otherRepoPath = Path.Combine(directory.Root, "other-repo");
+        var oldest = SaveCleanRun(store, directory.Root, _sampleStartedAt.AddMinutes(-2));
+        var newest = SaveBlockedRun(store, directory.Root, _sampleStartedAt, findingCount: 1);
+        SaveCleanRun(store, otherRepoPath, _sampleStartedAt.AddMinutes(1));
+
+        AuditRunPage firstPage = store.QueryScanRuns(
+            new AuditQuery(limit: 1, repoPath: Path.TrimEndingDirectorySeparator(directory.Root)));
+        AuditRunPage secondPage = store.QueryScanRuns(
+            new AuditQuery(limit: 1, offset: 1, repoPath: directory.Root));
+        AuditRunPage blockedOnly = store.QueryScanRuns(
+            new AuditQuery(result: ScanResult.Blocked, repoPath: directory.Root));
+
+        firstPage.TotalCount.Should().Be(2);
+        firstPage.Runs.Should().ContainSingle().Which.RunId.Should().Be(newest.Id);
+        secondPage.TotalCount.Should().Be(2);
+        secondPage.Runs.Should().ContainSingle().Which.RunId.Should().Be(oldest.Id);
+        blockedOnly.TotalCount.Should().Be(1);
+        blockedOnly.Runs[0].RunId.Should().Be(newest.Id);
+    }
+
+    [Fact]
     public void QueryScanRuns_ReportsFindingCountAndRunFields()
     {
         using var directory = new TempDirectory();

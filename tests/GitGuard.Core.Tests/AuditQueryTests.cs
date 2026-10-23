@@ -17,6 +17,7 @@ public sealed class AuditQueryTests
         query.Offset.Should().Be(0);
         query.Since.Should().BeNull();
         query.Result.Should().BeNull();
+        query.RepoPath.Should().BeNull();
     }
 
     [Theory]
@@ -74,5 +75,27 @@ public sealed class AuditQueryTests
         Action act = () => _ = new AuditQuery(result: (ScanResult)99);
 
         act.Should().Throw<InvariantViolationException>().WithMessage("*ScanResult*");
+    }
+
+    [Fact]
+    public void Constructor_AbsoluteRepoPath_TrimsTrailingSeparator()
+    {
+        string repoPath = Path.Combine(Path.GetTempPath(), "gitguard-audit-query");
+        string withSeparator = repoPath + Path.DirectorySeparatorChar;
+
+        var query = new AuditQuery(repoPath: withSeparator);
+
+        query.RepoPath.Should().Be(repoPath);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("relative/repo")]
+    [InlineData("   ")]
+    public void Constructor_RelativeOrBlankRepoPath_Throws(string repoPath)
+    {
+        Action act = () => _ = new AuditQuery(repoPath: repoPath);
+
+        act.Should().Throw<InvariantViolationException>().WithMessage("*repoPath*");
     }
 }

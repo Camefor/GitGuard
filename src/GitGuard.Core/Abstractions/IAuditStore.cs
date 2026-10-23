@@ -56,7 +56,8 @@ public interface IAuditStore
 
     /// <summary>
     /// 按分页与筛选条件查询扫描运行摘要（<c>started_at</c> 倒序，不加载 Finding 明细），
-    /// 并返回同一筛选条件下的总记录数（<c>06-API接口设计</c> §5.6）。
+    /// 并返回同一筛选条件下的总记录数（<c>06-API接口设计</c> §5.6）。可选的 <see cref="AuditQuery.RepoPath"/>
+    /// 将结果限定到单个仓库，供桌面端扫描历史分页使用。
     /// </summary>
     /// <param name="query">分页与筛选条件。</param>
     /// <returns>当前页运行摘要与总数。</returns>

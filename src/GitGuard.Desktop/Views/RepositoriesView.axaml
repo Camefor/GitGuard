@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GitGuard.Desktop.ViewModels"
+             xmlns:views="using:GitGuard.Desktop.Views"
              x:Class="GitGuard.Desktop.Views.RepositoriesView"
              x:DataType="vm:RepositoriesViewModel">
 
@@ -279,6 +280,10 @@
                         Command="{Binding ScanCommand}"
                         IsEnabled="{Binding CanInteract}"
                         Classes="primary" />
+                <Button Content="{Binding ScanHistoryButtonText}"
+                        Command="{Binding OpenHistoryCommand}"
+                        IsEnabled="{Binding CanInteract}"
+                        CornerRadius="8" />
                 <Button Content="{Binding RemoveButtonText}"
                         Command="{Binding RequestRemoveCommand}"
                         IsEnabled="{Binding CanInteract}"
@@ -328,5 +333,14 @@
       </Grid>
 
     </Grid>
+
+    <!-- 扫描历史子页面：覆盖整个仓库页内容区（GGD-0043） -->
+    <Border Grid.Row="0"
+            Grid.RowSpan="2"
+            IsVisible="{Binding IsHistoryVisible}"
+            Background="{DynamicResource GitGuardContentBrush}">
+      <views:ScanHistoryView DataContext="{Binding History}" />
+    </Border>
+
   </Grid>
 </UserControl>

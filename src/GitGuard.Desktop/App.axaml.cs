@@ -25,7 +25,10 @@ public sealed partial class App : Avalonia.Application
                 new GitGuardSessionOptions { WorkingDirectory = AppContext.BaseDirectory });
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainViewModel(appState, new RepositoryOperations(session)),
+                DataContext = new MainViewModel(
+                    appState,
+                    new RepositoryOperations(session),
+                    new ShellEditorLauncher()),
             };
         }
 

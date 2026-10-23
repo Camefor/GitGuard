@@ -27,8 +27,14 @@ public sealed class MainViewModel : ObservableObject
     /// <param name="repositoryOperations">
     /// 仓库页操作服务；<see langword="null"/> 时仓库页保持骨架（ViewModel 单测与设计预览不访问真实数据）。
     /// </param>
+    /// <param name="editorLauncher">
+    /// 外部编辑器启动器；<see langword="null"/> 时由仓库页使用默认实现（单测可注入假对象）。
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="appState"/> 为 <see langword="null"/>。</exception>
-    public MainViewModel(AppState appState, IRepositoryOperations? repositoryOperations = null)
+    public MainViewModel(
+        AppState appState,
+        IRepositoryOperations? repositoryOperations = null,
+        IEditorLauncher? editorLauncher = null)
     {
         _appState = appState ?? throw new ArgumentNullException(nameof(appState));
 
@@ -36,7 +42,7 @@ public sealed class MainViewModel : ObservableObject
             Enum.GetValues<DesktopSection>().Select(section => new NavigationItemViewModel(section, appState.Language)));
         _pages = Enum.GetValues<DesktopSection>().ToDictionary(
             section => section,
-            section => CreatePage(section, appState.Language, repositoryOperations));
+            section => CreatePage(section, appState.Language, repositoryOperations, editorLauncher));
 
         _windowTitle = DesktopText.WindowTitle(appState.Language);
         _tagline = DesktopText.Tagline(appState.Language);
@@ -108,9 +114,10 @@ public sealed class MainViewModel : ObservableObject
     private static SectionViewModel CreatePage(
         DesktopSection section,
         DesktopLanguage language,
-        IRepositoryOperations? repositoryOperations) =>
+        IRepositoryOperations? repositoryOperations,
+        IEditorLauncher? editorLauncher) =>
         section == DesktopSection.Repositories && repositoryOperations is not null
-            ? new RepositoriesViewModel(repositoryOperations, language)
+            ? new RepositoriesViewModel(repositoryOperations, language, editorLauncher)
             : new SectionViewModel(section, language);
 
     private static void EnsurePageLoaded(SectionViewModel page)

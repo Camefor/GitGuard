@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using GitGuard.Application.Hooks;
 using GitGuard.Core.Model;
+using GitGuard.Desktop.Services;
 
 namespace GitGuard.Desktop.Localization;
 
@@ -297,6 +298,224 @@ internal static class DesktopText
         ScanType.Bypass => language == DesktopLanguage.English ? "Bypass" : "绕过",
         _ => scanType.ToString(),
     };
+
+    /// <summary>严重度标签。</summary>
+    /// <param name="severity">严重度。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string SeverityLabel(Severity severity, DesktopLanguage language) => severity switch
+    {
+        Severity.Critical => language == DesktopLanguage.English ? "Critical" : "严重",
+        Severity.High => language == DesktopLanguage.English ? "High" : "高",
+        Severity.Medium => language == DesktopLanguage.English ? "Medium" : "中",
+        Severity.Low => language == DesktopLanguage.English ? "Low" : "低",
+        _ => severity.ToString(),
+    };
+
+    /// <summary>仓库详情页的扫描历史入口。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Scan history" : "扫描历史";
+
+    /// <summary>扫描历史页标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string ScanHistoryTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Scan history" : "扫描历史";
+
+    /// <summary>返回仓库详情按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryBackButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Back to repository" : "返回仓库详情";
+
+    /// <summary>刷新扫描历史按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryRefreshButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Refresh" : "刷新";
+
+    /// <summary>扫描时间线标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string ScanHistoryTimelineTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Timeline" : "扫描时间线";
+
+    /// <summary>发现项列表标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string ScanHistoryFindingsTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Findings" : "发现项";
+
+    /// <summary>发现项详情标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string ScanHistoryFindingDetailTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Finding details" : "发现项详情";
+
+    /// <summary>无扫描历史空状态。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryEmpty(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "No scans recorded for this repository yet. Hook or manual scans will appear here."
+            : "该仓库尚无扫描记录。完成一次 Hook 或手动扫描后，这里会显示时间线。";
+
+    /// <summary>未选择扫描运行时的提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistorySelectRunPrompt(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Select a scan run in the timeline to inspect findings."
+            : "从左侧时间线选择一次扫描，查看发现项。";
+
+    /// <summary>扫描运行没有发现项时的提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryNoFindings(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "This scan recorded no findings."
+            : "本次扫描未记录发现项。";
+
+    /// <summary>未选择发现项时的提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistorySelectFindingPrompt(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Select a finding to inspect its masked details."
+            : "选择一个发现项查看脱敏详情。";
+
+    /// <summary>扫描历史加载提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryLoading(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Loading scan history…" : "正在加载扫描历史…";
+
+    /// <summary>发现项加载提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryRunLoading(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Loading findings…" : "正在加载发现项…";
+
+    /// <summary>上一页按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryPreviousPage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Previous" : "上一页";
+
+    /// <summary>下一页按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryNextPage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Next" : "下一页";
+
+    /// <summary>扫描历史分页状态。</summary>
+    /// <param name="currentPage">当前页（1-based）。</param>
+    /// <param name="totalPages">总页数（至少 1）。</param>
+    /// <param name="totalCount">扫描运行总数。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化分页文本。</returns>
+    internal static string ScanHistoryPage(int currentPage, int totalPages, int totalCount, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"Page {currentPage} of {totalPages} · {totalCount} scans"
+            : $"第 {currentPage} / {totalPages} 页 · 共 {totalCount} 次扫描";
+
+    /// <summary>发现项数量标签。</summary>
+    /// <param name="count">数量。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化数量文本。</returns>
+    internal static string ScanHistoryFindingCount(int count, DesktopLanguage language) =>
+        language == DesktopLanguage.English ? $"{count} findings" : $"{count} 个发现";
+
+    /// <summary>扫描耗时文本。</summary>
+    /// <param name="durationMs">耗时毫秒；未知时为 <see langword="null"/>。</param>
+    /// <returns>耗时文本。</returns>
+    internal static string ScanHistoryDuration(long? durationMs) =>
+        durationMs is { } value ? $"{value} ms" : "—";
+
+    /// <summary>退出码标签。</summary>
+    /// <param name="exitCode">退出码。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化退出码文本。</returns>
+    internal static string ScanHistoryExitCode(int exitCode, DesktopLanguage language) =>
+        language == DesktopLanguage.English ? $"exit {exitCode}" : $"退出码 {exitCode}";
+
+    /// <summary>在编辑器中打开按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryOpenInEditor(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Open in editor" : "在编辑器中打开";
+
+    /// <summary>规则字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryRuleLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Rule" : "规则";
+
+    /// <summary>严重度字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistorySeverityLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Severity" : "严重度";
+
+    /// <summary>位置字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryLocationLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Location" : "位置";
+
+    /// <summary>脱敏片段字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistorySnippetLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Masked snippet" : "脱敏片段";
+
+    /// <summary>指纹字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryFingerprintLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Fingerprint" : "指纹";
+
+    /// <summary>提交字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryCommitLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Commit" : "提交";
+
+    /// <summary>扫描运行已不存在提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryRunNotFound(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "The selected scan run no longer exists."
+            : "所选扫描记录已不存在。";
+
+    /// <summary>编辑器启动失败提示。</summary>
+    /// <param name="status">启动结果分类。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryEditorError(EditorLaunchStatus status, DesktopLanguage language) =>
+        (status, language) switch
+        {
+            (EditorLaunchStatus.RepositoryMissing, DesktopLanguage.English) =>
+                "The repository directory no longer exists.",
+            (EditorLaunchStatus.FileMissing, DesktopLanguage.English) =>
+                "The file no longer exists; it may have been moved or deleted.",
+            (EditorLaunchStatus.PathOutsideRepository, DesktopLanguage.English) =>
+                "The finding path is outside the repository and was refused.",
+            (EditorLaunchStatus.LaunchFailed, DesktopLanguage.English) =>
+                "Could not start an editor. Set GITGUARD_EDITOR, VISUAL, or EDITOR.",
+            (EditorLaunchStatus.RepositoryMissing, _) =>
+                "仓库目录已不存在。",
+            (EditorLaunchStatus.FileMissing, _) =>
+                "文件已不存在，可能已被移动或删除。",
+            (EditorLaunchStatus.PathOutsideRepository, _) =>
+                "发现项路径不在仓库内，已拒绝打开。",
+            (EditorLaunchStatus.LaunchFailed, _) =>
+                "无法启动编辑器，请设置 GITGUARD_EDITOR、VISUAL 或 EDITOR。",
+            _ => string.Empty,
+        };
 
     /// <summary>最近扫描摘要（时间按用户区域设置显示，审计内部仍为 UTC epoch）。</summary>
     /// <param name="summary">扫描运行摘要。</param>

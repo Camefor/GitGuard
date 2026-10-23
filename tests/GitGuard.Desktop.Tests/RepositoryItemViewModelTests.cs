@@ -136,5 +136,15 @@ public sealed class RepositoryItemViewModelTests
 
         public Task<RepositoryDetail> ScanAsync(string repoPath, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("本测试不执行扫描。");
+
+        public Task<AuditRunPage> QueryScanHistoryAsync(
+            string repoPath,
+            int limit,
+            int offset,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不读取扫描历史。");
+
+        public Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不读取扫描明细。");
     }
 }

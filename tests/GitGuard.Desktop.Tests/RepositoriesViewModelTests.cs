@@ -308,6 +308,83 @@ public sealed class RepositoriesViewModelTests
         viewModel.HookRows.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task OpenHistoryCommand_ShowsHistoryForSelectedRepositoryAndBackClosesIt()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        var summary = CreateBlockedSummary(repository.RepoPath);
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+            QueryScanHistoryHandler = (path, _, _) =>
+            {
+                path.Should().Be(repository.RepoPath);
+                return Task.FromResult(new AuditRunPage(new[] { summary }, 1));
+            },
+            LoadScanRunHandler = id => Task.FromResult<ScanRun?>(CreateRun(repository.RepoPath, id)),
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+
+        await viewModel.OpenHistoryCommand.ExecuteAsync(null);
+
+        viewModel.IsHistoryVisible.Should().BeTrue();
+        viewModel.CanInteract.Should().BeFalse();
+        viewModel.History.RepositoryName.Should().Be("甲仓库");
+        viewModel.History.RepositoryPath.Should().Be(repository.RepoPath);
+        viewModel.History.Runs.Should().ContainSingle();
+        viewModel.History.Findings.Should().ContainSingle();
+
+        viewModel.History.BackCommand.Execute(null);
+
+        viewModel.IsHistoryVisible.Should().BeFalse();
+        viewModel.CanInteract.Should().BeTrue();
+        viewModel.History.Runs.Should().BeEmpty();
+        viewModel.History.RepositoryName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SelectingAnotherRepository_WhileHistoryOpen_ClosesHistory()
+    {
+        var first = CreateRepository("repo-a", "甲仓库");
+        var second = CreateRepository("repo-b", "乙仓库");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { first, second }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+        await viewModel.OpenHistoryCommand.ExecuteAsync(null);
+        viewModel.IsHistoryVisible.Should().BeTrue();
+
+        viewModel.SelectedRepository = viewModel.Repositories[1];
+
+        viewModel.IsHistoryVisible.Should().BeFalse();
+        viewModel.History.Runs.Should().BeEmpty();
+    }
+
+    private static ScanRun CreateRun(string repoPath, Guid runId)
+    {
+        var finding = Finding.Create(
+            "GGD/SECRET/AWS_KEY",
+            "src/appsettings.json",
+            42,
+            Severity.High,
+            Fingerprint.FromHex(new string('f', 64)),
+            SnippetMasked.Create("secret-********"));
+        return ScanRun.Restore(
+            runId,
+            repoPath,
+            ScanType.Manual,
+            new DateTimeOffset(2026, 10, 20, 10, 0, 0, TimeSpan.Zero),
+            45,
+            ScanResult.Blocked,
+            1,
+            new[] { finding });
+    }
+
     private static RegisteredRepository CreateRepository(string directoryName, string displayName)
     {
         string path = Path.Combine(Path.GetTempPath(), "gitguard-desktop-tests", Guid.NewGuid().ToString("N"), directoryName);
@@ -367,6 +444,12 @@ public sealed class RepositoriesViewModelTests
         internal Func<string, Task<RepositoryDetail>> ScanHandler { get; set; } =
             path => Task.FromResult(CreateDetail(path));
 
+        internal Func<string, int, int, Task<AuditRunPage>> QueryScanHistoryHandler { get; set; } =
+            (_, _, _) => Task.FromResult(new AuditRunPage(Array.Empty<AuditRunSummary>(), 0));
+
+        internal Func<Guid, Task<ScanRun?>> LoadScanRunHandler { get; set; } =
+            _ => Task.FromResult<ScanRun?>(null);
+
         internal int ListCalls { get; private set; }
 
         internal int RegisterCalls { get; private set; }
@@ -376,6 +459,10 @@ public sealed class RepositoriesViewModelTests
         internal int LoadDetailCalls { get; private set; }
 
         internal int ScanCalls { get; private set; }
+
+        internal int QueryScanHistoryCalls { get; private set; }
+
+        internal int LoadScanRunCalls { get; private set; }
 
         public Task<IReadOnlyList<RegisteredRepository>> ListAsync(CancellationToken cancellationToken = default)
         {
@@ -405,6 +492,22 @@ public sealed class RepositoriesViewModelTests
         {
             ScanCalls++;
             return ScanHandler(repoPath);
+        }
+
+        public Task<AuditRunPage> QueryScanHistoryAsync(
+            string repoPath,
+            int limit,
+            int offset,
+            CancellationToken cancellationToken = default)
+        {
+            QueryScanHistoryCalls++;
+            return QueryScanHistoryHandler(repoPath, limit, offset);
+        }
+
+        public Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default)
+        {
+            LoadScanRunCalls++;
+            return LoadScanRunHandler(runId);
         }
     }
 }

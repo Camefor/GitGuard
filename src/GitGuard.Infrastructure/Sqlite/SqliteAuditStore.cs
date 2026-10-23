@@ -724,15 +724,19 @@ public sealed partial class SqliteAuditStore : IAuditStore, IAllowlistStore, IRe
     {
         object since = (object?)query.Since?.ToUnixTimeMilliseconds() ?? DBNull.Value;
         object result = (object?)query.Result?.ToString() ?? DBNull.Value;
+        object repoPath = (object?)query.RepoPath ?? DBNull.Value;
 
         int totalCount;
         using (var command = connection.CreateCommand())
         {
             command.CommandText =
                 "SELECT COUNT(*) FROM scan_runs " +
-                "WHERE ($since IS NULL OR started_at >= $since) AND ($result IS NULL OR result = $result);";
+                "WHERE ($since IS NULL OR started_at >= $since) " +
+                "AND ($result IS NULL OR result = $result) " +
+                "AND ($repo_path IS NULL OR repo_path = $repo_path);";
             command.Parameters.AddWithValue("$since", since);
             command.Parameters.AddWithValue("$result", result);
+            command.Parameters.AddWithValue("$repo_path", repoPath);
             totalCount = checked((int)(long)(command.ExecuteScalar() ?? 0L));
         }
 
@@ -744,10 +748,13 @@ public sealed partial class SqliteAuditStore : IAuditStore, IAllowlistStore, IRe
                 "SELECT r.id, r.repo_path, r.scan_type, r.started_at, r.duration_ms, r.result, r.exit_code, " +
                 "(SELECT COUNT(*) FROM findings f WHERE f.run_id = r.id) " +
                 "FROM scan_runs r " +
-                "WHERE ($since IS NULL OR r.started_at >= $since) AND ($result IS NULL OR r.result = $result) " +
+                "WHERE ($since IS NULL OR r.started_at >= $since) " +
+                "AND ($result IS NULL OR r.result = $result) " +
+                "AND ($repo_path IS NULL OR r.repo_path = $repo_path) " +
                 "ORDER BY r.started_at DESC, r.rowid DESC LIMIT $limit OFFSET $offset;";
             command.Parameters.AddWithValue("$since", since);
             command.Parameters.AddWithValue("$result", result);
+            command.Parameters.AddWithValue("$repo_path", repoPath);
             command.Parameters.AddWithValue("$limit", query.Limit);
             command.Parameters.AddWithValue("$offset", query.Offset);
 

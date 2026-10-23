@@ -22,6 +22,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
     private bool _isBusy;
     private bool _isDetailLoading;
     private bool _isDetailVisible;
+    private bool _isHistoryVisible;
     private bool _isScanning;
     private bool _isRemoveConfirmationVisible;
     private string? _listMessage;
@@ -40,8 +41,15 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>初始化仓库页 ViewModel。</summary>
     /// <param name="operations">仓库操作服务（ViewModel 不直接访问 SQLite / Git）。</param>
     /// <param name="language">初始界面语言。</param>
+    /// <param name="editorLauncher">
+    /// 外部编辑器启动器；<see langword="null"/> 时使用默认的 <see cref="ShellEditorLauncher"/>
+    /// （ViewModel 单测可注入假对象，避免真实启动进程）。
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="operations"/> 为 <see langword="null"/>。</exception>
-    public RepositoriesViewModel(IRepositoryOperations operations, DesktopLanguage language)
+    public RepositoriesViewModel(
+        IRepositoryOperations operations,
+        DesktopLanguage language,
+        IEditorLauncher? editorLauncher = null)
         : base(DesktopSection.Repositories, language)
     {
         ArgumentNullException.ThrowIfNull(operations);
@@ -50,9 +58,15 @@ public sealed class RepositoriesViewModel : SectionViewModel
         _language = language;
         Repositories = new ObservableCollection<RepositoryItemViewModel>();
         HookRows = new ObservableCollection<HookStatusRowViewModel>();
+        History = new ScanHistoryViewModel(
+            operations,
+            editorLauncher ?? new ShellEditorLauncher(),
+            CloseHistory,
+            language);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         AddCommand = new AsyncRelayCommand(AddAsync);
         ScanCommand = new AsyncRelayCommand(ScanAsync);
+        OpenHistoryCommand = new AsyncRelayCommand(OpenHistoryAsync);
         RequestRemoveCommand = new RelayCommand(RequestRemove);
         ConfirmRemoveCommand = new AsyncRelayCommand(ConfirmRemoveAsync);
         CancelRemoveCommand = new RelayCommand(CancelRemove);
@@ -64,6 +78,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>当前仓库的 Hook 状态行（pre-commit / pre-push / post-commit）。</summary>
     public ObservableCollection<HookStatusRowViewModel> HookRows { get; }
 
+    /// <summary>当前仓库的扫描历史子页面（GGD-0043）。</summary>
+    public ScanHistoryViewModel History { get; }
+
     /// <summary>刷新仓库列表命令。</summary>
     public IAsyncRelayCommand RefreshCommand { get; }
 
@@ -72,6 +89,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
 
     /// <summary>立即扫描命令。</summary>
     public IAsyncRelayCommand ScanCommand { get; }
+
+    /// <summary>打开当前仓库的扫描历史命令。</summary>
+    public IAsyncRelayCommand OpenHistoryCommand { get; }
 
     /// <summary>请求移除（显示二次确认）命令。</summary>
     public IRelayCommand RequestRemoveCommand { get; }
@@ -100,6 +120,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
                 return;
             }
 
+            CloseHistory();
             IsRemoveConfirmationVisible = false;
             _ = LoadSelectedDetailAsync(value);
         }
@@ -141,6 +162,19 @@ public sealed class RepositoriesViewModel : SectionViewModel
             if (SetProperty(ref _isDetailVisible, value))
             {
                 OnPropertyChanged(nameof(IsSelectPromptVisible));
+                OnPropertyChanged(nameof(CanInteract));
+            }
+        }
+    }
+
+    /// <summary>是否展示扫描历史子页面（覆盖仓库详情）。</summary>
+    public bool IsHistoryVisible
+    {
+        get => _isHistoryVisible;
+        private set
+        {
+            if (SetProperty(ref _isHistoryVisible, value))
+            {
                 OnPropertyChanged(nameof(CanInteract));
             }
         }
@@ -198,8 +232,8 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>是否展示「请选择仓库」占位。</summary>
     public bool IsSelectPromptVisible => !IsDetailVisible && Repositories.Count > 0;
 
-    /// <summary>详情操作（扫描 / 移除）当前是否可用。</summary>
-    public bool CanInteract => IsDetailVisible && !IsBusy && !IsDetailLoading;
+    /// <summary>详情操作（扫描 / 移除 / 扫描历史）当前是否可用。</summary>
+    public bool CanInteract => IsDetailVisible && !IsBusy && !IsDetailLoading && !IsHistoryVisible;
 
     /// <summary>列表级消息是否可见。</summary>
     public bool HasListMessage => !string.IsNullOrWhiteSpace(ListMessage);
@@ -303,6 +337,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
         ? DesktopText.RepositoryScanningButton(_language)
         : DesktopText.RepositoryScanButton(_language);
 
+    /// <summary>扫描历史按钮文案。</summary>
+    public string ScanHistoryButtonText => DesktopText.ScanHistoryButton(_language);
+
     /// <summary>移除登记按钮文案。</summary>
     public string RemoveButtonText => DesktopText.RepositoryRemoveButton(_language);
 
@@ -347,6 +384,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
             hook.Relocalize(language);
         }
 
+        History.Relocalize(language);
         NotifyLocalizedLabels();
         if (_currentDetail is not null)
         {
@@ -465,6 +503,30 @@ public sealed class RepositoriesViewModel : SectionViewModel
             IsScanning = false;
             IsBusy = false;
         }
+    }
+
+    private async Task OpenHistoryAsync()
+    {
+        RepositoryItemViewModel? item = SelectedRepository;
+        if (item is null || IsBusy || IsDetailLoading)
+        {
+            return;
+        }
+
+        IsHistoryVisible = true;
+        await History.OpenAsync(item.DisplayName, item.RepoPath).ConfigureAwait(true);
+    }
+
+    /// <summary>关闭扫描历史并释放其进行中的请求（返回仓库详情）。</summary>
+    private void CloseHistory()
+    {
+        if (!_isHistoryVisible)
+        {
+            return;
+        }
+
+        History.Deactivate();
+        IsHistoryVisible = false;
     }
 
     private void RequestRemove()
@@ -608,6 +670,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         OnPropertyChanged(nameof(LatestScanLabel));
         OnPropertyChanged(nameof(NoScanText));
         OnPropertyChanged(nameof(ScanButtonText));
+        OnPropertyChanged(nameof(ScanHistoryButtonText));
         OnPropertyChanged(nameof(RemoveButtonText));
         OnPropertyChanged(nameof(RemoveConfirmPrompt));
         OnPropertyChanged(nameof(ConfirmRemoveButtonText));

@@ -70,4 +70,18 @@ public sealed class RepositoryOperations : IRepositoryOperations
                 return new RepositoryDetail(status, latestScan, outcome.AuditWriteFailed);
             },
             cancellationToken);
+
+    /// <inheritdoc />
+    public Task<AuditRunPage> QueryScanHistoryAsync(
+        string repoPath,
+        int limit,
+        int offset,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () => _session.CreateAuditList().Execute(new AuditQuery(limit, offset, repoPath: repoPath)),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default) =>
+        Task.Run(() => _session.CreateAuditView().Execute(runId), cancellationToken);
 }
