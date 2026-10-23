@@ -29,6 +29,103 @@ public sealed class CliHookLifecycleTests
         }
     }
 
+    // GGD-0038：hooks.* 控制缺省安装的 Hook 子集（显式 --hook 始终优先）
+    [Fact]
+    public async Task Install_WithHooksConfig_RegistersOnlyEnabledHooks()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig("""
+            version: 1
+            hooks:
+              pre_commit: false
+              post_commit_bypass_detection: false
+            """);
+
+        int exitCode = await harness.RunAsync("install");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        File.Exists(harness.ResolvePath(".git/hooks/pre-commit")).Should().BeFalse("hooks.pre_commit=false");
+        File.Exists(harness.ResolvePath(".git/hooks/pre-push")).Should().BeTrue("hooks.pre_push 缺省 true");
+        File.Exists(harness.ResolvePath(".git/hooks/post-commit")).Should().BeFalse("hooks.post_commit_bypass_detection=false");
+    }
+
+    [Fact]
+    public async Task Install_ExplicitHook_OverridesDisabledConfig()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig("""
+            version: 1
+            hooks:
+              pre_commit: false
+            """);
+
+        int exitCode = await harness.RunAsync("install", "--hook", "pre-commit");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        File.Exists(harness.ResolvePath(".git/hooks/pre-commit")).Should().BeTrue("显式 --hook 优先于配置");
+        File.Exists(harness.ResolvePath(".git/hooks/pre-push")).Should().BeFalse("显式指定后不再安装其余 Hook");
+    }
+
+    [Fact]
+    public async Task Install_AllHooksDisabled_ReturnsConfigInvalid()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig("""
+            version: 1
+            hooks:
+              pre_commit: false
+              pre_push: false
+              post_commit_bypass_detection: false
+            """);
+
+        int exitCode = await harness.RunAsync("install");
+
+        exitCode.Should().Be(ExitCodes.CONFIG_INVALID);
+        harness.Error.Should().Contain("无可安装项");
+        File.Exists(harness.ResolvePath(".git/hooks/pre-commit")).Should().BeFalse();
+        File.Exists(harness.ResolvePath(".git/hooks/pre-push")).Should().BeFalse();
+        File.Exists(harness.ResolvePath(".git/hooks/post-commit")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Install_ConfiguredExecutablePath_IsWrittenIntoScript()
+    {
+        using var harness = new CliHarness();
+        string executable = harness.ResolvePath("tools/custom-gitguard.exe");
+        Directory.CreateDirectory(harness.ResolvePath("tools"));
+        File.WriteAllText(executable, "stub");
+        harness.WriteProjectConfig($"""
+            version: 1
+            hooks:
+              gitguard_executable_path: "{executable.Replace('\\', '/')}"
+            """);
+
+        int exitCode = await harness.RunAsync("install", "--hook", "pre-commit");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        string script = File.ReadAllText(harness.ResolvePath(".git/hooks/pre-commit"));
+        script.Should().Contain($"GITGUARD_BIN=\"{executable.Replace('\\', '/')}\"");
+        script.Should().NotContain(CliHarness.TEST_EXECUTABLE);
+    }
+
+    [Fact]
+    public async Task Install_ConfiguredExecutablePathMissing_ReturnsConfigInvalid()
+    {
+        using var harness = new CliHarness();
+        string missing = harness.ResolvePath("tools/missing-gitguard.exe").Replace('\\', '/');
+        harness.WriteProjectConfig($"""
+            version: 1
+            hooks:
+              gitguard_executable_path: "{missing}"
+            """);
+
+        int exitCode = await harness.RunAsync("install", "--hook", "pre-commit");
+
+        exitCode.Should().Be(ExitCodes.CONFIG_INVALID);
+        harness.Error.Should().Contain("hooks.gitguard_executable_path").And.Contain("不存在");
+        File.Exists(harness.ResolvePath(".git/hooks/pre-commit")).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Install_JsonOutput_MatchesInstallSchema()
     {

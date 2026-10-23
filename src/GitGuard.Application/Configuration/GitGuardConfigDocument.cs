@@ -15,6 +15,9 @@ internal sealed class GitGuardConfigDocument
     /// <summary><c>scan</c> 段落。</summary>
     public ScanSectionDto? Scan { get; set; }
 
+    /// <summary><c>hooks</c> 段落（模块设计/Hook.md §8：安装期注册开关与可执行文件路径）。</summary>
+    public HooksSectionDto? Hooks { get; set; }
+
     /// <summary><c>logging</c> 段落。</summary>
     public LoggingSectionDto? Logging { get; set; }
 
@@ -34,10 +37,10 @@ internal sealed class GitGuardConfigDocument
 /// <summary><c>scan</c> 段落 DTO。</summary>
 internal sealed class ScanSectionDto
 {
-    /// <summary>是否启用 pre-commit 扫描（当前仅解析，语义接线顺延）。</summary>
+    /// <summary>是否启用 pre-commit 阶段的 Hook 模式扫描（<c>--hook-mode pre-commit</c>）。</summary>
     public bool? PreCommit { get; set; }
 
-    /// <summary>是否启用 pre-push 扫描（当前仅解析，语义接线顺延）。</summary>
+    /// <summary>是否启用 pre-push 阶段的 Hook 模式扫描（<c>--hook-mode pre-push</c>）。</summary>
     public bool? PrePush { get; set; }
 
     /// <summary>FailClosed 开关；置 <see langword="false"/> 仅产生警告（DR-03 行为不变）。</summary>
@@ -48,6 +51,22 @@ internal sealed class ScanSectionDto
 
     /// <summary>扫描级超时（毫秒）。</summary>
     public int? TimeoutMs { get; set; }
+}
+
+/// <summary><c>hooks</c> 段落 DTO（模块设计/Hook.md §8）。</summary>
+internal sealed class HooksSectionDto
+{
+    /// <summary>安装时是否注册 <c>pre-commit</c>（默认 <see langword="true"/>）。</summary>
+    public bool? PreCommit { get; set; }
+
+    /// <summary>安装时是否注册 <c>pre-push</c>（默认 <see langword="true"/>）。</summary>
+    public bool? PrePush { get; set; }
+
+    /// <summary>安装时是否注册 <c>post-commit</c> 绕过检测（默认 <see langword="true"/>）。</summary>
+    public bool? PostCommitBypassDetection { get; set; }
+
+    /// <summary>固化到分发脚本的可执行文件路径（支持 <c>~</c>；省略时自动探测）。</summary>
+    public string? GitguardExecutablePath { get; set; }
 }
 
 /// <summary><c>logging</c> 段落 DTO。</summary>
@@ -229,6 +248,7 @@ internal sealed class AllowlistEntryDto
 [YamlStaticContext]
 [YamlSerializable(typeof(GitGuardConfigDocument))]
 [YamlSerializable(typeof(ScanSectionDto))]
+[YamlSerializable(typeof(HooksSectionDto))]
 [YamlSerializable(typeof(LoggingSectionDto))]
 [YamlSerializable(typeof(LogFileSectionDto))]
 [YamlSerializable(typeof(RulesSectionDto))]

@@ -22,7 +22,8 @@ namespace GitGuard.Application.Configuration;
 /// <list type="bullet">
 ///   <item><description><c>version</c> 缺失或不为 <see cref="GitGuardConfig.SUPPORTED_VERSION"/> → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
 ///   <item><description><c>policy.critical: allow</c> 违反硬下限 → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
-///   <item><description>未知字段、<c>fail_closed: false</c>、<c>pre_commit</c> / <c>pre_push</c>（语义接线顺延）→ 宽松处理：记入 <see cref="GitGuardConfig.Warnings"/>，不阻断。</description></item>
+///   <item><description>未知字段、<c>fail_closed: false</c> → 宽松处理：记入 <see cref="GitGuardConfig.Warnings"/>，不阻断。</description></item>
+///   <item><description><c>hooks.gitguard_executable_path</c> 为空白 → 抛 <see cref="ConfigurationException"/>（退出码 13）；文件存在性在安装期校验。</description></item>
 ///   <item><description><c>exclude.paths</c> / <c>exclude.files</c> 含空项 → 抛 <see cref="ConfigurationException"/>（退出码 13）。</description></item>
 ///   <item><description><c>rules.secrets.gitleaks_path</c> 为空白 → 抛 <see cref="ConfigurationException"/>（退出码 13）；路径存在性与版本在启动期探测。</description></item>
 /// </list>
@@ -50,8 +51,9 @@ public sealed class GitGuardConfigLoader
     private static readonly ImmutableDictionary<string, ImmutableHashSet<string>> _knownKeys =
         new Dictionary<string, ImmutableHashSet<string>>(StringComparer.Ordinal)
         {
-            [string.Empty] = ImmutableHashSet.Create(StringComparer.Ordinal, "version", "scan", "logging", "rules", "policy", "exclude", "allowlist"),
+            [string.Empty] = ImmutableHashSet.Create(StringComparer.Ordinal, "version", "scan", "hooks", "logging", "rules", "policy", "exclude", "allowlist"),
             ["scan"] = ImmutableHashSet.Create(StringComparer.Ordinal, "pre_commit", "pre_push", "fail_closed", "max_file_bytes", "timeout_ms"),
+            ["hooks"] = ImmutableHashSet.Create(StringComparer.Ordinal, "pre_commit", "pre_push", "post_commit_bypass_detection", "gitguard_executable_path"),
             ["exclude"] = ImmutableHashSet.Create(StringComparer.Ordinal, "paths", "files"),
             ["logging"] = ImmutableHashSet.Create(StringComparer.Ordinal, "verbose", "file"),
             ["logging.file"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "path", "max_bytes", "max_files"),
@@ -202,6 +204,7 @@ public sealed class GitGuardConfigLoader
         {
             Version = project.Version ?? user.Version,
             Scan = MergeScan(user.Scan, project.Scan),
+            Hooks = MergeHooks(user.Hooks, project.Hooks),
             Logging = MergeLogging(user.Logging, project.Logging),
             Rules = MergeRules(user.Rules, project.Rules),
             Policy = MergePolicy(user.Policy, project.Policy),
@@ -219,6 +222,16 @@ public sealed class GitGuardConfigLoader
             FailClosed = project?.FailClosed ?? user?.FailClosed,
             MaxFileBytes = project?.MaxFileBytes ?? user?.MaxFileBytes,
             TimeoutMs = project?.TimeoutMs ?? user?.TimeoutMs,
+        };
+
+    private static HooksSectionDto? MergeHooks(HooksSectionDto? user, HooksSectionDto? project) => BothNull(user, project)
+        ? null
+        : new HooksSectionDto
+        {
+            PreCommit = project?.PreCommit ?? user?.PreCommit,
+            PrePush = project?.PrePush ?? user?.PrePush,
+            PostCommitBypassDetection = project?.PostCommitBypassDetection ?? user?.PostCommitBypassDetection,
+            GitguardExecutablePath = project?.GitguardExecutablePath ?? user?.GitguardExecutablePath,
         };
 
     private static LoggingSectionDto? MergeLogging(LoggingSectionDto? user, LoggingSectionDto? project) => BothNull(user, project)
@@ -322,15 +335,15 @@ public sealed class GitGuardConfigLoader
             warnings.Add("scan.fail_closed 已设置为 false；MVP 行为恒为 FailClosed（DR-03），该设置暂不生效。");
         }
 
-        WarnDisabledScanType(scan.PreCommit, "scan.pre_commit", warnings);
-        WarnDisabledScanType(scan.PrePush, "scan.pre_push", warnings);
-
         var scanSettings = new ScanSettings
         {
+            PreCommit = scan.PreCommit ?? true,
+            PrePush = scan.PrePush ?? true,
             MaxFileBytes = scan.MaxFileBytes ?? ScanSettings.DEFAULT_MAX_FILE_BYTES,
             Timeout = TimeSpan.FromMilliseconds(scan.TimeoutMs ?? (long)ScanSettings.DEFAULT_TIMEOUT.TotalMilliseconds),
         };
         ValidateScanSettings(scanSettings);
+        HooksSettings hooks = BuildHooks(merged.Hooks);
 
         RulesSectionDto rules = merged.Rules ?? new RulesSectionDto();
         SecretRulesSettings secrets = BuildSecrets(rules.Secrets, warnings);
@@ -365,15 +378,32 @@ public sealed class GitGuardConfigLoader
             ExcludePaths = excludePaths,
             ExcludeFiles = excludeFiles,
             CustomRules = customRules,
+            Hooks = hooks,
         };
     }
 
-    private static void WarnDisabledScanType(bool? enabled, string key, List<string> warnings)
+    /// <summary>映射 <c>hooks</c> 段落；空白可执行文件路径 → <see cref="ConfigurationException"/>（退出码 13）。</summary>
+    private static HooksSettings BuildHooks(HooksSectionDto? dto)
     {
-        if (enabled == false)
+        string? executablePath = null;
+        if (dto?.GitguardExecutablePath is { } rawPath)
         {
-            warnings.Add($"{key} 已设置为 false；扫描类型开关的接线顺延（Hook 分发脚本恒调用扫描），该设置暂不生效。");
+            if (string.IsNullOrWhiteSpace(rawPath))
+            {
+                throw new ConfigurationException(
+                    "hooks.gitguard_executable_path 不能为空字符串；省略该字段表示自动探测当前可执行文件");
+            }
+
+            executablePath = rawPath.Trim();
         }
+
+        return new HooksSettings
+        {
+            PreCommit = dto?.PreCommit ?? true,
+            PrePush = dto?.PrePush ?? true,
+            PostCommitBypassDetection = dto?.PostCommitBypassDetection ?? true,
+            ExecutablePath = executablePath,
+        };
     }
 
     private static void ValidateScanSettings(ScanSettings settings)

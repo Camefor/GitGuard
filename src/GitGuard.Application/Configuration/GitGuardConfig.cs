@@ -128,6 +128,9 @@ public sealed record GitGuardConfig
     /// </summary>
     public ImmutableArray<DetectionRule> CustomRules { get; init; } = ImmutableArray<DetectionRule>.Empty;
 
+    /// <summary>Hook 安装设置（<c>hooks</c> 段落，模块设计/Hook.md §8）。</summary>
+    public HooksSettings Hooks { get; init; } = HooksSettings.Default;
+
     /// <summary>实际参与合并的配置文件路径（低优先级在前）；空表示全部使用内置默认。</summary>
     public ImmutableArray<string> LoadedConfigFiles { get; }
 
@@ -194,6 +197,31 @@ public sealed record PrivacyRulesSettings
     /// <summary>测试文件路径子串（<c>test_file_patterns</c>，大小写不敏感，命中即严重度降一级）。</summary>
     public IReadOnlyList<string> TestFilePatterns { get; init; } =
         ImmutableArray.Create("test", "spec", "fixture", "mock", "sample", "example");
+}
+
+/// <summary>
+/// Hook 安装设置（<c>hooks</c> 段落，模块设计/Hook.md §8）：由 <c>gitguard install</c> 消费。
+/// 三个注册开关仅影响未显式指定 <c>--hook</c> 时的默认集合；显式 <c>--hook</c> 始终以命令行为准。
+/// </summary>
+public sealed record HooksSettings
+{
+    /// <summary>默认设置：三类 Hook 全部注册、可执行文件路径自动探测。</summary>
+    public static HooksSettings Default { get; } = new HooksSettings();
+
+    /// <summary>安装时是否注册 <c>pre-commit</c>（默认 <see langword="true"/>）。</summary>
+    public bool PreCommit { get; init; } = true;
+
+    /// <summary>安装时是否注册 <c>pre-push</c>（默认 <see langword="true"/>）。</summary>
+    public bool PrePush { get; init; } = true;
+
+    /// <summary>安装时是否注册 <c>post-commit</c> 绕过检测（默认 <see langword="true"/>）。</summary>
+    public bool PostCommitBypassDetection { get; init; } = true;
+
+    /// <summary>
+    /// 固化到分发脚本的可执行文件路径（<c>hooks.gitguard_executable_path</c>）：<see langword="null"/> 表示自动探测；
+    /// 支持 <c>~</c> 前缀，相对路径按安装时的当前目录解析，文件不存在在安装期 FailClosed（退出码 13）。
+    /// </summary>
+    public string? ExecutablePath { get; init; }
 }
 
 /// <summary>文件日志设置（<c>logging.file</c>，09-日志设计 §7）。</summary>

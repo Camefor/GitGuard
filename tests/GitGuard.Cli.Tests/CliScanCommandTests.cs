@@ -169,6 +169,88 @@ public sealed class CliScanCommandTests
         harness.Error.Should().Contain(ConfigurationException.CONFIG_INVALID);
     }
 
+    // GGD-0038：scan.pre_commit / scan.pre_push 仅控制 Hook 模式（--hook-mode），手动扫描不受影响
+    [Fact]
+    public async Task PreCommitHookMode_WithScanDisabled_SkipsAndRecordsNonBypassMarker()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig("""
+            version: 1
+            scan:
+              pre_commit: false
+            """);
+        string canary = CliHarness.CreateCanaryToken();
+        harness.WriteFile("config/app.env", $"aws_key={canary}\n");
+        harness.Stage("config/app.env");
+
+        int exitCode = await harness.RunAsync(
+            "scan", "--staged", "--record-pending", "--hook-mode", "pre-commit");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.Error.Should().Contain("scan.pre_commit=false");
+        harness.Error.Should().NotContain(canary);
+        File.Exists(harness.PendingScanPath).Should().BeTrue("配置关闭扫描仍需记录待提交预测");
+        using var marker = JsonDocument.Parse(File.ReadAllText(harness.PendingScanPath));
+        marker.RootElement.GetProperty("skipped").GetBoolean()
+            .Should().BeFalse("配置关闭扫描不是绕过，避免 post-commit 误登记 BypassDetected");
+    }
+
+    [Fact]
+    public async Task PrePushHookMode_WithScanDisabled_SkipsWithoutScanning()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig("""
+            version: 1
+            scan:
+              pre_push: false
+            """);
+        string canary = CliHarness.CreateCanaryToken();
+        harness.WriteFile("config/app.env", $"aws_key={canary}\n");
+        harness.Stage("config/app.env");
+        string sha = harness.Commit("feat: add config");
+        string pushLine = $"refs/heads/master {sha} refs/heads/master {ZERO_SHA}";
+
+        int exitCode = await harness.RunAsync(
+            ["scan", "--push", "--hook-mode", "pre-push"], pushLine);
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        harness.Error.Should().Contain("scan.pre_push=false");
+        harness.Error.Should().NotContain(canary);
+    }
+
+    [Fact]
+    public async Task ManualStagedScan_WithScanDisabled_StillScans()
+    {
+        using var harness = new CliHarness();
+        harness.WriteProjectConfig("""
+            version: 1
+            scan:
+              pre_commit: false
+            """);
+        string canary = CliHarness.CreateCanaryToken();
+        harness.WriteFile("config/app.env", $"aws_key={canary}\n");
+        harness.Stage("config/app.env");
+
+        int exitCode = await harness.RunAsync("scan", "--staged");
+
+        exitCode.Should().Be(ExitCodes.BLOCKED, "scan.pre_commit 只控制 Hook 模式，手动扫描始终执行");
+        harness.Error.Should().Contain("GGD/SECRET/AWS-AKID");
+    }
+
+    [Theory]
+    [InlineData("--push", "pre-commit")]
+    [InlineData("--staged", "pre-push")]
+    public async Task HookMode_MismatchedScope_ReturnsUsageError(string scope, string hookMode)
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("notes.txt", "clean\n");
+        harness.Stage("notes.txt");
+
+        int exitCode = await harness.RunAsync("scan", scope, "--hook-mode", hookMode);
+
+        exitCode.Should().Be(ExitCodes.USAGE_ERROR);
+    }
+
     [Fact]
     public async Task PushScan_ReadsStdinAndReportsCommitSha()
     {

@@ -26,6 +26,7 @@ internal enum CliTextKey
     ScanMaxFilesDescription,
     ScanBaselineDescription,
     ScanRecordPendingDescription,
+    ScanHookModeDescription,
     InstallForceDescription,
     InstallHookDescription,
     UninstallForceDescription,
@@ -118,6 +119,8 @@ internal enum CliTextKey
     ScanBaselineRequiresAll,
     ScanBaselineInvalid,
     RecordPendingRequiresStaged,
+    HookModeRequiresStaged,
+    HookModeRequiresPush,
     UnknownHook,
     AuditLimitInvalid,
     AuditOffsetInvalid,
@@ -231,6 +234,7 @@ internal enum CliTextKey
     // 日志消息
     LogCommandStarted,
     LogScanSkipped,
+    LogScanDisabledByConfig,
     LogScanCompleted,
     LogRuleTiming,
     LogHookInstalled,
@@ -254,6 +258,8 @@ internal enum CliTextKey
 
     // 提示行
     NoticeSkip,
+    NoticeScanDisabledPreCommit,
+    NoticeScanDisabledPrePush,
     PendingClearFailed,
     PendingWriteFailed,
 }

@@ -104,11 +104,17 @@ flowchart LR
 version: 1
 
 scan:
-  pre_commit: true
-  pre_push: true
+  pre_commit: true   # Hook 模式扫描开关；手动 scan --staged 不受影响
+  pre_push: true     # Hook 模式扫描开关；手动 scan --push 不受影响
   fail_closed: true
   max_file_bytes: 1048576  # 1 MiB
   timeout_ms: 30000
+
+hooks:
+  pre_commit: true                  # install 缺省是否注册 pre-commit
+  pre_push: true                    # install 缺省是否注册 pre-push
+  post_commit_bypass_detection: true  # install 缺省是否注册 post-commit 绕过检测
+  gitguard_executable_path: null    # 可省略；覆盖固化到脚本内的可执行文件路径
 
 logging:
   verbose: false
@@ -206,6 +212,7 @@ allowlist:
 - [x] 排除规则：`exclude.paths` 命中路径、`exclude.files` 命中任意深度文件名 → 不扫描且不产生 Finding；项目级按字段覆盖用户级；空白列表项 → 退出码 13（TC-FR-070-05）。
 - [x] 降级审计：`policy.high: warn` 与 `disabled_rules: [GGD/SECRET/AWS-AKID]` 首次装配各写一条 `PolicyOverride`，同 Session 多次装配不重复；本地路径规则不被误判为禁用（`AuditEventWiringTests`，GGD-0015）。
 - [x] 自定义规则（GGD-0034）：加载期编译与校验（`USR/` 前缀、类别、必填字段、非法正则、重复 ID、空白上下文关键字 → 13）、项目级整体替换用户级；规则目录追加顺序与 `User` 来源；`enabled` / `disabled_rules` / 类别开关对有效启用的组合；检测器命中、上下文 / glob 过滤与 200ms 超时 FailClosed（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests`）。
+- [x] Hook 配置（GGD-0038）：`hooks.*` 默认值 / 解析 / 项目级按字段覆盖、未知子键警告、空白 `gitguard_executable_path` → 13；安装期按子集注册与显式 `--hook` 覆盖、全禁用 → 13、可执行文件缺失 → 13；`scan.pre_commit` / `scan.pre_push` 仅 Hook 模式生效且跳过不产生绕过事件（`GitGuardConfigLoaderTests` / `CliHookLifecycleTests` / `CliScanCommandTests` / `HookScriptBuilderTests`）。
 
 ## 10. 演进与扩展位
 
@@ -227,3 +234,4 @@ allowlist:
 | 0.1.8 | 2026-10-22 | GGD-0032：§2.2 / §3 / §6.1 补基线覆盖（`ScanExecutor` 按指纹覆盖为 `Allow + IgnoredByBaseline`，白名单优先）与 `PolicyDecision.IgnoredByBaseline` 字段 |
 | 0.1.9 | 2026-10-22 | GGD-0034：§1 承担 FR 补 `FR-080`；§3 / §6.2 / §7 新增 `rules.custom` 自定义规则（加载期校验、列表替换、`RuleSource.User` 追加、有效启用语义、200ms 超时与超长行不跳过）；§9 增补配置 / 目录 / 检测测试项 |
 | 0.1.10 | 2026-10-22 | GGD-0035：§7 Schema 补 `rules.secrets.gitleaks_path`，并新增 Gitleaks 适配器配置语义（开关、路径解析、启动期降级 / 扫描期 FailClosed、`GLK/` 过滤与跨引擎去重） |
+| 0.1.11 | 2026-10-23 | GGD-0038：§7 Schema 新增 `hooks` 段（安装期 Hook 子集与可执行文件路径覆盖），标注 `scan.pre_commit` / `scan.pre_push` 为 Hook 模式专用；§9 增补 Hook 配置测试项 |

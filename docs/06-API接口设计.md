@@ -450,10 +450,11 @@ CSV 契约：
 - **用途**：在当前仓库注入 `pre-commit` / `pre-push` / `post-commit` 分发脚本（`post-commit` 用于 FR-050 绕过检测）。
 - **选项**：
   - `--force` 允许接管无法安全包裹的既有 Hook（二进制 / 符号链接形态）；普通文本 Hook 自动备份包裹，无需 `--force`；「遗留 `.local.bak` + 非托管目标」冲突不可用 `--force` 绕过。
-  - `--hook <name>` 仅安装某个 Hook：`pre-commit` / `pre-push` / `post-commit`（默认全部；其他取值 → 退出码 7）。
+  - `--hook <name>` 仅安装某个 Hook：`pre-commit` / `pre-push` / `post-commit`（其他取值 → 退出码 7）。省略时按配置 `hooks.pre_commit` / `hooks.pre_push` / `hooks.post_commit_bypass_detection` 注册子集；显式 `--hook` 始终优先（`GGD-0038`）。
+- **配置**：`hooks.gitguard_executable_path` 覆盖写入分发脚本的可执行文件路径（支持 `~` / 相对路径，必须在安装期存在）；缺省使用当前可执行文件。三项 Hook 开关均为 `false` 且未显式给出 `--hook` → 退出码 13。
 - **输入**：当前工作目录（必须是 Git 仓库）。
 - **输出**：安装摘要（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.5）。
-- **退出码**：0 成功；2 非 Git 仓库；3 写入权限不足；4 目标 Hook 无法安全包裹（需 `--force` 或不可接管）；7 参数非法；50 已有并发 install / uninstall 持锁。
+- **退出码**：0 成功；2 非 Git 仓库；3 写入权限不足；4 目标 Hook 无法安全包裹（需 `--force` 或不可接管）；7 参数非法；13 配置错误（Hook 全禁用 / 配置的可执行文件不存在）；50 已有并发 install / uninstall 持锁。
 - **幂等**：是（已安装再次执行只刷新版本，不重复备份）。
 - **关联 FR**：`FR-010`。
 - **示例**：
@@ -490,6 +491,7 @@ gitguard install --format json
   - `--max-files <N>`：与 `--all` 同用，历史文件数软上限（按提交边界生效，`N` 必须为正数）；隐含历史模式，截断时报告 `truncated` / `next_since_sha` / `remaining_commits`。
   - `--baseline <path>`：与 `--all` 同用，扫描完成后把当前全部命中的指纹写入指定路径（`GGD-0032`）。生成当次命中的 Finding 仍按原策略阻断；后续未指定 `--baseline` 的全量扫描自动消费仓库根默认 `.gitguard-baseline.json`。`--staged` / `--push` 组合、路径为空或以 `-` 开头 → 退出码 7。
   - `--record-pending`（隐藏）：Hook 模式专用，只能与 `--staged` 同用（否则退出码 7）。扫描通过后记录待提交预测（父提交 + 暂存树）供 `post-commit` 比对；扫描阻断 / 失败时清理旧标记。标记写入失败仅产生警告，不阻断提交。
+  - `--hook-mode pre-commit|pre-push`（隐藏，`GGD-0038`）：标记分发脚本来源，分别要求与 `--staged` / `--push` 同用（不匹配 → 退出码 7）。配置 `scan.pre_commit` / `scan.pre_push` 为 `false` 时跳过扫描、退出码 0、不产生 ScanRun；`pre-commit` 仍以 `skipped=false` 写入待提交标记（配置关闭不计为绕过）。手动扫描不带该选项，始终执行。
 - **`GITGUARD_SKIP=1`**：仅在 `--record-pending` 模式识别——跳过扫描、写入 `skipped` 标记、退出码 0（终端提示本次提交将登记为绕过事件）；手动 `scan --staged` 忽略该变量。
 - **范围校验**：`--staged` / `--push` / `--all` 三选一（缺失或同时给出 → 退出码 7）；历史选项与 `--baseline` 仅能与 `--all` 组合，否则退出码 7；`--max-files` 非正数或 `--since` / `--baseline` 为空、以 `-` 开头 → 退出码 7。
 - **输入**：Git 仓库 + 可选 stdin（`--push`）。
@@ -635,3 +637,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.8 | 2026-10-22 | GGD-0032：§4.2 新增 `summary.ignored_by_baseline` 与可选 `baseline` 对象（`path` / `generated` / `entries` / `suppressed_findings`）；§4.3 动作枚举新增 `AllowedByBaseline` 并声明白名单优先级；§5.4 注册 `--baseline <path>` 及组合 / 路径校验，补充基线相关退出码 13 / 31；§6 退出码 13 / 31 场景扩展 |
 | 0.1.9 | 2026-10-22 | GGD-0034：§4.11 新增 `gitguard.rules.list.v1` / `gitguard.rules.view.v1` Schema（默认隐藏 `pattern`，`--show-pattern` 才输出）；§5.7 重写 `rules list` / `view` 选项、筛选与过滤语义、无仓库可用与退出码 7 / 40；§6 退出码 40 转为已使用 |
 | 0.1.10 | 2026-10-22 | GGD-0036：§4.8 注册 `audit view <run-id>`；§4.9 新增 `gitguard.audit.view.v1` Schema（`run` 对象 + `findings` 数组，字段与列表 / 导出一致）；§5.6 补充 `view` 选项、输出分流与退出码 7 / 14 / 30；§6 退出码 30 转为已使用 |
+| 0.1.11 | 2026-10-23 | GGD-0038：§5.1 `install` 缺省按 `hooks.*` 注册子集（显式 `--hook` 优先）、`gitguard_executable_path` 覆盖脚本路径、全禁用 / 路径不存在 → 13；§5.4 新增隐藏选项 `--hook-mode` 与 `scan.pre_commit` / `scan.pre_push` 跳过语义（不产生 ScanRun，pre-commit 仍写非绕过标记） |

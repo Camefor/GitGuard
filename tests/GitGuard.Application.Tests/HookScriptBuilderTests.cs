@@ -21,7 +21,7 @@ public sealed class HookScriptBuilderTests
         // 首两行即托管标记（HookFileOperations.Inspect 的识别窗口）
         script.Should().StartWith("#!/bin/sh\n# gitguard-managed v1.2.3\n");
         script.Should().Contain("GITGUARD_BIN=\"/opt/gitguard/gitguard\"");
-        script.Should().Contain("scan --staged --record-pending");
+        script.Should().Contain("scan --staged --record-pending --hook-mode pre-commit");
         script.Should().Contain("pre-commit.local.bak");
         script.Should().NotContain("{{");
         script[0].Should().Be('#');
@@ -34,7 +34,7 @@ public sealed class HookScriptBuilderTests
     {
         string script = HookScriptBuilder.Render(HookType.PrePush, SAMPLE_EXECUTABLE, SAMPLE_VERSION);
 
-        script.Should().Contain("scan --push");
+        script.Should().Contain("scan --push --hook-mode pre-push");
         script.Should().NotContain("scan --staged");
         script.Should().Contain("pre-push.local.bak");
         script.Should().Contain("# gitguard-managed v1.2.3");

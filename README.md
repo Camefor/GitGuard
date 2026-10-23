@@ -319,6 +319,16 @@ policy:
   critical: block     # 硬下限，不可改为 allow
   high: warn          # 默认 block；按需降级
 
+hooks:
+  pre_commit: true                  # install 缺省是否注册 pre-commit
+  pre_push: true                    # install 缺省是否注册 pre-push
+  post_commit_bypass_detection: true  # 是否注册 post-commit 绕过检测
+  # gitguard_executable_path: C:/tools/gitguard.exe  # 覆盖写入 Hook 脚本的可执行文件路径
+
+scan:
+  pre_commit: true    # false = Hook 模式跳过暂存区扫描（手动 scan 不受影响）
+  pre_push: true      # false = Hook 模式跳过推送范围扫描
+
 exclude:
   paths:
     - "**/bin/**"
@@ -363,7 +373,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1353 用例（1344 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1368 用例（1359 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)

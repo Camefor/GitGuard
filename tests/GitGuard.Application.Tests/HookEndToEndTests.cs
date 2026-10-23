@@ -102,7 +102,7 @@ public sealed class HookEndToEndTests
         string commitSha = repo.Commit("init");
 
         commitSha.Should().HaveLength(40);
-        File.ReadAllText(guardLog).Trim().Should().Be("scan --staged --record-pending");
+        File.ReadAllText(guardLog).Trim().Should().Be("scan --staged --record-pending --hook-mode pre-commit");
         File.ReadAllText(legacyLog).Trim().Should().Be("LEGACY");
     }
 
@@ -126,7 +126,7 @@ public sealed class HookEndToEndTests
         Action act = () => repo.Commit("init");
 
         act.Should().Throw<InvalidOperationException>();
-        File.ReadAllText(guardLog).Trim().Should().Be("scan --staged --record-pending");
+        File.ReadAllText(guardLog).Trim().Should().Be("scan --staged --record-pending --hook-mode pre-commit");
         File.ReadAllText(legacyLog).Trim().Should().Be("LEGACY");
     }
 
@@ -158,7 +158,7 @@ public sealed class HookEndToEndTests
         int exitCode = HookTestSupport.RunScript(shPath, hookPath, repo.Root, "alpha", "beta");
 
         exitCode.Should().Be(expectedExitCode);
-        File.ReadAllText(guardLog).Trim().Should().Be("scan --staged --record-pending");
+        File.ReadAllText(guardLog).Trim().Should().Be("scan --staged --record-pending --hook-mode pre-commit");
         File.ReadAllText(legacyLog).Trim().Should().Be("LEGACY alpha beta");
     }
 

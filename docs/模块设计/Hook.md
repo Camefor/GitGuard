@@ -115,7 +115,7 @@ sequenceDiagram
     participant Hook as pre-commit sh
     participant CLI as gitguard scan --staged
     Git->>Hook: 调用 pre-commit（$@ 透传）
-    Hook->>CLI: 执行 gitguard scan --staged --record-pending
+    Hook->>CLI: 执行 gitguard scan --staged --record-pending --hook-mode pre-commit
     CLI-->>Hook: 退出码 GUARD_EXIT（通过时已写入待提交标记）
     Hook->>Hook: 若有 .local.bak 且可执行，调用并收集 LEGACY_EXIT
     Hook-->>Git: GUARD_EXIT 非零则退出 GUARD_EXIT，否则退出 LEGACY_EXIT
@@ -124,6 +124,8 @@ sequenceDiagram
 > 退出码规则：GitGuard 非零优先（守卫失败必须阻断），GitGuard 为 0 时沿用原 Hook 退出码。二者均非零时结果为 GitGuard 的退出码，不做数值合并（原 `max(...)` 表述作废）。分发脚本不使用 `set -e`：GitGuard 阻断时原 Hook 仍需执行（Husky 等既有流程不因守卫失败被静默跳过）。
 >
 > 隐藏选项 `--record-pending` 同时承载 FR-050：扫描通过后记录待提交预测；扫描阻断 / 失败时清理旧标记；标记写入失败只显示警告，不改变扫描退出码。`GITGUARD_SKIP=1` 仅在此模式生效（跳过扫描并写入 `skipped` 标记）。
+>
+> 隐藏选项 `--hook-mode pre-commit` 标记分发脚本来源，消费配置 `scan.pre_commit`（`GGD-0038`）：为 `false` 时跳过扫描、写入 `skipped=false` 的待提交标记（配置关闭不算绕过，避免 `post-commit` 误登记 `BypassDetected`）并返回 0；手动 `scan --staged` 不受该开关影响。
 
 ### 6.3 PrePush
 
@@ -133,7 +135,7 @@ sequenceDiagram
     participant Hook as pre-push sh
     participant CLI as gitguard scan --push
     Git->>Hook: 调用 pre-push + stdin（$1 remote / $2 url）
-    Hook->>CLI: 执行 gitguard scan --push（stdin 透传）
+    Hook->>CLI: 执行 gitguard scan --push --hook-mode pre-push（stdin 透传）
     CLI-->>Hook: 退出码 GUARD_EXIT
     Hook->>Hook: 调用备份 pre-push（若有，$@ 透传）
     Hook-->>Git: 同 6.2 退出码规则
@@ -173,7 +175,7 @@ sequenceDiagram
 
 ## 7. 分发脚本模板
 
-`pre-commit.sh.template`（`{{VERSION}}` / `{{GITGUARD_BIN}}` / `{{HOOK_NAME}}` 为渲染占位符；`pre-push.sh.template` 除 `scan --push` 外与之一致）：
+`pre-commit.sh.template`（`{{VERSION}}` / `{{GITGUARD_BIN}}` / `{{HOOK_NAME}}` 为渲染占位符；`pre-push.sh.template` 除调用 `scan --push --hook-mode pre-push` 外与之一致）：
 
 ```sh
 #!/bin/sh
@@ -193,7 +195,7 @@ ORIGINAL_HOOK="$HOOK_DIR/{{HOOK_NAME}}"
 LEGACY_HOOK="$HOOK_DIR/{{HOOK_NAME}}.local.bak"
 
 GUARD_EXIT=0
-"$GITGUARD_BIN" scan --staged --record-pending || GUARD_EXIT=$?
+"$GITGUARD_BIN" scan --staged --record-pending --hook-mode pre-commit || GUARD_EXIT=$?
 
 LEGACY_EXIT=0
 if [ -x "$LEGACY_HOOK" ]; then
@@ -235,19 +237,21 @@ GUARD_EXIT=0
 | 脚本内消息使用英文 | POSIX 区域环境下中文可能乱码；面向开发者的双语提示由 CLI 负责 |
 | 路径固化 | Windows 下反斜杠在渲染期转为正斜杠（MSYS sh 不识别 `\`） |
 | 可执行文件缺失 | 退出码 10 且**不调用**原 Hook——分发链断链时宁可阻断也不静默降级 |
-| Hook 模式标记 | `pre-commit` 必须带 `--record-pending`，否则正常提交会被 `post-commit` 误判为 `NoVerify`（GGD-0013 E2E 暴露的实际缺陷） |
+| Hook 模式标记 | `pre-commit` 必须带 `--record-pending`，否则正常提交会被 `post-commit` 误判为 `NoVerify`（GGD-0013 E2E 暴露的实际缺陷）；两种 Hook 均带 `--hook-mode`，供 CLI 区分手动扫描并消费 `scan.pre_commit` / `scan.pre_push` |
 | post-commit 调用 | `post-commit` 只调用 `hook post-commit`（不扫描）；命令自身恒为 0，审计失败按 14 上抛 |
 
 ## 8. 配置项
 
 | 配置项 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `hooks.pre_commit` | bool | true | 是否注册 pre-commit |
-| `hooks.pre_push` | bool | true | 是否注册 pre-push |
-| `hooks.post_commit_bypass_detection` | bool | true | 是否注册 post-commit 检测 `--no-verify` 绕过 |
-| `hooks.gitguard_executable_path` | string? | 自动探测 | 固化到分发脚本内 |
+| `hooks.pre_commit` | bool | true | `install` 缺省是否注册 pre-commit |
+| `hooks.pre_push` | bool | true | `install` 缺省是否注册 pre-push |
+| `hooks.post_commit_bypass_detection` | bool | true | `install` 缺省是否注册 post-commit 检测 `--no-verify` 绕过 |
+| `hooks.gitguard_executable_path` | string? | 自动探测 | 固化到分发脚本内；支持 `~` 与相对路径，安装期必须存在（否则退出码 13） |
 
-> 当前配置加载器尚未注册 `hooks.*` 段（GGD-0013 时安装器默认注册 pre-commit / pre-push / post-commit）；本表为规划 Schema，接线后生效。
+> `GGD-0038` 起 `hooks.*` 已接线：`gitguard install` 未显式给出 `--hook` 时按上表注册 Hook 子集；显式 `--hook` 始终优先。三项开关全为 `false` 且未显式指定 `--hook` → 退出码 13。`gitguard_executable_path` 缺省沿用当前可执行文件路径。
+>
+> 运行期扫描开关为 `scan.pre_commit` / `scan.pre_push`（`GGD-0038`）：仅由分发脚本携带的 `--hook-mode` 消费，手动扫描不受影响。
 
 ## 9. 质量属性
 
@@ -281,3 +285,4 @@ GUARD_EXIT=0
 | 0.1.3 | 2026-10-21 | 与 GGD-0013 实现同步：§2.1/§2.2 补 post-commit 输入与 Bypass 审计输出；§3 补绕过判定与原因优先级；§5 新增 `post-commit.sh.template` 与待提交标记文件语义；§6.2 更新为 `scan --staged --record-pending`，新增 §6.4 PostCommit 流程；§7 模板片段更新并补 post-commit 调用；§8 标注 `hooks.*` 配置未接线；§10 勾选 TC-DR-06-01 / TC-FR-050-01 |
 | 0.1.4 | 2026-10-21 | 与 GGD-0021 实现同步：§7 模板新增 POSIX sh 备份的 `$0` 保留执行（Husky `.husky/_/h` 按 `$0` 推导目标 Hook），要点表补对应说明；§10 勾选 TC-COMPAT-01~04（Husky / lefthook / pre-commit 真实安装矩阵） |
 | 0.1.5 | 2026-10-22 | GGD-0017：§5 待提交标记的 Git 目录解析由 `rev-parse --absolute-git-dir`（Git ≥ 2.13）改为 `rev-parse --git-dir` + 绝对化，兼容 Git 2.9 起版本 |
+| 0.1.6 | 2026-10-23 | GGD-0038：§6.2/§6.3/§7 分发脚本补 `--hook-mode`；§8 `hooks.*` 由规划 Schema 改为已接线（安装期子集注册 + 可执行文件路径覆盖 + 全禁用退出码 13），补运行期 `scan.pre_commit` / `scan.pre_push` 语义 |

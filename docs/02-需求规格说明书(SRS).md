@@ -167,11 +167,12 @@
   - 取值越界（`scan.max_file_bytes` / `scan.timeout_ms` / `logging.file.*` / `rules.secrets.min_entropy`）→ FailClosed（退出码 13）。
   - `rules.secrets.use_gitleaks`（bool，默认 false）：启用 GitleaksAdapter（`GGD-0035`）。`rules.secrets.gitleaks_path` 为空白字符串 → FailClosed（退出码 13）；未配置时按 `gitleaks` 在 PATH 中查找。启用但可执行文件缺失 / 无法执行 → 告警并禁用适配器，不阻断扫描。
   - `exclude.paths`：glob 匹配仓库相对路径；`exclude.files`：glob 匹配任意目录下的文件名。命中文件在扫描管线中直接跳过（暂存区与推送共用），不产生 Finding，也不计入 `skipped_files`；空项 → 退出码 13。
-  - `scan.pre_commit: false` / `scan.pre_push: false`：仅警告，扫描类型开关尚未接线（Hook 分发脚本恒调用扫描）。
+  - `hooks.pre_commit` / `hooks.pre_push` / `hooks.post_commit_bypass_detection`（bool，默认 true）：`gitguard install` 未显式给出 `--hook` 时按开关注册 Hook 子集；显式 `--hook` 始终优先；三项全为 `false` 且未显式指定 → FailClosed（退出码 13）。`hooks.gitguard_executable_path`（string?，默认自动探测）：覆盖固化到分发脚本的可执行文件路径，支持 `~` / 相对路径，安装期文件不存在或为空白 → 退出码 13（`GGD-0038`）。
+  - `scan.pre_commit: false` / `scan.pre_push: false`：仅控制 Hook 模式扫描（分发脚本携带隐藏选项 `--hook-mode`），手动 `scan --staged` / `scan --push` 始终执行；跳过时退出码 0、无 ScanRun（`GGD-0038`）。`pre-commit` 跳过仍写入 `skipped=false` 的待提交标记，`post-commit` 不将其误判为绕过事件。
   - `scan.fail_closed: false`：仅警告，MVP 行为恒为 FailClosed（DR-03）。
-- **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）。
-- **v0.1 实现状态**：除上述「仅警告」项外，其余字段均生效（`exclude` 自 `GGD-0019` 起生效）。
-- **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-05`
+- **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）；`hooks.*` 与 `scan.pre_commit` / `scan.pre_push` 接线于 `GGD-0038`。
+- **v0.2 实现状态**：除 `scan.fail_closed` 仍为「仅警告」外，其余字段均生效（`exclude` 自 `GGD-0019`、`hooks.*` 与 Hook 模式扫描开关自 `GGD-0038` 起生效）。
+- **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-08`
 
 ### 2.12.1 `FR-071` 用户级配置
 
@@ -326,7 +327,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | `TC-FR-060-01~04`（`ScanAllUseCaseTests` / `GitAccessFullScanTests` / `CliScanAllTests`） | 已实现（`GGD-0031`） |
 | `FR-061` | 3.6 | `模块设计/Cli.md` | `TC-FR-061-01~05`（`BaselineUseCaseTests` / `CliScanBaselineTests` / `ExitCodeMapperTests`） | 已实现（`GGD-0032`） |
-| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~05`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现 |
+| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~08`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests` / `CliHookLifecycleTests` / `HookScriptBuilderTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` / `06-API接口设计` §5.7 | `TC-FR-080-01~04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`） | 已实现（`GGD-0034`） |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-01~04`（`GitleaksAdapterTests` / `GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests` / `GitGuardConfigLoaderTests` / `GitGuardSessionTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现（`GGD-0035`） |
@@ -365,3 +366,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.19 | 2026-10-22 | GGD-0035：§2.12 更新 `use_gitleaks` / `gitleaks_path` 配置语义（空白路径 → 13，缺失可执行文件 → 告警降级）；§2.13 FR-090 按实现重写（启动探测、逐文件暂存、命令与退出码、GLK 映射、禁用规则过滤、跨引擎去重、FailClosed 与临时目录清理）；§4 可选依赖说明与 §8 追溯矩阵同步标记已实现 |
 | 0.1.20 | 2026-10-22 | GGD-0036：§4 审计接口补充 `gitguard audit view <run-id>`（单次运行摘要与 Finding 明细，脱敏输出，退出码 7 / 30）并标记已实现 |
 | 0.1.21 | 2026-10-22 | GGD-0037：§2.5 补充 40 条规则严重度分布；§2.9 增加误报治理流程链接；§2.11.1 校正基线 `entries` 实际字段（`fingerprint` / `rule_id` / `file_path`，读取仅强制校验指纹） |
+| 0.1.22 | 2026-10-23 | GGD-0038：§2.12 接线 `hooks.*`（安装期 Hook 子集 / 可执行文件路径覆盖 / 全禁用退出码 13）与 `scan.pre_commit` / `scan.pre_push`（仅 Hook 模式生效，跳过不产生绕过事件）；「仅警告」项收敛为 `scan.fail_closed`；§8 FR-070 追溯扩展至 `TC-FR-070-01~08` |

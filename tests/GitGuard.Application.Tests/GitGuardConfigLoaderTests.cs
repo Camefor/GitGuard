@@ -28,6 +28,12 @@ public sealed class GitGuardConfigLoaderTests
         config.Version.Should().Be(GitGuardConfig.SUPPORTED_VERSION);
         config.Scan.MaxFileBytes.Should().Be(ScanSettings.DEFAULT_MAX_FILE_BYTES);
         config.Scan.Timeout.Should().Be(ScanSettings.DEFAULT_TIMEOUT);
+        config.Scan.PreCommit.Should().BeTrue("Hook 模式扫描默认开启");
+        config.Scan.PrePush.Should().BeTrue("Hook 模式扫描默认开启");
+        config.Hooks.PreCommit.Should().BeTrue("install 默认注册 pre-commit");
+        config.Hooks.PrePush.Should().BeTrue("install 默认注册 pre-push");
+        config.Hooks.PostCommitBypassDetection.Should().BeTrue("install 默认注册 post-commit 绕过检测");
+        config.Hooks.ExecutablePath.Should().BeNull("缺省自动探测当前可执行文件");
         config.Secrets.Enabled.Should().BeTrue();
         config.Privacy.Enabled.Should().BeTrue();
         config.LocalPath.Enabled.Should().BeTrue();
@@ -247,14 +253,16 @@ public sealed class GitGuardConfigLoaderTests
         act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("gitleaks_path");
     }
 
+    // GGD-0038：scan.pre_commit / scan.pre_push 已接线，仅剩余未消费开关产生警告
     [Fact]
-    public void Load_DeferredSwitches_ProduceWarningsWithoutBlocking()
+    public void Load_WiredScanSwitches_AreConsumedWithoutWarnings()
     {
         using var project = new TempDirectory();
         const string yaml = """
             version: 1
             scan:
               pre_commit: false
+              pre_push: false
               fail_closed: false
             logging:
               verbose: true
@@ -266,12 +274,92 @@ public sealed class GitGuardConfigLoaderTests
 
         GitGuardConfig config = CreateLoader(project.Root).Load();
 
+        config.Scan.PreCommit.Should().BeFalse("scan.pre_commit 已接线为 Hook 模式扫描开关");
+        config.Scan.PrePush.Should().BeFalse("scan.pre_push 已接线为 Hook 模式扫描开关");
         config.LogVerbose.Should().BeTrue();
         config.ExcludePaths.Should().ContainSingle().Which.Should().Be("**/vendor/**");
-        config.Warnings.Should().Contain(warning => warning.Contains("scan.pre_commit"));
+        config.Warnings.Should().NotContain(warning => warning.Contains("scan.pre_commit"));
+        config.Warnings.Should().NotContain(warning => warning.Contains("scan.pre_push"));
         config.Warnings.Should().Contain(warning => warning.Contains("fail_closed"));
         config.Warnings.Should().Contain(warning => warning.Contains("logging.verbose"));
         config.Warnings.Should().NotContain(warning => warning.Contains("exclude"));
+    }
+
+    [Fact]
+    public void Load_HooksSection_MapsAllSwitches()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            hooks:
+              pre_commit: false
+              pre_push: true
+              post_commit_bypass_detection: false
+              gitguard_executable_path: "  C:/tools/gitguard.exe  "
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        config.Hooks.PreCommit.Should().BeFalse();
+        config.Hooks.PrePush.Should().BeTrue();
+        config.Hooks.PostCommitBypassDetection.Should().BeFalse();
+        config.Hooks.ExecutablePath.Should().Be("C:/tools/gitguard.exe", "路径两端空白需裁剪");
+        config.Warnings.Should().BeEmpty("hooks.* 全部字段均为已知配置项");
+    }
+
+    [Fact]
+    public void Load_ProjectHooks_OverrideUserLevelPerField()
+    {
+        using var project = new TempDirectory();
+        string userConfigPath = Path.Combine(project.Root, "user-config.yml");
+        const string userYaml = """
+            version: 1
+            hooks:
+              pre_commit: false
+              pre_push: false
+              gitguard_executable_path: C:/user/gitguard.exe
+            """;
+        const string projectYaml = """
+            version: 1
+            hooks:
+              pre_push: true
+            """;
+        File.WriteAllText(userConfigPath, userYaml);
+        File.WriteAllText(ProjectConfigPath(project), projectYaml);
+
+        GitGuardConfig config = CreateLoader(project.Root, userConfigPath).Load();
+
+        config.Hooks.PreCommit.Should().BeFalse("未覆盖的开关沿用用户级");
+        config.Hooks.PrePush.Should().BeTrue("项目级覆盖开关");
+        config.Hooks.ExecutablePath.Should().Be("C:/user/gitguard.exe", "未覆盖的路径字段沿用用户级");
+    }
+
+    [Fact]
+    public void Load_UnknownHooksKey_ProducesWarning()
+    {
+        using var project = new TempDirectory();
+        const string yaml = "version: 1\nhooks:\n  pre_commmit: false\n";
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        config.Hooks.PreCommit.Should().BeTrue("拼写错误的键不改变默认值");
+        config.Warnings.Should().Contain(warning => warning.Contains("hooks.pre_commmit"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Load_BlankHooksExecutablePath_FailsClosed(string value)
+    {
+        using var project = new TempDirectory();
+        string yaml = $"version: 1\nhooks:\n  gitguard_executable_path: \"{value}\"\n";
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        Action act = () => CreateLoader(project.Root).Load();
+
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("hooks.gitguard_executable_path");
     }
 
     [Fact]

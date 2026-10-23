@@ -13,9 +13,14 @@ namespace GitGuard.Cli.Commands;
 /// 仅用于 <c>--all</c> 的历史扫描（后两者同时隐含历史模式）。
 /// 隐藏选项 <c>--record-pending</c> 仅供 Hook 分发脚本使用：扫描通过（或按 <c>GITGUARD_SKIP=1</c> 跳过）后
 /// 记录待提交预测，供 post-commit 绕过检测比对（FR-050）。
+/// 隐藏选项 <c>--hook-mode</c> 标记分发脚本来源：<c>pre-commit</c> / <c>pre-push</c> 模式下分别消费
+/// <c>scan.pre_commit</c> / <c>scan.pre_push</c>，关闭时跳过扫描（手动扫描不受影响）。
 /// </summary>
 internal static class ScanCommand
 {
+    private const string HOOK_MODE_PRE_COMMIT = "pre-commit";
+    private const string HOOK_MODE_PRE_PUSH = "pre-push";
+
     /// <summary>创建 <c>scan</c> 子命令。</summary>
     /// <param name="runtime">运行时上下文。</param>
     /// <returns>已接线动作的子命令（动作闭包捕获 <paramref name="runtime"/>）。</returns>
@@ -57,6 +62,12 @@ internal static class ScanCommand
             Description = runtime.Text.Get(CliTextKey.ScanRecordPendingDescription),
             Hidden = true,
         };
+        var hookModeOption = new Option<string?>("--hook-mode")
+        {
+            Description = runtime.Text.Get(CliTextKey.ScanHookModeDescription),
+            Hidden = true,
+        };
+        hookModeOption.AcceptOnlyFromAmong(HOOK_MODE_PRE_COMMIT, HOOK_MODE_PRE_PUSH);
 
         var command = new Command("scan", runtime.Text.Get(CliTextKey.ScanDescription));
         command.Options.Add(stagedOption);
@@ -67,6 +78,7 @@ internal static class ScanCommand
         command.Options.Add(maxFilesOption);
         command.Options.Add(baselineOption);
         command.Options.Add(recordPendingOption);
+        command.Options.Add(hookModeOption);
 
         Func<ParseResult, CancellationToken, Task<int>> action = (parseResult, cancellationToken) =>
             ExecuteAsync(
@@ -80,6 +92,7 @@ internal static class ScanCommand
                 maxFilesOption,
                 baselineOption,
                 recordPendingOption,
+                hookModeOption,
                 cancellationToken);
         command.SetAction(action);
         return command;
@@ -139,6 +152,40 @@ internal static class ScanCommand
         }
     }
 
+    /// <summary>输出跳过提示与日志并返回成功退出码（不产生 ScanRun）。</summary>
+    /// <param name="runtime">运行时上下文。</param>
+    /// <param name="pendingWarning">待提交标记写入 / 清理失败的警告；成功时为 <see langword="null"/>。</param>
+    /// <param name="noticeKey">面向用户的跳过多语言文案键。</param>
+    /// <param name="eventName">日志事件名。</param>
+    /// <param name="logKey">日志文案键。</param>
+    /// <param name="configKey">日志文案中的配置键（如 <c>scan.pre_commit</c>）；无参数时为 <see langword="null"/>。</param>
+    private static int SkipWithoutScan(
+        CliRuntime runtime,
+        string? pendingWarning,
+        CliTextKey noticeKey,
+        string eventName,
+        CliTextKey logKey,
+        string? configKey)
+    {
+        if (pendingWarning is not null)
+        {
+            runtime.Writer.WriteNotice(pendingWarning);
+        }
+
+        runtime.Writer.WriteNotice(runtime.Text.Get(noticeKey));
+        string message = configKey is null ? runtime.Text.Get(logKey) : runtime.Text.Format(logKey, configKey);
+        runtime.Logger.Log(
+            CliLogLevel.Information,
+            eventName,
+            message,
+            new LogFields
+            {
+                ExitCode = ExitCodes.SUCCESS,
+                TraceId = runtime.TraceId,
+            });
+        return ExitCodes.SUCCESS;
+    }
+
     private static async Task<int> ExecuteAsync(
         CliRuntime runtime,
         ParseResult parseResult,
@@ -150,6 +197,7 @@ internal static class ScanCommand
         Option<int?> maxFilesOption,
         Option<string?> baselineOption,
         Option<bool> recordPendingOption,
+        Option<string?> hookModeOption,
         CancellationToken cancellationToken)
     {
         bool staged = parseResult.GetValue(stagedOption);
@@ -160,6 +208,7 @@ internal static class ScanCommand
         int? maxFiles = parseResult.GetValue(maxFilesOption);
         string? baseline = parseResult.GetValue(baselineOption);
         bool recordPending = parseResult.GetValue(recordPendingOption);
+        string? hookMode = parseResult.GetValue(hookModeOption);
 
         int scopeCount = (staged ? 1 : 0) + (push ? 1 : 0) + (all ? 1 : 0);
         if (scopeCount != 1)
@@ -197,26 +246,46 @@ internal static class ScanCommand
             return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.RecordPendingRequiresStaged));
         }
 
+        if (hookMode == HOOK_MODE_PRE_COMMIT && !staged)
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.HookModeRequiresStaged));
+        }
+
+        if (hookMode == HOOK_MODE_PRE_PUSH && !push)
+        {
+            return UsageError.Report(runtime, runtime.Text.Get(CliTextKey.HookModeRequiresPush));
+        }
+
         // FR-050：仅在 Hook 模式（--record-pending）识别 GITGUARD_SKIP=1，手动扫描不受环境变量影响
         if (recordPending && string.Equals(runtime.Host.SkipEnvironment?.Trim(), "1", StringComparison.Ordinal))
         {
             string? skipWarning = TryUpdatePendingScan(runtime, skipped: true);
-            if (skipWarning is not null)
-            {
-                runtime.Writer.WriteNotice(skipWarning);
-            }
+            return SkipWithoutScan(runtime, skipWarning, CliTextKey.NoticeSkip, "Scan.Skipped", CliTextKey.LogScanSkipped, configKey: null);
+        }
 
-            runtime.Writer.WriteNotice(runtime.Text.Get(CliTextKey.NoticeSkip));
-            runtime.Logger.Log(
-                CliLogLevel.Information,
-                "Scan.Skipped",
-                runtime.Text.Get(CliTextKey.LogScanSkipped),
-                new LogFields
-                {
-                    ExitCode = ExitCodes.SUCCESS,
-                    TraceId = runtime.TraceId,
-                });
-            return ExitCodes.SUCCESS;
+        // FR-070：scan.pre_commit / scan.pre_push 只控制 Hook 模式；手动扫描始终执行
+        if (hookMode == HOOK_MODE_PRE_COMMIT && !runtime.Session.Config.Scan.PreCommit)
+        {
+            // 仍记录待提交预测（skipped=false）：配置关闭扫描不是绕过，避免 post-commit 误登记 BypassDetected
+            string? disabledPendingWarning = recordPending ? TryUpdatePendingScan(runtime, skipped: false) : null;
+            return SkipWithoutScan(
+                runtime,
+                disabledPendingWarning,
+                CliTextKey.NoticeScanDisabledPreCommit,
+                "Scan.DisabledByConfig",
+                CliTextKey.LogScanDisabledByConfig,
+                configKey: "scan.pre_commit");
+        }
+
+        if (hookMode == HOOK_MODE_PRE_PUSH && !runtime.Session.Config.Scan.PrePush)
+        {
+            return SkipWithoutScan(
+                runtime,
+                null,
+                CliTextKey.NoticeScanDisabledPrePush,
+                "Scan.DisabledByConfig",
+                CliTextKey.LogScanDisabledByConfig,
+                configKey: "scan.pre_push");
         }
 
         // NFR-M-002：--verbose（Debug）才采集规则耗时，普通扫描不付出计时开销
