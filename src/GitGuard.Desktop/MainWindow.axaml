@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:GitGuard.Desktop.ViewModels"
+        xmlns:views="using:GitGuard.Desktop.Views"
         x:Class="GitGuard.Desktop.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="{Binding WindowTitle}"
@@ -87,8 +88,12 @@
             BorderThickness="1"
             CornerRadius="12">
       <ContentControl Content="{Binding CurrentPage}">
-        <ContentControl.ContentTemplate>
-          <DataTemplate x:DataType="vm:SectionViewModel">
+        <ContentControl.DataTemplates>
+          <!-- 仓库页（GGD-0042）优先匹配；其余区块暂用骨架模板 -->
+          <DataTemplate DataType="vm:RepositoriesViewModel">
+            <views:RepositoriesView />
+          </DataTemplate>
+          <DataTemplate DataType="vm:SectionViewModel" x:DataType="vm:SectionViewModel">
             <StackPanel Margin="32" Spacing="12">
               <TextBlock Text="{Binding Title}"
                          FontSize="26"
@@ -111,7 +116,7 @@
               </Border>
             </StackPanel>
           </DataTemplate>
-        </ContentControl.ContentTemplate>
+        </ContentControl.DataTemplates>
       </ContentControl>
     </Border>
 

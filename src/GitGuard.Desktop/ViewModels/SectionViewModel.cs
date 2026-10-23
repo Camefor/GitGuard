@@ -7,7 +7,7 @@ namespace GitGuard.Desktop.ViewModels;
 /// 一级页面骨架（12-前端组件设计 §1 业务层）：当前承载标题与空状态文案，
 /// 后续任务以真实页面 ViewModel 替换内容，导航壳保持不变。
 /// </summary>
-public sealed class SectionViewModel : ObservableObject
+public class SectionViewModel : ObservableObject
 {
     private string _title;
     private string _subtitle;
@@ -50,7 +50,7 @@ public sealed class SectionViewModel : ObservableObject
 
     /// <summary>按新界面语言刷新文案。</summary>
     /// <param name="language">目标界面语言。</param>
-    public void Relocalize(DesktopLanguage language)
+    public virtual void Relocalize(DesktopLanguage language)
     {
         Title = DesktopText.SectionTitle(Section, language);
         Subtitle = DesktopText.SectionSubtitle(Section, language);

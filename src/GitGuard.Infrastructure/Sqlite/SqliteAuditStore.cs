@@ -17,7 +17,7 @@ namespace GitGuard.Infrastructure.Sqlite;
 /// 构造期执行一次 schema 迁移（<see cref="SchemaMigrator"/>）与文件加固：Unix 0700/0600（08-权限设计 §5.1）、
 /// Windows ACL 收紧（08 §5.2）、符号链接路径拒绝（08-权限设计 §9）。
 /// </summary>
-public sealed class SqliteAuditStore : IAuditStore, IAllowlistStore
+public sealed partial class SqliteAuditStore : IAuditStore, IAllowlistStore, IRepositoryStore
 {
     private const int SQLITE_BUSY_ERROR_CODE = 5;
     private const int SQLITE_LOCKED_ERROR_CODE = 6;

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GitGuard.Desktop.Localization;
+using GitGuard.Desktop.Services;
 
 namespace GitGuard.Desktop.ViewModels;
 
@@ -23,8 +24,11 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>初始化主窗口 ViewModel。</summary>
     /// <param name="appState">应用级状态。</param>
+    /// <param name="repositoryOperations">
+    /// 仓库页操作服务；<see langword="null"/> 时仓库页保持骨架（ViewModel 单测与设计预览不访问真实数据）。
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="appState"/> 为 <see langword="null"/>。</exception>
-    public MainViewModel(AppState appState)
+    public MainViewModel(AppState appState, IRepositoryOperations? repositoryOperations = null)
     {
         _appState = appState ?? throw new ArgumentNullException(nameof(appState));
 
@@ -32,7 +36,7 @@ public sealed class MainViewModel : ObservableObject
             Enum.GetValues<DesktopSection>().Select(section => new NavigationItemViewModel(section, appState.Language)));
         _pages = Enum.GetValues<DesktopSection>().ToDictionary(
             section => section,
-            section => new SectionViewModel(section, appState.Language));
+            section => CreatePage(section, appState.Language, repositoryOperations));
 
         _windowTitle = DesktopText.WindowTitle(appState.Language);
         _tagline = DesktopText.Tagline(appState.Language);
@@ -43,6 +47,7 @@ public sealed class MainViewModel : ObservableObject
 
         ToggleLanguageCommand = new RelayCommand(ToggleLanguage);
         _appState.PropertyChanged += OnAppStatePropertyChanged;
+        EnsurePageLoaded(_currentPage);
     }
 
     /// <summary>一级导航项（顺序与 <see cref="DesktopSection"/> 声明一致）。</summary>
@@ -88,6 +93,7 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref _selectedNavigation, value) && value is not null)
             {
                 CurrentPage = _pages[value.Section];
+                EnsurePageLoaded(CurrentPage);
             }
         }
     }
@@ -97,6 +103,23 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _currentPage;
         private set => SetProperty(ref _currentPage, value);
+    }
+
+    private static SectionViewModel CreatePage(
+        DesktopSection section,
+        DesktopLanguage language,
+        IRepositoryOperations? repositoryOperations) =>
+        section == DesktopSection.Repositories && repositoryOperations is not null
+            ? new RepositoriesViewModel(repositoryOperations, language)
+            : new SectionViewModel(section, language);
+
+    private static void EnsurePageLoaded(SectionViewModel page)
+    {
+        if (page is RepositoriesViewModel repositoriesPage)
+        {
+            // 首次进入仓库页时异步加载列表；失败由 ViewModel 转为可展示消息
+            _ = repositoriesPage.EnsureLoadedAsync();
+        }
     }
 
     private void ToggleLanguage() => _appState.ToggleLanguage();
@@ -121,6 +144,10 @@ public sealed class MainViewModel : ObservableObject
             item.Relocalize(language);
         }
 
-        CurrentPage.Relocalize(language);
+        // 页面实例会话内缓存：语言切换必须刷新全部缓存页面，避免切回旧页面时残留旧语言文案
+        foreach (SectionViewModel page in _pages.Values)
+        {
+            page.Relocalize(language);
+        }
     }
 }

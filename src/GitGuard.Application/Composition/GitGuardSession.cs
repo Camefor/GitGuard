@@ -7,6 +7,7 @@ using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Repositories;
 using GitGuard.Application.Rules;
 using GitGuard.Application.Scanning;
 using GitGuard.Core;
@@ -36,6 +37,7 @@ public sealed class GitGuardSession
     private readonly IClock _clock;
     private readonly ISecretRandom _secretRandom;
     private readonly UserDataPaths _paths;
+    private readonly GitAccessFactory _gitAccessFactory;
 
     private readonly Lazy<GitGuardConfig> _config;
     private readonly Lazy<IGitAccess> _gitAccess;
@@ -71,6 +73,7 @@ public sealed class GitGuardSession
         _clock = clock ?? new SystemClock();
         _secretRandom = secretRandom ?? SystemSecretRandom.Instance;
         _paths = new UserDataPaths(_options.DataDirectory, _options.UserConfigDirectory);
+        _gitAccessFactory = new GitAccessFactory(_options.GitExecutable);
         Version = string.IsNullOrWhiteSpace(_options.GitGuardVersion) ? ResolveDefaultVersion() : _options.GitGuardVersion;
 
         _config = new Lazy<GitGuardConfig>(LoadConfig);
@@ -92,6 +95,9 @@ public sealed class GitGuardSession
     /// <summary>用户数据目录根路径。</summary>
     public string UserDataDirectory => _paths.DataDirectory;
 
+    /// <summary>用户级配置目录（<c>config.yml</c> 的父目录）。</summary>
+    public string UserConfigDirectory => _paths.UserConfigDirectory;
+
     /// <summary>用户级配置文件路径（FR-071：<c>~/.config/gitguard/config.yml</c>）。</summary>
     public string UserConfigPath => _paths.UserConfigPath;
 
@@ -109,6 +115,9 @@ public sealed class GitGuardSession
 
     /// <summary>白名单存储（与审计数据共享本地数据库）；首次访问时打开（或创建并迁移）<c>audit.db</c>。</summary>
     public IAllowlistStore AllowlistStore => _auditStore.Value;
+
+    /// <summary>本机仓库注册表（与审计数据共享本地数据库）；首次访问时打开（或创建并迁移）<c>audit.db</c>。</summary>
+    public IRepositoryStore Repositories => _auditStore.Value;
 
     /// <summary>
     /// 本次配置下参与评估的启用规则总数（扫描报告 <c>summary.rules_evaluated</c> 的来源）；
@@ -332,6 +341,51 @@ public sealed class GitGuardSession
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
     public AllowlistListUseCase CreateAllowlistList() => new AllowlistListUseCase(AllowlistStore);
 
+    /// <summary>装配仓库登记用例（仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的登记用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public RegisterRepositoryUseCase CreateRegisterRepository() =>
+        new RegisterRepositoryUseCase(Repositories, _gitAccessFactory, _clock);
+
+    /// <summary>装配仓库移除用例（仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的移除用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public RemoveRepositoryUseCase CreateRemoveRepository() => new RemoveRepositoryUseCase(Repositories);
+
+    /// <summary>装配仓库列表用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的列表用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public ListRepositoriesUseCase CreateListRepositories() => new ListRepositoriesUseCase(Repositories);
+
+    /// <summary>装配仓库最近扫描摘要用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
+    /// <returns>已接线的最近扫描摘要用例。</returns>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public LatestRepositoryScanUseCase CreateLatestRepositoryScan() => new LatestRepositoryScanUseCase(AuditStore);
+
+    /// <summary>
+    /// 为指定仓库创建共享同一用户数据目录与用户配置目录的子会话（GGD-0042）：桌面端在单进程内对多个已登记仓库
+    /// 执行状态查询与扫描时使用；配置快照、审计库连接与指纹盐均按子会话独立惰性装配。
+    /// </summary>
+    /// <param name="workingDirectory">仓库内任意目录（通常为登记时解析出的工作区根目录）。</param>
+    /// <returns>绑定该工作目录的子会话。</returns>
+    /// <exception cref="ArgumentException"><paramref name="workingDirectory"/> 为空或全空白。</exception>
+    public GitGuardSession CreateScopedSession(string workingDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
+
+        return new GitGuardSession(
+            new GitGuardSessionOptions
+            {
+                WorkingDirectory = workingDirectory,
+                GitExecutable = _options.GitExecutable,
+                DataDirectory = _paths.DataDirectory,
+                UserConfigDirectory = _paths.UserConfigDirectory,
+                GitGuardVersion = Version,
+            },
+            _clock,
+            _secretRandom);
+    }
+
     /// <summary>装配状态查询用例（只读：不触发审计打开与检测器装配）。</summary>
     /// <returns>已接线的状态用例（配置加载链来自 <see cref="Config"/>）。</returns>
     /// <exception cref="ConfigurationException">配置无效（解析失败 / 违反硬下限）。</exception>
@@ -361,7 +415,7 @@ public sealed class GitGuardSession
             _clock,
             defaultLogFilePath: _paths.LogFilePath).Load();
 
-    private GitAccess CreateGitAccess() => new GitAccess(_options.WorkingDirectory, _options.GitExecutable);
+    private IGitAccess CreateGitAccess() => _gitAccessFactory.Create(_options.WorkingDirectory);
 
     private SqliteAuditStore CreateAuditStore()
     {

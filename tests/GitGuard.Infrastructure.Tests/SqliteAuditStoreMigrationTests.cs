@@ -14,6 +14,7 @@ public sealed class SqliteAuditStoreMigrationTests
         "audit_logs",
         "findings",
         "hook_installations",
+        "repositories",
         "scan_runs",
         "schema_version",
     };
@@ -25,6 +26,7 @@ public sealed class SqliteAuditStoreMigrationTests
         "ix_findings_fingerprint",
         "ix_findings_rule_severity",
         "ix_findings_run_id",
+        "ix_repositories_added_at",
         "ix_scan_runs_repo_time",
     };
 
@@ -53,7 +55,7 @@ public sealed class SqliteAuditStoreMigrationTests
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadLongColumn(connection, "SELECT version FROM schema_version ORDER BY version;")
-            .Should().Equal(1L, 2L);
+            .Should().Equal(1L, 2L, 3L);
     }
 
     [Fact]
@@ -67,7 +69,7 @@ public sealed class SqliteAuditStoreMigrationTests
 
         using SqliteConnection connection = SqliteTestHelpers.OpenRawConnection(dbPath);
         SqliteTestHelpers.ReadLongColumn(connection, "SELECT version FROM schema_version ORDER BY version;")
-            .Should().Equal(1L, 2L);
+            .Should().Equal(1L, 2L, 3L);
     }
 
     [Fact]
@@ -95,7 +97,7 @@ public sealed class SqliteAuditStoreMigrationTests
                 "SELECT category || '|' || event_type || '|' || payload_json FROM audit_logs WHERE seq = 1;")
             .Should().Be("Scan|ScanCompleted|{\"RunId\":\"legacy-run\"}", "V002 重建 audit_logs 时必须保留既有行与自增序列");
         SqliteTestHelpers.ReadLongColumn(reopened, "SELECT version FROM schema_version ORDER BY version;")
-            .Should().Equal(1L, 2L);
+            .Should().Equal(1L, 2L, 3L);
     }
 
     [Fact]

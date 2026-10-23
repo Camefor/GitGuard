@@ -1,6 +1,8 @@
 ﻿using System.Reflection;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using GitGuard.Application.Composition;
+using GitGuard.Desktop.Services;
 using GitGuard.Desktop.ViewModels;
 
 namespace GitGuard.Desktop;
@@ -17,9 +19,13 @@ public sealed partial class App : Avalonia.Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var appState = new AppState(ResolveVersion());
+
+            // 主会话仅用于仓库注册表与共享用户数据目录：以应用基目录为工作目录，避免把启动目录当作项目配置来源
+            var session = new GitGuardSession(
+                new GitGuardSessionOptions { WorkingDirectory = AppContext.BaseDirectory });
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainViewModel(appState),
+                DataContext = new MainViewModel(appState, new RepositoryOperations(session)),
             };
         }
 
