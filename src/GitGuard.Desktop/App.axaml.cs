@@ -18,18 +18,31 @@ public sealed partial class App : Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var appState = new AppState(ResolveVersion());
-
             // 主会话仅用于仓库注册表与共享用户数据目录：以应用基目录为工作目录，避免把启动目录当作项目配置来源
             var session = new GitGuardSession(
                 new GitGuardSessionOptions { WorkingDirectory = AppContext.BaseDirectory });
+
+            // GGD-0046：桌面设置独立于 config.yml 持久化，启动时恢复语言与主题
+            var settingsService = new DesktopSettingsService(
+                DesktopSettingsService.ResolvePath(session.UserDataDirectory),
+                () => session.Config);
+            DesktopSettings settings = settingsService.Current;
+            var appState = new AppState(ResolveVersion(), settings.Language, settings.ThemeMode);
+            RequestedThemeVariant = appState.ThemeMode.ToThemeVariant();
+
             desktop.MainWindow = new MainWindow
             {
                 DataContext = new MainViewModel(
                     appState,
-                    new RepositoryOperations(session),
-                    new ShellEditorLauncher(),
-                    new RuleOperations(session)),
+                    new DesktopServices
+                    {
+                        RepositoryOperations = new RepositoryOperations(session, settingsService),
+                        EditorLauncher = new ShellEditorLauncher(),
+                        RuleOperations = new RuleOperations(session, settingsService),
+                        AuditOperations = new AuditOperations(session),
+                        SettingsOperations = settingsService,
+                        ExportPathPicker = new StorageProviderExportPathPicker(() => desktop.MainWindow),
+                    }),
             };
         }
 

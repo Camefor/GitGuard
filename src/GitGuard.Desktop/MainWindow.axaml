@@ -8,7 +8,7 @@
         Width="1120" Height="720"
         MinWidth="1024" MinHeight="720"
         Background="{DynamicResource GitGuardSurfaceBrush}"
-        RequestedThemeVariant="Default">
+        RequestedThemeVariant="{Binding RequestedThemeVariant}">
 
   <Grid ColumnDefinitions="240,*">
 
@@ -89,12 +89,18 @@
             CornerRadius="12">
       <ContentControl Content="{Binding CurrentPage}">
         <ContentControl.DataTemplates>
-          <!-- 仓库页（GGD-0042）与规则页（GGD-0045）优先匹配；其余区块暂用骨架模板 -->
+          <!-- 仓库页（GGD-0042）、规则页（GGD-0045）、日志页与设置页（GGD-0046）优先匹配；其余区块暂用骨架模板 -->
           <DataTemplate DataType="vm:RepositoriesViewModel">
             <views:RepositoriesView />
           </DataTemplate>
           <DataTemplate DataType="vm:RulesViewModel">
             <views:RulesView />
+          </DataTemplate>
+          <DataTemplate DataType="vm:LogsViewModel">
+            <views:LogsView />
+          </DataTemplate>
+          <DataTemplate DataType="vm:SettingsViewModel">
+            <views:SettingsView />
           </DataTemplate>
           <DataTemplate DataType="vm:SectionViewModel" x:DataType="vm:SectionViewModel">
             <StackPanel Margin="32" Spacing="12">

@@ -12,14 +12,19 @@ namespace GitGuard.Desktop.Services;
 public sealed class RuleOperations : IRuleOperations
 {
     private readonly GitGuardSession _session;
+    private readonly ISettingsOperations? _settingsOperations;
 
     /// <summary>初始化规则目录数据访问实现。</summary>
     /// <param name="session">应用级组合根（仅用于规则目录与配置快照）。</param>
+    /// <param name="settingsOperations">
+    /// 桌面设置服务；存在 Gitleaks 覆盖时优先展示桌面端生效值，<see langword="null"/> 时完全采用配置文件。
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="session"/> 为 <see langword="null"/>。</exception>
-    public RuleOperations(GitGuardSession session)
+    public RuleOperations(GitGuardSession session, ISettingsOperations? settingsOperations = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
+        _settingsOperations = settingsOperations;
     }
 
     /// <inheritdoc />
@@ -32,7 +37,11 @@ public sealed class RuleOperations : IRuleOperations
                 // 与 CLI 共用同一目录构建逻辑；Config 仅用于读取 Gitleaks 开关，不装配检测器
                 ImmutableArray<RuleCatalogEntry> catalog = _session.GetRuleCatalog();
                 SecretRulesSettings secrets = _session.Config.Secrets;
-                return new RuleCatalogSnapshot(catalog, secrets.UseGitleaks, secrets.GitleaksPath);
+                DesktopGitleaksSettings? overrideSettings = _settingsOperations?.Current.Gitleaks;
+                return new RuleCatalogSnapshot(
+                    catalog,
+                    overrideSettings?.Enabled ?? secrets.UseGitleaks,
+                    overrideSettings is null ? secrets.GitleaksPath : overrideSettings.Path);
             },
             cancellationToken);
 }

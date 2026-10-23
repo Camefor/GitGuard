@@ -93,7 +93,9 @@ public sealed class RepositoryItemViewModelTests
             "甲仓库",
             new DateTimeOffset(2026, 10, 20, 9, 0, 0, TimeSpan.Zero));
         var fake = new StubRepositoryOperations(repository);
-        var viewModel = new MainViewModel(new AppState("0.3.0"), fake);
+        var viewModel = new MainViewModel(
+            new AppState("0.3.0"),
+            new DesktopServices { RepositoryOperations = fake });
 
         var page = viewModel.CurrentPage.Should().BeOfType<RepositoriesViewModel>().Subject;
         page.Repositories.Should().ContainSingle().Which.Id.Should().Be(repository.Id);

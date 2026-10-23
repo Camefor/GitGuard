@@ -332,7 +332,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` / `06-API接口设计` §5.7 | `TC-FR-080-01~04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`） | 已实现（`GGD-0034`） |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-01~04`（`GitleaksAdapterTests` / `GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests` / `GitGuardConfigLoaderTests` / `GitGuardSessionTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现（`GGD-0035`） |
-| `FR-100` | 全部 | `11-前端UI设计` | 无 | 未实现（v0.3） |
+| `FR-100` | 全部 | `11-前端UI设计` | `TC-FR-100-01~12`（`tests/GitGuard.Desktop.Tests`，含手动验收用例） | 已实现（v0.3，`GGD-0041` ~ `GGD-0046`；三平台打包待 `GGD-0047`） |
 
 ## 9. 未解问题
 
@@ -370,3 +370,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.22 | 2026-10-23 | GGD-0038：§2.12 接线 `hooks.*`（安装期 Hook 子集 / 可执行文件路径覆盖 / 全禁用退出码 13）与 `scan.pre_commit` / `scan.pre_push`（仅 Hook 模式生效，跳过不产生绕过事件）；「仅警告」项收敛为 `scan.fail_closed`；§8 FR-070 追溯扩展至 `TC-FR-070-01~08` |
 | 0.1.23 | 2026-10-23 | GGD-0039：§2.5 UrlDetector 补公共主机白名单；§2.12 新增 `rules.url.public_hostname_whitelist` 语义（规范化 / 非法项 13 / 项目级列表替换）并更新实现状态；§8 FR-070 追溯扩展至 `TC-FR-070-01~09` |
 | 0.1.24 | 2026-10-23 | GGD-0040：§2.5 LocalPathDetector 补 Markdown 围栏代码块感知（反引号 / 波浪线、≤3 空格缩进、闭合长度校验；跨 unified-0 差异缺口保守回落）；仅作用于 LocalPath，Url 与白名单行为不变 |
+| 0.1.25 | 2026-10-23 | GGD-0046：§8 追溯矩阵 FR-100 更新为已实现（桌面四区页面与设置 / 日志导出，`TC-FR-100-01~12`；三平台打包待 `GGD-0047`） |

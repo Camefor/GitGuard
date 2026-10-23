@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GitGuard.Desktop.ViewModels"
+             x:Class="GitGuard.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.sectionTitle">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#C62828" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarTextBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="14,7" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSidebarHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="32" RowSpacing="16">
+
+    <!-- 顶部：标题与加载状态 -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <StackPanel Grid.Column="0" Spacing="4">
+        <TextBlock Text="{Binding Title}"
+                   FontSize="26"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+        <TextBlock Text="{Binding Subtitle}"
+                   Classes="secondary"
+                   FontSize="14"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True"
+                     Width="96"
+                     IsVisible="{Binding IsLoading}" />
+        <TextBlock Text="{Binding LoadingText}"
+                   Classes="hint"
+                   IsVisible="{Binding IsLoading}"
+                   VerticalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+
+    <!-- 页面级消息 -->
+    <TextBlock Grid.Row="1"
+               Text="{Binding Message}"
+               IsVisible="{Binding HasMessage}"
+               Classes.error="{Binding IsMessageError}"
+               FontSize="12"
+               TextWrapping="Wrap" />
+
+    <ScrollViewer Grid.Row="2">
+      <StackPanel Spacing="16" MaxWidth="780" HorizontalAlignment="Left">
+
+        <!-- 外观：语言与主题 -->
+        <Border Background="{DynamicResource GitGuardSurfaceBrush}"
+                BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="20">
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="28">
+            <StackPanel Grid.Column="0" Spacing="6">
+              <TextBlock Text="{Binding LanguageLabel}" Classes="sectionTitle" />
+              <TextBlock Text="{Binding LanguageHint}" Classes="hint" />
+              <ComboBox ItemsSource="{Binding LanguageOptions}"
+                        SelectedItem="{Binding SelectedLanguage}"
+                        IsEnabled="{Binding CanInteract}"
+                        HorizontalAlignment="Stretch"
+                        Margin="0,4,0,0">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SettingsLanguageOption">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="6">
+              <TextBlock Text="{Binding ThemeLabel}" Classes="sectionTitle" />
+              <TextBlock Text="{Binding ThemeHint}" Classes="hint" />
+              <ComboBox ItemsSource="{Binding ThemeOptions}"
+                        SelectedItem="{Binding SelectedTheme}"
+                        IsEnabled="{Binding CanInteract}"
+                        HorizontalAlignment="Stretch"
+                        Margin="0,4,0,0">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SettingsThemeOption">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Gitleaks 桌面覆盖 -->
+        <Border Background="{DynamicResource GitGuardSurfaceBrush}"
+                BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="20">
+          <StackPanel Spacing="12">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding GitleaksTitle}" Classes="sectionTitle" />
+              <TextBlock Text="{Binding OverrideStatusText}" Classes="hint" />
+            </StackPanel>
+
+            <CheckBox Content="{Binding GitleaksEnabledLabel}"
+                      IsChecked="{Binding GitleaksEnabled}"
+                      IsEnabled="{Binding CanInteract}" />
+            <TextBlock Text="{Binding GitleaksEnabledHint}" Classes="hint" />
+
+            <StackPanel Spacing="4" Margin="0,4,0,0">
+              <TextBlock Text="{Binding GitleaksPathLabel}" Classes="fieldLabel" />
+              <TextBox Text="{Binding GitleaksPath}"
+                       Watermark="{Binding GitleaksPathWatermark}"
+                       IsEnabled="{Binding CanInteract}"
+                       CornerRadius="8" />
+              <TextBlock Text="{Binding GitleaksPathHint}" Classes="hint" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0">
+              <Button Content="{Binding SaveGitleaksText}"
+                      Command="{Binding SaveGitleaksCommand}"
+                      IsEnabled="{Binding CanInteract}"
+                      Classes="primary" />
+              <Button Content="{Binding ResetGitleaksText}"
+                      Command="{Binding ResetGitleaksCommand}"
+                      IsEnabled="{Binding CanResetGitleaks}"
+                      CornerRadius="8" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+
+  </Grid>
+
+</UserControl>

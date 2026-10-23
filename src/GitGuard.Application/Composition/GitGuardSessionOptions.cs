@@ -1,4 +1,6 @@
-﻿namespace GitGuard.Application.Composition;
+﻿using GitGuard.Application.Configuration;
+
+namespace GitGuard.Application.Composition;
 
 /// <summary>
 /// 组合根（<see cref="GitGuardSession"/>）的外部注入点：CLI 全局选项 / 进程环境 / 测试缝隙。
@@ -8,6 +10,12 @@ public sealed record GitGuardSessionOptions
 {
     /// <summary>工作目录（仓库内任意目录）：项目级配置的定位起点与 Git 命令的启动目录。默认当前工作目录。</summary>
     public string WorkingDirectory { get; init; } = Environment.CurrentDirectory;
+
+    /// <summary>
+    /// 宿主提供的配置覆盖（GGD-0046 桌面设置页）：在配置文件三层合并后应用，
+    /// <see langword="null"/> 表示完全采用配置文件取值。
+    /// </summary>
+    public GitGuardConfigOverrides? ConfigOverrides { get; init; }
 
     /// <summary>git 可执行文件；默认从 PATH 解析 <c>git</c>。</summary>
     public string GitExecutable { get; init; } = "git";

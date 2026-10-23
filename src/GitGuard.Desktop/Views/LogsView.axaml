@@ -1,0 +1,242 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GitGuard.Desktop.ViewModels"
+             x:Class="GitGuard.Desktop.Views.LogsView"
+             x:DataType="vm:LogsViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.columnHeader">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#C62828" />
+    </Style>
+    <Style Selector="TextBlock.cell">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.cellMuted">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarTextBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="14,7" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSidebarHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="32" RowSpacing="14">
+
+    <!-- 顶部：标题与刷新 / 导出操作 -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <StackPanel Grid.Column="0" Spacing="4">
+        <TextBlock Text="{Binding Title}"
+                   FontSize="26"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+        <TextBlock Text="{Binding Subtitle}"
+                   Classes="secondary"
+                   FontSize="14"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="10"
+                  VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True"
+                     Width="80"
+                     IsVisible="{Binding IsLoading}" />
+        <Button Content="{Binding RefreshButtonText}"
+                Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding CanInteract}"
+                CornerRadius="8" />
+        <Button Content="{Binding ExportJsonText}"
+                Command="{Binding ExportJsonCommand}"
+                IsEnabled="{Binding CanExport}"
+                Classes="primary" />
+        <Button Content="{Binding ExportCsvText}"
+                Command="{Binding ExportCsvCommand}"
+                IsEnabled="{Binding CanExport}" />
+      </StackPanel>
+    </Grid>
+
+    <!-- 筛选：结果 / 时间范围 / 总数摘要 -->
+    <Border Grid.Row="1"
+            Background="{DynamicResource GitGuardSurfaceBrush}"
+            BorderBrush="{DynamicResource GitGuardBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="16">
+      <Grid ColumnDefinitions="180,180,*,Auto" ColumnSpacing="14">
+        <StackPanel Grid.Column="0" Spacing="4">
+          <TextBlock Text="{Binding ResultFilterLabel}" Classes="fieldLabel" />
+          <ComboBox ItemsSource="{Binding ResultFilters}"
+                    SelectedItem="{Binding SelectedResultFilter}"
+                    IsEnabled="{Binding CanInteract}"
+                    HorizontalAlignment="Stretch">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:AuditResultFilterOption">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Spacing="4">
+          <TextBlock Text="{Binding RangeFilterLabel}" Classes="fieldLabel" />
+          <ComboBox ItemsSource="{Binding RangeFilters}"
+                    SelectedItem="{Binding SelectedRangeFilter}"
+                    IsEnabled="{Binding CanInteract}"
+                    HorizontalAlignment="Stretch">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:AuditRangeFilterOption">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+
+        <TextBlock Grid.Column="2"
+                   Text="{Binding SummaryText}"
+                   Classes="hint"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,6" />
+
+        <TextBlock Grid.Column="3"
+                   Text="{Binding ExportHintText}"
+                   Classes="hint"
+                   MaxWidth="360"
+                   TextAlignment="Right"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,4" />
+      </Grid>
+    </Border>
+
+    <!-- 页面级消息 -->
+    <TextBlock Grid.Row="2"
+               Text="{Binding Message}"
+               IsVisible="{Binding HasMessage}"
+               Classes.error="{Binding IsMessageError}"
+               FontSize="12"
+               TextWrapping="Wrap" />
+
+    <!-- 审计记录列表 -->
+    <Border Grid.Row="3"
+            Background="{DynamicResource GitGuardSurfaceBrush}"
+            BorderBrush="{DynamicResource GitGuardBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="14">
+      <Grid RowDefinitions="Auto,*">
+
+        <Grid Grid.Row="0"
+              ColumnDefinitions="150,190,110,*"
+              ColumnSpacing="12"
+              Margin="8,0,8,8">
+          <TextBlock Grid.Column="0" Text="{Binding ColumnTimeText}" Classes="columnHeader" />
+          <TextBlock Grid.Column="1" Text="{Binding ColumnRepositoryText}" Classes="columnHeader" />
+          <TextBlock Grid.Column="2" Text="{Binding ColumnResultText}" Classes="columnHeader" />
+          <TextBlock Grid.Column="3" Text="{Binding ColumnDetailText}" Classes="columnHeader" />
+        </Grid>
+
+        <Grid Grid.Row="1">
+          <ScrollViewer IsVisible="{Binding HasItems}">
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AuditLogItemViewModel">
+                  <Border BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                          BorderThickness="0,1,0,0"
+                          Padding="8,9">
+                    <Grid ColumnDefinitions="150,190,110,*" ColumnSpacing="12">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding TimestampText}"
+                                 Classes="cell"
+                                 VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="{Binding RepoName}"
+                                   Classes="cell"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding RepoPath}" />
+                        <TextBlock Text="{Binding RepoPath}"
+                                   Classes="cellMuted"
+                                   FontSize="10"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding RepoPath}" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding ResultText}"
+                                 Classes="cell"
+                                 FontWeight="SemiBold"
+                                 VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3"
+                                 Text="{Binding MetaText}"
+                                 Classes="cellMuted"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <TextBlock Text="{Binding EmptyText}"
+                     IsVisible="{Binding IsEmpty}"
+                     Classes="hint"
+                     FontSize="13"
+                     TextAlignment="Center"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center" />
+        </Grid>
+      </Grid>
+    </Border>
+
+    <!-- 分页 -->
+    <Grid Grid.Row="4" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding LoadingText}"
+                 Classes="hint"
+                 IsVisible="{Binding IsLoading}"
+                 VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="10"
+                  HorizontalAlignment="Right">
+        <Button Content="{Binding PreviousPageText}"
+                Command="{Binding PreviousPageCommand}"
+                IsEnabled="{Binding CanGoPrevious}"
+                CornerRadius="8"
+                Padding="12,4"
+                FontSize="11" />
+        <TextBlock Text="{Binding PageText}"
+                   Classes="hint"
+                   VerticalAlignment="Center" />
+        <Button Content="{Binding NextPageText}"
+                Command="{Binding NextPageCommand}"
+                IsEnabled="{Binding CanGoNext}"
+                CornerRadius="8"
+                Padding="12,4"
+                FontSize="11" />
+      </StackPanel>
+    </Grid>
+
+  </Grid>
+
+</UserControl>

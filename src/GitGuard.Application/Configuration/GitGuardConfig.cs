@@ -95,8 +95,8 @@ public sealed record GitGuardConfig
     /// <summary>严重度 → 动作映射（已通过 Critical ≠ Allow 硬下限校验）。</summary>
     public SeverityPolicy Policy { get; }
 
-    /// <summary>秘密检测类别设置（<c>rules.secrets</c>）。</summary>
-    public SecretRulesSettings Secrets { get; }
+    /// <summary>秘密检测类别设置（<c>rules.secrets</c>）；<see langword="init"/> 供宿主配置覆盖创建新快照（GGD-0046）。</summary>
+    public SecretRulesSettings Secrets { get; init; }
 
     /// <summary>隐私检测类别设置（<c>rules.privacy</c>）。</summary>
     public PrivacyRulesSettings Privacy { get; }

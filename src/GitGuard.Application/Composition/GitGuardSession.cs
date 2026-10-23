@@ -367,9 +367,15 @@ public sealed class GitGuardSession
     /// 执行状态查询与扫描时使用；配置快照、审计库连接与指纹盐均按子会话独立惰性装配。
     /// </summary>
     /// <param name="workingDirectory">仓库内任意目录（通常为登记时解析出的工作区根目录）。</param>
+    /// <param name="configOverrides">
+    /// 子会话的配置覆盖（GGD-0046 桌面设置页）；<see langword="null"/> 时继承当前会话的
+    /// <see cref="GitGuardSessionOptions.ConfigOverrides"/>。
+    /// </param>
     /// <returns>绑定该工作目录的子会话。</returns>
     /// <exception cref="ArgumentException"><paramref name="workingDirectory"/> 为空或全空白。</exception>
-    public GitGuardSession CreateScopedSession(string workingDirectory)
+    public GitGuardSession CreateScopedSession(
+        string workingDirectory,
+        GitGuardConfigOverrides? configOverrides = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
 
@@ -381,6 +387,7 @@ public sealed class GitGuardSession
                 DataDirectory = _paths.DataDirectory,
                 UserConfigDirectory = _paths.UserConfigDirectory,
                 GitGuardVersion = Version,
+                ConfigOverrides = configOverrides ?? _options.ConfigOverrides,
             },
             _clock,
             _secretRandom);
@@ -408,12 +415,17 @@ public sealed class GitGuardSession
         return new ScanPolicy(config.Policy, entries, config.ExcludePaths, config.ExcludeFiles);
     }
 
-    private GitGuardConfig LoadConfig() =>
-        new GitGuardConfigLoader(
+    private GitGuardConfig LoadConfig()
+    {
+        GitGuardConfig config = new GitGuardConfigLoader(
             _options.WorkingDirectory,
             _paths.UserConfigPath,
             _clock,
             defaultLogFilePath: _paths.LogFilePath).Load();
+
+        // GGD-0046：桌面设置页的 Gitleaks 覆盖在配置文件合并后应用，不写回 config.yml
+        return _options.ConfigOverrides?.ApplyTo(config) ?? config;
+    }
 
     private IGitAccess CreateGitAccess() => _gitAccessFactory.Create(_options.WorkingDirectory);
 

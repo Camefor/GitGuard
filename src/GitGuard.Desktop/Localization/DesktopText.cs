@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using GitGuard.Application.Audit;
 using GitGuard.Application.Hooks;
 using GitGuard.Core;
 using GitGuard.Core.Model;
@@ -1080,4 +1081,305 @@ internal static class DesktopText
         enabled
             ? language == DesktopLanguage.English ? "Enabled" : "已启用"
             : language == DesktopLanguage.English ? "Disabled" : "已禁用";
+
+    /// <summary>跨仓库日志加载提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AuditLogLoading(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Loading audit logs…" : "正在加载审计日志…";
+
+    /// <summary>跨仓库日志空状态。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AuditLogEmpty(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "No audit runs match the current filters."
+            : "没有符合当前筛选条件的审计记录。";
+
+    /// <summary>跨仓库日志刷新按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AuditLogRefreshButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Refresh" : "刷新";
+
+    /// <summary>跨仓库日志分页状态。</summary>
+    /// <param name="currentPage">当前页（1-based）。</param>
+    /// <param name="totalPages">总页数（至少 1）。</param>
+    /// <param name="totalCount">审计记录总数。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化分页文本。</returns>
+    internal static string AuditLogPage(int currentPage, int totalPages, int totalCount, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"Page {currentPage} of {totalPages} · {totalCount} runs"
+            : $"第 {currentPage} / {totalPages} 页 · 共 {totalCount} 条审计记录";
+
+    /// <summary>跨仓库日志总数摘要。</summary>
+    /// <param name="totalCount">审计记录总数。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化摘要。</returns>
+    internal static string AuditLogSummary(int totalCount, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"{totalCount} audit runs in total"
+            : $"共 {totalCount} 条审计记录";
+
+    /// <summary>导出说明（导出全部记录且与 CLI 契约一致）。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string AuditLogExportHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Exports every audit run in the database (not just this page) using the same JSON / CSV contract as the CLI."
+            : "导出数据库中的全部审计记录（不仅是当前页），格式与 CLI 的 JSON / CSV 契约一致。";
+
+    /// <summary>导出 JSON 按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AuditLogExportJson(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Export JSON" : "导出 JSON";
+
+    /// <summary>导出 CSV 按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AuditLogExportCsv(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Export CSV" : "导出 CSV";
+
+    /// <summary>结果筛选标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AuditLogResultFilterLabelText(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Result" : "结果";
+
+    /// <summary>时间范围筛选标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AuditLogRangeFilterLabelText(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Time range" : "时间范围";
+
+    /// <summary>时间列标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AuditLogColumnTime(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Time" : "时间";
+
+    /// <summary>仓库列标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AuditLogColumnRepository(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Repository" : "仓库";
+
+    /// <summary>结果列标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AuditLogColumnResult(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Result" : "结果";
+
+    /// <summary>明细列标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AuditLogColumnDetail(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Detail" : "明细";
+
+    /// <summary>结果筛选项标签。</summary>
+    /// <param name="result">扫描结果；<see langword="null"/> 表示全部结果。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AuditLogResultFilterLabel(ScanResult? result, DesktopLanguage language) =>
+        result is { } value
+            ? ScanResultLabel(value, language)
+            : language == DesktopLanguage.English ? "All results" : "全部结果";
+
+    /// <summary>时间范围筛选项标签。</summary>
+    /// <param name="days">最近天数；<see langword="null"/> 表示全部时间。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AuditLogRangeFilterLabel(int? days, DesktopLanguage language) =>
+        days is { } value
+            ? language == DesktopLanguage.English ? $"Last {value} days" : $"最近 {value} 天"
+            : language == DesktopLanguage.English ? "All time" : "全部时间";
+
+    /// <summary>导出文件选择器标题。</summary>
+    /// <param name="format">导出格式。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AuditLogExportPickerTitle(AuditExportFormat format, DesktopLanguage language)
+    {
+        string formatName = format == AuditExportFormat.Json ? "JSON" : "CSV";
+        return language == DesktopLanguage.English
+            ? $"Export audit log as {formatName}"
+            : $"导出审计日志（{formatName}）";
+    }
+
+    /// <summary>导出成功提示。</summary>
+    /// <param name="report">导出结果。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AuditLogExportSucceeded(AuditExportReport report, DesktopLanguage language)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return language == DesktopLanguage.English
+            ? $"Exported {report.RunCount} runs ({report.FindingCount} findings) to {report.OutputPath}."
+            : $"已导出 {report.RunCount} 条审计记录（{report.FindingCount} 个发现）到 {report.OutputPath}。";
+    }
+
+    /// <summary>导出失败提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <param name="message">底层错误消息。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AuditLogExportFailed(DesktopLanguage language, string message) =>
+        language == DesktopLanguage.English
+            ? $"Export failed: {message}"
+            : $"导出失败：{message}";
+
+    /// <summary>审计日志加载失败提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <param name="message">底层错误消息。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AuditLogLoadFailed(DesktopLanguage language, string message) =>
+        language == DesktopLanguage.English
+            ? $"Failed to load audit logs: {message}"
+            : $"审计日志加载失败：{message}";
+
+    /// <summary>设置页加载提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string SettingsLoading(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Loading settings…" : "正在加载设置…";
+
+    /// <summary>语言区块标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string SettingsLanguageLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Interface language" : "界面语言";
+
+    /// <summary>语言区块说明。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string SettingsLanguageHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Applies immediately and persists across restarts."
+            : "立即生效，并在重启后保持。";
+
+    /// <summary>主题区块标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string SettingsThemeLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Theme" : "主题";
+
+    /// <summary>主题区块说明。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string SettingsThemeHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Follow system switches with the operating system appearance; Light or Dark forces the theme."
+            : "跟随系统会随操作系统外观切换；浅色 / 深色为强制主题。";
+
+    /// <summary>主题选项标签。</summary>
+    /// <param name="mode">主题模式。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ThemeOptionLabel(DesktopThemeMode mode, DesktopLanguage language) => mode switch
+    {
+        DesktopThemeMode.System => language == DesktopLanguage.English ? "Follow system" : "跟随系统",
+        DesktopThemeMode.Light => language == DesktopLanguage.English ? "Light" : "浅色",
+        DesktopThemeMode.Dark => language == DesktopLanguage.English ? "Dark" : "深色",
+        _ => mode.ToString(),
+    };
+
+    /// <summary>Gitleaks 设置区块标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string SettingsGitleaksTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Gitleaks integration" : "Gitleaks 集成";
+
+    /// <summary>Gitleaks 启用开关标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string SettingsGitleaksEnabledLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Use Gitleaks for desktop scans" : "桌面端扫描启用 Gitleaks";
+
+    /// <summary>Gitleaks 启用开关说明。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string SettingsGitleaksEnabledHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "When enabled, desktop scans run the external Gitleaks engine and merge its findings. CLI scans still follow config.yml."
+            : "启用后桌面端扫描会运行外部 Gitleaks 引擎并合并其发现项；CLI 扫描仍遵循 config.yml。";
+
+    /// <summary>Gitleaks 路径字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string SettingsGitleaksPathLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Gitleaks executable" : "Gitleaks 可执行文件";
+
+    /// <summary>Gitleaks 路径输入水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string SettingsGitleaksPathWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? @"e.g. C:\tools\gitleaks.exe or /usr/local/bin/gitleaks"
+            : @"例如 C:\tools\gitleaks.exe 或 /usr/local/bin/gitleaks";
+
+    /// <summary>Gitleaks 路径说明。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string SettingsGitleaksPathHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Leave empty to resolve gitleaks from PATH."
+            : "留空表示从 PATH 查找 gitleaks。";
+
+    /// <summary>保存 Gitleaks 覆盖按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string SettingsSaveGitleaksButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Apply to desktop scans" : "应用到桌面扫描";
+
+    /// <summary>清除桌面覆盖按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string SettingsResetGitleaksButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Clear override" : "清除覆盖";
+
+    /// <summary>Gitleaks 覆盖状态说明。</summary>
+    /// <param name="hasOverride">是否存在桌面覆盖。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string SettingsOverrideStatus(bool hasOverride, DesktopLanguage language) =>
+        hasOverride
+            ? language == DesktopLanguage.English
+                ? "Desktop override active. config.yml is not modified."
+                : "桌面覆盖已生效，不会写入 config.yml。"
+            : language == DesktopLanguage.English
+                ? "Using Gitleaks settings from config.yml."
+                : "当前使用 config.yml 中的 Gitleaks 设置。";
+
+    /// <summary>Gitleaks 覆盖保存成功提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string SettingsGitleaksSaved(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Gitleaks settings saved." : "Gitleaks 设置已保存。";
+
+    /// <summary>桌面覆盖清除成功提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string SettingsOverrideCleared(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Desktop override cleared; config.yml values restored."
+            : "已清除桌面覆盖，恢复 config.yml 中的值。";
+
+    /// <summary>设置保存失败提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <param name="message">底层错误消息。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string SettingsSaveFailed(DesktopLanguage language, string message) =>
+        language == DesktopLanguage.English
+            ? $"Failed to save settings: {message}"
+            : $"设置保存失败：{message}";
+
+    /// <summary>设置加载失败提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <param name="message">底层错误消息。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string SettingsLoadFailed(DesktopLanguage language, string message) =>
+        language == DesktopLanguage.English
+            ? $"Failed to load settings: {message}"
+            : $"设置加载失败：{message}";
 }

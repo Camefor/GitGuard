@@ -24,6 +24,41 @@ public sealed class AppStateTests
 
         state.Version.Should().Be("0.1.0");
         state.Language.Should().Be(DesktopLanguage.Chinese);
+        state.ThemeMode.Should().Be(DesktopThemeMode.System);
+    }
+
+    [Fact]
+    public void Constructor_InvalidThemeMode_Throws()
+    {
+        Action act = () => _ = new AppState("0.1.0", themeMode: (DesktopThemeMode)99);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void ThemeMode_ChangeNotifiesAndKeepsLanguage()
+    {
+        var state = new AppState("0.1.0");
+        var changed = new List<string?>();
+        state.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        state.ThemeMode = DesktopThemeMode.Dark;
+
+        state.ThemeMode.Should().Be(DesktopThemeMode.Dark);
+        state.Language.Should().Be(DesktopLanguage.Chinese);
+        changed.Should().Equal(nameof(AppState.ThemeMode));
+    }
+
+    [Fact]
+    public void SettingSameThemeMode_DoesNotNotify()
+    {
+        var state = new AppState("0.1.0");
+        var changed = new List<string?>();
+        state.PropertyChanged += (sender, e) => changed.Add(e.PropertyName);
+
+        state.ThemeMode = DesktopThemeMode.System;
+
+        changed.Should().BeEmpty();
     }
 
     [Fact]

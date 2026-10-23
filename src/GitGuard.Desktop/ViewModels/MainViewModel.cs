@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GitGuard.Desktop.Localization;
@@ -14,6 +15,7 @@ namespace GitGuard.Desktop.ViewModels;
 public sealed class MainViewModel : ObservableObject
 {
     private readonly AppState _appState;
+    private readonly DesktopServices _services;
     private readonly Dictionary<DesktopSection, SectionViewModel> _pages;
     private NavigationItemViewModel? _selectedNavigation;
     private SectionViewModel _currentPage;
@@ -21,37 +23,28 @@ public sealed class MainViewModel : ObservableObject
     private string _tagline;
     private string _languageToggleText;
     private string _versionText;
+    private ThemeVariant _requestedThemeVariant;
 
     /// <summary>初始化主窗口 ViewModel。</summary>
     /// <param name="appState">应用级状态。</param>
-    /// <param name="repositoryOperations">
-    /// 仓库页操作服务；<see langword="null"/> 时仓库页保持骨架（ViewModel 单测与设计预览不访问真实数据）。
-    /// </param>
-    /// <param name="editorLauncher">
-    /// 外部编辑器启动器；<see langword="null"/> 时由仓库页使用默认实现（单测可注入假对象）。
-    /// </param>
-    /// <param name="ruleOperations">
-    /// 规则目录操作服务；<see langword="null"/> 时规则页保持骨架（ViewModel 单测与设计预览不访问真实数据）。
+    /// <param name="services">
+    /// 页面服务集合；<see langword="null"/> 时全部页面保持骨架（ViewModel 单测与设计预览不访问真实数据）。
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="appState"/> 为 <see langword="null"/>。</exception>
-    public MainViewModel(
-        AppState appState,
-        IRepositoryOperations? repositoryOperations = null,
-        IEditorLauncher? editorLauncher = null,
-        IRuleOperations? ruleOperations = null)
+    public MainViewModel(AppState appState, DesktopServices? services = null)
     {
         _appState = appState ?? throw new ArgumentNullException(nameof(appState));
+        _services = services ?? new DesktopServices();
 
         NavigationItems = new ObservableCollection<NavigationItemViewModel>(
             Enum.GetValues<DesktopSection>().Select(section => new NavigationItemViewModel(section, appState.Language)));
-        _pages = Enum.GetValues<DesktopSection>().ToDictionary(
-            section => section,
-            section => CreatePage(section, appState.Language, repositoryOperations, editorLauncher, ruleOperations));
+        _pages = Enum.GetValues<DesktopSection>().ToDictionary(section => section, CreatePage);
 
         _windowTitle = DesktopText.WindowTitle(appState.Language);
         _tagline = DesktopText.Tagline(appState.Language);
         _languageToggleText = DesktopText.LanguageToggle(appState.Language);
         _versionText = DesktopText.VersionText(appState.Version);
+        _requestedThemeVariant = appState.ThemeMode.ToThemeVariant();
         _selectedNavigation = NavigationItems[0];
         _currentPage = _pages[_selectedNavigation.Section];
 
@@ -94,6 +87,13 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _versionText, value);
     }
 
+    /// <summary>窗口主题变体（跟随系统 / 浅色 / 深色），由 <see cref="AppState.ThemeMode"/> 驱动。</summary>
+    public ThemeVariant RequestedThemeVariant
+    {
+        get => _requestedThemeVariant;
+        private set => SetProperty(ref _requestedThemeVariant, value);
+    }
+
     /// <summary>当前选中的导航项；置空时保持当前页面不变。</summary>
     public NavigationItemViewModel? SelectedNavigation
     {
@@ -115,21 +115,6 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _currentPage, value);
     }
 
-    private static SectionViewModel CreatePage(
-        DesktopSection section,
-        DesktopLanguage language,
-        IRepositoryOperations? repositoryOperations,
-        IEditorLauncher? editorLauncher,
-        IRuleOperations? ruleOperations) =>
-        section switch
-        {
-            DesktopSection.Repositories when repositoryOperations is not null =>
-                new RepositoriesViewModel(repositoryOperations, language, editorLauncher),
-            DesktopSection.Rules when ruleOperations is not null =>
-                new RulesViewModel(ruleOperations, language),
-            _ => new SectionViewModel(section, language),
-        };
-
     private static void EnsurePageLoaded(SectionViewModel page)
     {
         // 首次进入页面时异步加载数据；失败由各 ViewModel 转为可展示消息
@@ -141,16 +126,61 @@ public sealed class MainViewModel : ObservableObject
             case RulesViewModel rulesPage:
                 _ = rulesPage.EnsureLoadedAsync();
                 break;
+            case LogsViewModel logsPage:
+                _ = logsPage.EnsureLoadedAsync();
+                break;
+            case SettingsViewModel settingsPage:
+                _ = settingsPage.EnsureLoadedAsync();
+                break;
         }
     }
 
-    private void ToggleLanguage() => _appState.ToggleLanguage();
+    private SectionViewModel CreatePage(DesktopSection section) =>
+        section switch
+        {
+            DesktopSection.Repositories when _services.RepositoryOperations is not null =>
+                new RepositoriesViewModel(_services.RepositoryOperations, _appState.Language, _services.EditorLauncher),
+            DesktopSection.Rules when _services.RuleOperations is not null =>
+                new RulesViewModel(_services.RuleOperations, _appState.Language),
+            DesktopSection.Logs when _services.AuditOperations is not null =>
+                new LogsViewModel(_services.AuditOperations, _services.ExportPathPicker, _appState.Language),
+            DesktopSection.Settings when _services.SettingsOperations is not null =>
+                new SettingsViewModel(_appState, _services.SettingsOperations, _appState.Language),
+            _ => new SectionViewModel(section, _appState.Language),
+        };
+
+    private void ToggleLanguage()
+    {
+        _appState.ToggleLanguage();
+
+        // 侧边栏切换同样写入桌面设置，保证重启后语言一致；写盘失败不阻断界面切换
+        if (_services.SettingsOperations is { } settingsOperations)
+        {
+            try
+            {
+                settingsOperations.Save(
+                    settingsOperations.Current with
+                    {
+                        Language = _appState.Language,
+                        ThemeMode = _appState.ThemeMode,
+                    });
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                // 设置页在显式保存时会展示错误；此处静默保留当前会话语言
+            }
+        }
+    }
 
     private void OnAppStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AppState.Language))
         {
             RefreshLocalizedText();
+        }
+        else if (e.PropertyName == nameof(AppState.ThemeMode))
+        {
+            RequestedThemeVariant = _appState.ThemeMode.ToThemeVariant();
         }
     }
 

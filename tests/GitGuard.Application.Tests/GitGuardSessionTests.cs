@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Composition;
+using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
 using GitGuard.Core;
 using GitGuard.Core.Abstractions;
@@ -84,6 +85,43 @@ public sealed class GitGuardSessionTests
     }
 
     [Fact]
+    public void ConfigOverrides_ApplyAfterProjectConfigMerge()
+    {
+        using var repo = new TempGitRepository();
+        using var data = new TempDirectory();
+        repo.WriteFile(".gitguard.yml", "version: 1\nrules:\n  secrets:\n    use_gitleaks: false\n");
+        var overrides = new GitGuardConfigOverrides
+        {
+            UseGitleaks = true,
+            GitleaksPath = "/opt/gitleaks",
+        };
+        GitGuardSession session = CreateSession(repo.Root, data.Root, overrides: overrides);
+
+        session.Config.Secrets.UseGitleaks.Should().BeTrue("桌面覆盖优先于项目配置");
+        session.Config.Secrets.GitleaksPath.Should().Be("/opt/gitleaks");
+        File.ReadAllText(Path.Combine(repo.Root, ".gitguard.yml"))
+            .Should().Contain("use_gitleaks: false", "覆盖不得写回配置文件");
+    }
+
+    [Fact]
+    public void CreateScopedSession_InheritsParentConfigOverrides()
+    {
+        using var repo = new TempGitRepository();
+        using var data = new TempDirectory();
+        var overrides = new GitGuardConfigOverrides
+        {
+            UseGitleaks = true,
+            GitleaksPath = "/opt/gitleaks",
+        };
+        GitGuardSession session = CreateSession(repo.Root, data.Root, overrides: overrides);
+
+        GitGuardSession scoped = session.CreateScopedSession(repo.Root);
+
+        scoped.Config.Secrets.UseGitleaks.Should().BeTrue();
+        scoped.Config.Secrets.GitleaksPath.Should().Be("/opt/gitleaks");
+    }
+
+    [Fact]
     public void NonRepositoryWorkingDirectory_FailsClosedWithGitException()
     {
         using var data = new TempDirectory();
@@ -124,7 +162,11 @@ public sealed class GitGuardSessionTests
             .Should().Contain("# gitguard-managed v1.2.3-test");
     }
 
-    private static GitGuardSession CreateSession(string workingDirectory, string dataDirectory, string? version = null) =>
+    private static GitGuardSession CreateSession(
+        string workingDirectory,
+        string dataDirectory,
+        string? version = null,
+        GitGuardConfigOverrides? overrides = null) =>
         new GitGuardSession(
             new GitGuardSessionOptions
             {
@@ -132,6 +174,7 @@ public sealed class GitGuardSessionTests
                 DataDirectory = dataDirectory,
                 UserConfigDirectory = Path.Combine(dataDirectory, "config"),
                 GitGuardVersion = version,
+                ConfigOverrides = overrides,
             },
             new FixedClock(new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero)),
             new FixedSecretRandom());
