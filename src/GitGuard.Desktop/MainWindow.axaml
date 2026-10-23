@@ -1,0 +1,120 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GitGuard.Desktop.ViewModels"
+        x:Class="GitGuard.Desktop.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding WindowTitle}"
+        Width="1120" Height="720"
+        MinWidth="1024" MinHeight="720"
+        Background="{DynamicResource GitGuardSurfaceBrush}"
+        RequestedThemeVariant="Default">
+
+  <Grid ColumnDefinitions="240,*">
+
+    <!-- 侧边栏：品牌、一级导航、语言切换与版本（11-前端UI设计 §1） -->
+    <Border Grid.Column="0" Background="{DynamicResource GitGuardSidebarBrush}">
+      <Grid RowDefinitions="Auto,*,Auto" Margin="16,24,16,20">
+
+        <StackPanel Grid.Row="0" Margin="8,0" Spacing="4">
+          <TextBlock Text="GitGuard"
+                     FontSize="22"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource GitGuardSidebarTextBrush}" />
+          <TextBlock Text="{Binding Tagline}"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource GitGuardSidebarMutedBrush}" />
+        </StackPanel>
+
+        <ListBox Grid.Row="1"
+                 Margin="0,24,0,0"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ItemsSource="{Binding NavigationItems}"
+                 SelectedItem="{Binding SelectedNavigation}">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="12,10" />
+              <Setter Property="Margin" Value="0,2" />
+              <Setter Property="CornerRadius" Value="8" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{DynamicResource GitGuardSidebarHoverBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavigationItemViewModel">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{Binding Label}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource GitGuardSidebarTextBrush}" />
+                <TextBlock Text="{Binding Description}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource GitGuardSidebarMutedBrush}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <StackPanel Grid.Row="2" Spacing="10">
+          <Button Content="{Binding LanguageToggleText}"
+                  Command="{Binding ToggleLanguageCommand}"
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center"
+                  CornerRadius="8"
+                  Background="{DynamicResource GitGuardSelectedBrush}"
+                  Foreground="{DynamicResource GitGuardSidebarTextBrush}"
+                  BorderThickness="0" />
+          <TextBlock Text="{Binding VersionText}"
+                     Margin="8,0"
+                     FontSize="11"
+                     Foreground="{DynamicResource GitGuardSidebarMutedBrush}" />
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- 内容区：页面骨架，后续任务以真实页面替换 DataTemplate（12-前端组件设计 §1） -->
+    <Border Grid.Column="1"
+            Margin="24"
+            Background="{DynamicResource GitGuardContentBrush}"
+            BorderBrush="{DynamicResource GitGuardBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+      <ContentControl Content="{Binding CurrentPage}">
+        <ContentControl.ContentTemplate>
+          <DataTemplate x:DataType="vm:SectionViewModel">
+            <StackPanel Margin="32" Spacing="12">
+              <TextBlock Text="{Binding Title}"
+                         FontSize="26"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+              <TextBlock Text="{Binding Subtitle}"
+                         Classes="secondary"
+                         FontSize="14"
+                         TextWrapping="Wrap" />
+              <Border Margin="0,16,0,0"
+                      Padding="24"
+                      Background="{DynamicResource GitGuardSurfaceBrush}"
+                      BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="8">
+                <TextBlock Text="{Binding Body}"
+                           Classes="secondary"
+                           FontSize="13"
+                           TextWrapping="Wrap" />
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ContentControl.ContentTemplate>
+      </ContentControl>
+    </Border>
+
+  </Grid>
+
+</Window>

@@ -1,0 +1,44 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="GitGuard.Desktop.App"
+             RequestedThemeVariant="Default">
+
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="TextBlock.secondary">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+  </Application.Styles>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="GitGuardSidebarBrush" Color="#1B5E20" />
+          <SolidColorBrush x:Key="GitGuardSidebarHoverBrush" Color="#236B29" />
+          <SolidColorBrush x:Key="GitGuardSelectedBrush" Color="#2E7D32" />
+          <SolidColorBrush x:Key="GitGuardSurfaceBrush" Color="#F7FAF7" />
+          <SolidColorBrush x:Key="GitGuardContentBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="GitGuardBorderBrush" Color="#DDE5DB" />
+          <SolidColorBrush x:Key="GitGuardPrimaryTextBrush" Color="#1D2A20" />
+          <SolidColorBrush x:Key="GitGuardSecondaryTextBrush" Color="#5F6B60" />
+          <SolidColorBrush x:Key="GitGuardSidebarTextBrush" Color="#F1F8F2" />
+          <SolidColorBrush x:Key="GitGuardSidebarMutedBrush" Color="#B7D8B9" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="GitGuardSidebarBrush" Color="#102614" />
+          <SolidColorBrush x:Key="GitGuardSidebarHoverBrush" Color="#1B3A20" />
+          <SolidColorBrush x:Key="GitGuardSelectedBrush" Color="#2E7D32" />
+          <SolidColorBrush x:Key="GitGuardSurfaceBrush" Color="#121612" />
+          <SolidColorBrush x:Key="GitGuardContentBrush" Color="#1A211B" />
+          <SolidColorBrush x:Key="GitGuardBorderBrush" Color="#2C382E" />
+          <SolidColorBrush x:Key="GitGuardPrimaryTextBrush" Color="#E8F1E9" />
+          <SolidColorBrush x:Key="GitGuardSecondaryTextBrush" Color="#A3B2A5" />
+          <SolidColorBrush x:Key="GitGuardSidebarTextBrush" Color="#E8F1E9" />
+          <SolidColorBrush x:Key="GitGuardSidebarMutedBrush" Color="#9CC3A0" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+</Application>

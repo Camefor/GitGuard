@@ -1,6 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- P3 桌面端（Avalonia）占位项目：骨架阶段仅保留模块边界（Desktop → Application）。 -->
+  <!-- v0.3 桌面端（Avalonia）：仅引用 Application / Core，禁止直接引用 Infrastructure（SAD §6，根 Directory.Build.props 守卫）。 -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <!-- 12-前端组件设计 §2：Avalonia CompiledBindings（ADR-0002），避免运行期反射绑定 -->
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" PrivateAssets="all" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GitGuard.Application\GitGuard.Application.csproj" />

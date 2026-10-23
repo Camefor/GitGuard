@@ -79,6 +79,14 @@ jobs:
           --results-directory artifacts/test-results/cli
           --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 
+      # 桌面端 ViewModel 测试：不启动 Avalonia 运行时（16-测试方案 §2）
+      - name: Unit tests - Desktop
+        run: >
+          dotnet test tests/GitGuard.Desktop.Tests/GitGuard.Desktop.Tests.csproj -c Release --no-build
+          --report-xunit-trx --report-xunit-trx-filename desktop.trx
+          --results-directory artifacts/test-results/desktop
+          --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+
       # 真实 git commit / git push → Hook 分发脚本 → 真实 gitguard 子进程（16-测试方案 §12）
       - name: Scenario tests - E2E
         run: >

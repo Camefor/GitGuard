@@ -36,6 +36,16 @@
     <PackageVersion Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" Version="18.1.0" />
   </ItemGroup>
 
+  <ItemGroup Label="桌面端">
+    <!-- Avalonia 11.3 LTS（ADR-0002 / RoadMap §2.3：锁定 LTS，避免 12.x breaking changes） -->
+    <PackageVersion Include="Avalonia" Version="11.3.22" />
+    <PackageVersion Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.22" />
+    <!-- MVVM（12-前端组件设计 §2：ObservableObject + RelayCommand） -->
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
   <ItemGroup Label="测试">
     <!-- 单元测试框架（SAD §2：xUnit v3） -->
     <PackageVersion Include="xunit.v3" Version="4.0.2" />
