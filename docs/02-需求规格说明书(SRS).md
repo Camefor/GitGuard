@@ -2,7 +2,7 @@
 
 ## 1. 范围
 
-本文件覆盖 GitGuard 的 CLI、Hook 分发器、检测引擎、策略引擎、SQLite 审计五个子系统的功能、数据、接口和非功能需求。Avalonia 桌面端（v0.3）在本文件只做占位，详细需求等桌面端启动时补充。
+本文件覆盖 GitGuard 的 CLI、Hook 分发器、检测引擎、策略引擎、SQLite 审计五个子系统的功能、数据、接口和非功能需求。Avalonia 桌面端（v0.3）以追溯矩阵 `FR-100` 为入口，页面与组件细节见 `11-前端UI设计.md` / `12-前端组件设计.md`，三平台发行见 `14-部署文档.md` §9。
 
 ## 2. 功能需求（FR）
 
@@ -257,7 +257,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 编号 | 指标 | 目标值 | 测量方式 | v0.1 状态 |
 | --- | --- | --- | --- | --- |
 | `NFR-A-001` | Hook 兼容率 | 与 Husky / lefthook / pre-commit 共存成功率 100% | 集成测试 `TC-COMPAT-*` | 已覆盖：`TC-COMPAT-01~04` 在真实安装的 Husky v9 / lefthook v2 / pre-commit 仓库中验证安装包裹、真实 `git commit` 链式执行、阻断语义与卸载逐字节还原；CI `hook-compat` 作业（Windows）执行（`GGD-0021`）；跨平台矩阵不再计划（`GGD-0028` 已取消） |
-| `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 | 部分覆盖：当前 `.github/workflows/ci.yml` 仅 Windows（`GGD-0027`）；跨平台矩阵不再计划（`GGD-0028` 已取消），`release.yml` 仍产出三平台 AOT 发行物 |
+| `NFR-A-002` | 跨平台可用性 | Windows 11 / macOS 14 / Ubuntu 24.04 均通过验收 | CI 多平台矩阵 | 部分覆盖：测试流水线仍仅 Windows（`GGD-0027`），跨平台测试矩阵不再计划（`GGD-0028` 已取消）；`release.yml` 产出三平台 CLI AOT 发行物，并在 Windows / macOS / Ubuntu runner 上构建 MSIX / DMG / AppImage 后执行发行形态冒烟（`GGD-0047`） |
 
 ### 5.3 安全
 
@@ -332,7 +332,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` / `06-API接口设计` §5.7 | `TC-FR-080-01~04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`） | 已实现（`GGD-0034`） |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-01~04`（`GitleaksAdapterTests` / `GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests` / `GitGuardConfigLoaderTests` / `GitGuardSessionTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现（`GGD-0035`） |
-| `FR-100` | 全部 | `11-前端UI设计` | `TC-FR-100-01~12`（`tests/GitGuard.Desktop.Tests`，含手动验收用例） | 已实现（v0.3，`GGD-0041` ~ `GGD-0046`；三平台打包待 `GGD-0047`） |
+| `FR-100` | 全部 | `11-前端UI设计` | `TC-FR-100-01~13`（`tests/GitGuard.Desktop.Tests` + `build/desktop/smoke-test.ps1`，含手动验收用例） | 已实现（v0.3，`GGD-0041` ~ `GGD-0047`：四区页面、设置 / 日志导出、三平台安装包与发行冒烟） |
 
 ## 9. 未解问题
 
@@ -371,3 +371,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.23 | 2026-10-23 | GGD-0039：§2.5 UrlDetector 补公共主机白名单；§2.12 新增 `rules.url.public_hostname_whitelist` 语义（规范化 / 非法项 13 / 项目级列表替换）并更新实现状态；§8 FR-070 追溯扩展至 `TC-FR-070-01~09` |
 | 0.1.24 | 2026-10-23 | GGD-0040：§2.5 LocalPathDetector 补 Markdown 围栏代码块感知（反引号 / 波浪线、≤3 空格缩进、闭合长度校验；跨 unified-0 差异缺口保守回落）；仅作用于 LocalPath，Url 与白名单行为不变 |
 | 0.1.25 | 2026-10-23 | GGD-0046：§8 追溯矩阵 FR-100 更新为已实现（桌面四区页面与设置 / 日志导出，`TC-FR-100-01~12`；三平台打包待 `GGD-0047`） |
+| 0.1.26 | 2026-10-23 | GGD-0047：§1 桌面端范围指向 FR-100 与 11 / 12 / 14；§5.2 NFR-A-002 补三平台桌面安装包构建与发行冒烟；§8 FR-100 追溯扩展至 `TC-FR-100-13` 并标记三平台打包完成 |

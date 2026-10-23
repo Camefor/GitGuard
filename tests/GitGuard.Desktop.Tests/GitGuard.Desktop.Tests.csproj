@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GitGuard.Desktop\GitGuard.Desktop.csproj" />
+    <!-- GGD-0047：冒烟测试用真实 SQLite 审计库验证桌面端读取 CLI 记录 -->
+    <ProjectReference Include="..\..\src\GitGuard.Infrastructure\GitGuard.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

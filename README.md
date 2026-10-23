@@ -4,9 +4,9 @@
 
 面向开发者的本地 Git 敏感信息防泄漏工具：在 `git commit` 与 `git push` 前通过 Hook 拦截 Token、密钥、密码、手机号、本地路径、内网 URL 等敏感信息。所有扫描与审计均在本机完成，不上传任何数据。
 
-## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 开发中，2026-10-23）
+## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 功能开发完成，2026-10-23）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，剩余三平台打包与 CI（`GGD-0047`）。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -32,9 +32,9 @@
 - 中英文输出、Native AOT 单文件发布
 - `GitGuard.Desktop` 桌面端：Avalonia 11.3 LTS 导航壳、中 / 英即时切换、跟随系统明暗主题；「仓库」页支持登记 / 移除本地 Git 仓库、查看 Git 与 Hook 状态、最近扫描摘要并立即执行全量扫描（`GGD-0042`）；扫描历史页支持按仓库分页浏览 ScanRun 时间线、查看脱敏 Finding 明细并在外部编辑器中打开文件行号（`GGD-0043`）；白名单页支持分页查看全局条目，按规则 / 路径 / 指纹新增，删除二次确认（`GGD-0044`）；规则库页与 `gitguard rules list` 同源，支持来源 / 类别 / 有效启用筛选、200ms 搜索节流，正则默认隐藏并可显式展开，Gitleaks 分类展示适配器状态说明（`GGD-0045`）；日志页跨仓库分页浏览审计记录，支持结果 / 时间范围筛选与 JSON / CSV 导出（与 `gitguard audit export` 同契约）；设置页支持语言、主题（跟随系统 / 浅色 / 深色）与 Gitleaks 覆盖的即时生效与持久化（`GGD-0046`）
 
-尚未实现（不影响核心试用）：
+尚未自动验证（不阻塞开发）：
 
-- Avalonia 桌面端三平台打包与 CI（`GGD-0047`）
+- macOS DMG / Linux AppImage 需由首次 Release 流水线在对应 runner 上确认；Windows MSIX 已在本机完成 CLI 审计 → 桌面端读取 / 导出的发行冒烟。
 
 ## 快速开始（从源码构建）
 
@@ -375,6 +375,31 @@ Windows 链接阶段若提示找不到 `vswhere.exe`，将 `C:\Program Files (x8
 
 仓库包含 `.github/workflows/release.yml`，推送 `v*` Tag 或手动触发即可在 Actions 中生成各平台 zip 产物（附 `SHA256SUMS`）。
 
+## 构建桌面端安装包（可选）
+
+桌面端与 CLI 分离发行，安装包为自包含发布（目标机无需 .NET 运行时），并与 CLI 共用同一用户数据目录中的 `audit.db`。打包脚本推荐 PowerShell 7（`pwsh`），Windows MSIX 也可在 Windows PowerShell 5.1 下运行：
+
+```powershell
+# Windows MSIX（需要 Windows SDK / MakeAppx；未配置证书时为未签名包）
+./build/desktop/package-msix.ps1 -Version 0.3.0 -OutputDirectory artifacts/desktop
+
+# macOS DMG（在 macOS 上运行；-Runtime 支持 osx-arm64 / osx-x64）
+pwsh ./build/desktop/package-dmg.ps1 -Version 0.3.0 -Runtime osx-arm64 -OutputDirectory artifacts/desktop
+
+# Linux AppImage（在 Linux 上运行，自动下载并缓存 appimagetool）
+pwsh ./build/desktop/package-appimage.ps1 -Version 0.3.0 -OutputDirectory artifacts/desktop
+```
+
+产物为 `gitguard-<version>-<rid>.msix` / `.dmg` / `.AppImage`。发行冒烟可用安装包和 CLI 验证「CLI 写入审计 → 桌面端读取明细并导出」：
+
+```powershell
+./build/desktop/smoke-test.ps1 `
+  -DesktopExecutable artifacts/desktop/msix-unpacked/GitGuard.Desktop.exe `
+  -CliExecutable artifacts/cli/gitguard.exe
+```
+
+Windows MSIX 可先通过 `build/desktop/unpack-msix.ps1` 解包；CI `desktop-package-smoke` 与 Release 的三平台桌面作业会自动完成构建、解包 / 挂载与冒烟。签名与公证配置见 [docs/14-部署文档.md](docs/14-部署文档.md) §3 / §9。
+
 ## 开发与质量现状
 
 ```bash
@@ -382,15 +407,17 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1568 用例（1559 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
-- CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 七类测试作业（Core / Detection / Infrastructure / Application / CLI / Desktop / E2E）；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
+- 全量测试：1578 用例（1569 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 七类测试作业（Core / Detection / Infrastructure / Application / CLI / Desktop / E2E）；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；Windows MSIX 打包 + 发行冒烟（`desktop-package-smoke` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
 
 ## 已知限制
 
 - Hook 兼容性：Husky v9 / lefthook v2 / pre-commit 4.x 的安装包裹、真实提交链式执行、阻断语义与卸载还原已在真实安装仓库中验证（`TC-COMPAT-01~04`）；CI `hook-compat` 作业当前仅覆盖 Windows（跨平台矩阵不再计划，`GGD-0028` 已取消）。
-- CI 当前仅运行 Windows 单平台；macOS / Ubuntu 测试矩阵与 Linux DR-01 `strace` 作业不再计划（`GGD-0028` 已取消）。
+- CI 当前仅运行 Windows 单平台；macOS / Ubuntu 单元 / 集成测试矩阵与 Linux DR-01 `strace` 作业不再计划（`GGD-0028` 已取消）；桌面安装包由 Release 在 macOS / Ubuntu runner 构建并冒烟。
+- 桌面安装包默认未签名 / 未公证：Windows MSIX 未配置证书时需开发者模式或信任自签证书；macOS DMG 默认 ad-hoc 签名，首次启动需手动放行。正式分发前配置 §3 所列签名与公证凭据。
+- macOS `osx-x64` DMG 在 arm64 runner 上交叉发布，不执行本机冒烟；`osx-arm64` 原生冒烟覆盖。
 - Windows 下审计库目前依赖用户目录默认 ACL，显式收紧计划中。
 - Git 2.9.3 / 2.40.1 / 最新稳定版已由 CI `git-compat` 矩阵覆盖；更老版本未验证。
 - `scan --staged` 只扫描暂存区，不读取未暂存内容；全量扫描（`scan --all`）已支持 HEAD 快照与历史续扫。

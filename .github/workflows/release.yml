@@ -1,6 +1,7 @@
 name: Release
 
-# 发行流程（14-部署文档 §3）：tag v* 或手动触发 → Native AOT 多 RID 构建 → 校验和 + zip 产物上传。
+# 发行流程（14-部署文档 §3）：tag v* 或手动触发 → Native AOT 多 RID 构建 → 三平台桌面安装包 →
+# 发行形态冒烟（CLI 写入审计 + 桌面端 --smoke-test 读取并导出）→ 校验和 + 产物上传。
 # RID 矩阵：Windows x64 / Linux x64 / macOS arm64（原生）+ macOS x64（在 arm64 runner 上交叉编译，无法本机冒烟）。
 
 on:
@@ -25,8 +26,30 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
 
 jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-24.04
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ -z "$version" ]]; then
+            version="0.0.0-dev"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "GitGuard version: $version"
+
   aot:
     name: Native AOT (${{ matrix.rid }})
+    needs: version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -63,21 +86,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev zip
 
-      - name: Resolve version
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ inputs.version }}"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-          fi
-          if [[ -z "$version" ]]; then
-            version="0.0.0-dev"
-          fi
-          echo "value=$version" >> "$GITHUB_OUTPUT"
-          echo "GitGuard version: $version"
-
       - name: Publish Native AOT
         shell: bash
         run: |
@@ -85,7 +93,7 @@ jobs:
             -c Release \
             -r "${{ matrix.rid }}" \
             -p:PublishAot=true \
-            -p:Version="${{ steps.version.outputs.value }}" \
+            -p:Version="${{ needs.version.outputs.value }}" \
             -o publish
 
       # 交叉编译产物无法在宿主运行，不执行冒烟（14-部署文档 §10 由原生平台覆盖）
@@ -106,7 +114,7 @@ jobs:
             shasum -a 256 "${{ matrix.executable }}" > SHA256SUMS
           fi
           cd ..
-          archive="gitguard-${{ steps.version.outputs.value }}-${{ matrix.rid }}.zip"
+          archive="gitguard-${{ needs.version.outputs.value }}-${{ matrix.rid }}.zip"
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             powershell -NoProfile -Command "Compress-Archive -Path 'publish/*' -DestinationPath '$archive' -Force"
           else
@@ -116,7 +124,195 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gitguard-${{ steps.version.outputs.value }}-${{ matrix.rid }}
-          path: gitguard-${{ steps.version.outputs.value }}-${{ matrix.rid }}.zip
+          name: gitguard-${{ needs.version.outputs.value }}-${{ matrix.rid }}
+          path: gitguard-${{ needs.version.outputs.value }}-${{ matrix.rid }}.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  # GGD-0047：Windows MSIX 安装包 + 解包后的发行形态冒烟。CLI 产物来自 aot 作业，
+  # 用于在隔离数据目录中写入真实审计记录，验证安装包能读取并导出全部审计数据（PRD Q-02）。
+  desktop-windows:
+    name: Desktop package (win-x64 MSIX)
+    needs: [version, aot]
+    runs-on: windows-latest
+    env:
+      GITGUARD_MSIX_CERT_BASE64: ${{ secrets.GITGUARD_MSIX_CERT_BASE64 }}
+      GITGUARD_MSIX_CERT_PASSWORD: ${{ secrets.GITGUARD_MSIX_CERT_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download CLI (smoke fixture)
+        uses: actions/download-artifact@v4
+        with:
+          name: gitguard-${{ needs.version.outputs.value }}-win-x64
+          path: cli
+
+      - name: Extract CLI
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem cli/*.zip | Select-Object -First 1
+          Expand-Archive -Path $archive.FullName -DestinationPath cli/exe -Force
+
+      - name: Build MSIX
+        shell: pwsh
+        run: >
+          ./build/desktop/package-msix.ps1
+          -Version "${{ needs.version.outputs.value }}"
+          -OutputDirectory artifacts/desktop
+
+      - name: Unpack MSIX
+        shell: pwsh
+        run: >
+          ./build/desktop/unpack-msix.ps1
+          -Package "artifacts/desktop/gitguard-${{ needs.version.outputs.value }}-win-x64.msix"
+          -Destination artifacts/desktop/msix-unpacked
+
+      - name: Desktop smoke (CLI audit -> desktop)
+        shell: pwsh
+        run: >
+          ./build/desktop/smoke-test.ps1
+          -DesktopExecutable artifacts/desktop/msix-unpacked/GitGuard.Desktop.exe
+          -CliExecutable cli/exe/gitguard.exe
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitguard-desktop-${{ needs.version.outputs.value }}-win-x64
+          path: artifacts/desktop/*.msix
+          if-no-files-found: error
+          retention-days: 30
+
+  # GGD-0047：macOS DMG。arm64 原生构建并冒烟；x64 在 arm64 runner 交叉发布，仅产出安装包。
+  desktop-macos:
+    name: Desktop package (${{ matrix.rid }} DMG)
+    needs: [version, aot]
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: osx-arm64
+            native: true
+          - rid: osx-x64
+            native: false
+    env:
+      GITGUARD_MACOS_SIGNING_IDENTITY: ${{ secrets.GITGUARD_MACOS_SIGNING_IDENTITY }}
+      GITGUARD_MACOS_NOTARY_APPLE_ID: ${{ secrets.GITGUARD_MACOS_NOTARY_APPLE_ID }}
+      GITGUARD_MACOS_NOTARY_TEAM_ID: ${{ secrets.GITGUARD_MACOS_NOTARY_TEAM_ID }}
+      GITGUARD_MACOS_NOTARY_PASSWORD: ${{ secrets.GITGUARD_MACOS_NOTARY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download CLI (smoke fixture)
+        uses: actions/download-artifact@v4
+        with:
+          name: gitguard-${{ needs.version.outputs.value }}-${{ matrix.rid }}
+          path: cli
+
+      - name: Extract CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cli/exe
+          unzip -q cli/*.zip -d cli/exe
+          chmod +x cli/exe/gitguard
+
+      - name: Build DMG
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File ./build/desktop/package-dmg.ps1
+          -Version "${{ needs.version.outputs.value }}"
+          -Runtime "${{ matrix.rid }}"
+          -OutputDirectory artifacts/desktop
+
+      # 从 DMG 复制 .app 后再冒烟：模拟安装位置，同时避免只读挂载点上的 chmod 失败
+      - name: Prepare app from DMG
+        if: matrix.native
+        shell: bash
+        run: |
+          set -euo pipefail
+          mount="$RUNNER_TEMP/gitguard-dmg"
+          mkdir -p "$mount"
+          hdiutil attach "artifacts/desktop/gitguard-${{ needs.version.outputs.value }}-${{ matrix.rid }}.dmg" \
+            -nobrowse -readonly -mountpoint "$mount"
+          cp -R "$mount/GitGuard.app" "$RUNNER_TEMP/GitGuard.app"
+          hdiutil detach "$mount"
+
+      - name: Desktop smoke (CLI audit -> desktop)
+        if: matrix.native
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File ./build/desktop/smoke-test.ps1
+          -DesktopExecutable "${{ runner.temp }}/GitGuard.app/Contents/MacOS/GitGuard.Desktop"
+          -CliExecutable cli/exe/gitguard
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitguard-desktop-${{ needs.version.outputs.value }}-${{ matrix.rid }}
+          path: artifacts/desktop/*.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+  # GGD-0047：Linux AppImage。AppImage 运行时通过 APPIMAGE_EXTRACT_AND_RUN=1 免 FUSE 启动，
+  # 冒烟脚本会设置该变量并直接以 --smoke-test 运行安装包。
+  desktop-linux:
+    name: Desktop package (linux-x64 AppImage)
+    needs: [version, aot]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download CLI (smoke fixture)
+        uses: actions/download-artifact@v4
+        with:
+          name: gitguard-${{ needs.version.outputs.value }}-linux-x64
+          path: cli
+
+      - name: Extract CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cli/exe
+          unzip -q cli/*.zip -d cli/exe
+          chmod +x cli/exe/gitguard
+
+      - name: Build AppImage
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File ./build/desktop/package-appimage.ps1
+          -Version "${{ needs.version.outputs.value }}"
+          -OutputDirectory artifacts/desktop
+
+      - name: Desktop smoke (CLI audit -> desktop)
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File ./build/desktop/smoke-test.ps1
+          -DesktopExecutable "artifacts/desktop/gitguard-${{ needs.version.outputs.value }}-linux-x64.AppImage"
+          -CliExecutable cli/exe/gitguard
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitguard-desktop-${{ needs.version.outputs.value }}-linux-x64
+          path: artifacts/desktop/*.AppImage
           if-no-files-found: error
           retention-days: 30

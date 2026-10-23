@@ -10,6 +10,12 @@ allowlist:
     - rule_id: GGD/SECRET/AWS-AKID
       path_pattern: README.md
       reason: "README 中的 AWS 官方文档示例 Access Key 非真实凭据"
+    - rule_id: GGD/SECRET/AWS-AKID
+      path_pattern: build/desktop/smoke-test.ps1
+      reason: "发行冒烟脚本中的 AWS 官方文档示例 Access Key，仅用作金丝雀触发检测，非真实凭据"
+    - rule_id: GGD/SECRET/AWS-AKID
+      path_pattern: docs/14-部署文档.md
+      reason: "部署文档中引用的 AWS 官方文档示例 Access Key，非真实凭据"
     - rule_id: GGD/URL/TOKEN-IN-QUERY
       path_pattern: tests/GitGuard.Cli.Tests/CliScanCommandTests.cs
       reason: "URL 白名单测试中的查询参数示例值，非真实凭据"

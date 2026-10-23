@@ -105,6 +105,51 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  # GGD-0047：Windows MSIX 打包 + 发行形态冒烟。用 CLI 真实写入审计记录，再启动解包后的
+  # 桌面端 --smoke-test，验证安装包能够读取并导出 CLI 记录的全部审计数据（PRD Q-02）。
+  desktop-package-smoke:
+    name: Desktop package smoke (Windows MSIX)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish CLI (smoke fixture)
+        run: >
+          dotnet publish src/GitGuard.Cli/GitGuard.Cli.csproj -c Release
+          -p:Version=0.3.0-ci -o artifacts/cli
+
+      - name: Build MSIX
+        shell: pwsh
+        run: ./build/desktop/package-msix.ps1 -Version 0.3.0-ci -OutputDirectory artifacts/desktop
+
+      - name: Unpack MSIX
+        shell: pwsh
+        run: >
+          ./build/desktop/unpack-msix.ps1
+          -Package artifacts/desktop/gitguard-0.3.0-ci-win-x64.msix
+          -Destination artifacts/desktop/msix-unpacked
+
+      - name: Desktop smoke (CLI audit -> desktop)
+        shell: pwsh
+        run: >
+          ./build/desktop/smoke-test.ps1
+          -DesktopExecutable artifacts/desktop/msix-unpacked/GitGuard.Desktop.exe
+          -CliExecutable artifacts/cli/gitguard.exe
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-msix-ci
+          path: artifacts/desktop/*.msix
+          if-no-files-found: error
+          retention-days: 30
+
   # SRS NFR-A-001 / 16-测试方案 §2：在真实 Husky / lefthook / pre-commit 仓库中验证安装包裹、
   # 提交链执行、阻断语义与卸载还原。build-test 中未设置 GITGUARD_HOOK_COMPAT 时，这三个用例自动跳过。
   hook-compat:

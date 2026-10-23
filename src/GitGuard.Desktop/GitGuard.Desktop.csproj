@@ -21,4 +21,9 @@
     <ProjectReference Include="..\GitGuard.Application\GitGuard.Application.csproj" />
   </ItemGroup>
 
+  <!-- GGD-0047：冒烟模式单元测试需要直接驱动内部入口 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="GitGuard.Desktop.Tests" />
+  </ItemGroup>
+
 </Project>

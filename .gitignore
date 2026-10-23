@@ -65,6 +65,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Desktop packaging tool cache
+build/desktop/.tools/
+
 # Tye
 .tye/
 
