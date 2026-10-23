@@ -284,6 +284,10 @@
                         Command="{Binding OpenHistoryCommand}"
                         IsEnabled="{Binding CanInteract}"
                         CornerRadius="8" />
+                <Button Content="{Binding AllowlistButtonText}"
+                        Command="{Binding OpenAllowlistCommand}"
+                        IsEnabled="{Binding CanInteract}"
+                        CornerRadius="8" />
                 <Button Content="{Binding RemoveButtonText}"
                         Command="{Binding RequestRemoveCommand}"
                         IsEnabled="{Binding CanInteract}"
@@ -340,6 +344,14 @@
             IsVisible="{Binding IsHistoryVisible}"
             Background="{DynamicResource GitGuardContentBrush}">
       <views:ScanHistoryView DataContext="{Binding History}" />
+    </Border>
+
+    <!-- 白名单子页面：覆盖整个仓库页内容区（GGD-0044） -->
+    <Border Grid.Row="0"
+            Grid.RowSpan="2"
+            IsVisible="{Binding IsAllowlistVisible}"
+            Background="{DynamicResource GitGuardContentBrush}">
+      <views:AllowlistView DataContext="{Binding Allowlist}" />
     </Border>
 
   </Grid>

@@ -1,5 +1,6 @@
 ﻿using GitGuard.Application.Hooks;
 using GitGuard.Core.Model;
+using GitGuard.Core.Policy;
 
 namespace GitGuard.Desktop.Services;
 
@@ -30,7 +31,7 @@ public sealed record RepositoryDetail
 }
 
 /// <summary>
-/// 桌面端仓库操作服务（GGD-0042）：为 ViewModel 隐藏 Application 组合根、SQLite 与 Git 子进程细节，
+/// 桌面端仓库操作服务（GGD-0042，GGD-0044 起含全局白名单）：为 ViewModel 隐藏 Application 组合根、SQLite 与 Git 子进程细节，
 /// 所有实现方法必须在后台线程执行（12-前端组件设计 §6：禁止在 UI 线程做 SQLite 查询）。
 /// ViewModel 单测通过实现本接口的假对象驱动，无需启动 Avalonia 或访问真实仓库。
 /// </summary>
@@ -81,4 +82,30 @@ public interface IRepositoryOperations
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>扫描运行聚合；记录不存在时为 <see langword="null"/>。</returns>
     Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>分页读取全局白名单条目（登记时间倒序）。</summary>
+    /// <param name="limit">每页条数（1..1000）。</param>
+    /// <param name="offset">跳过的记录数（≥ 0）。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>当前页白名单条目与总记录数。</returns>
+    Task<AllowlistPage> QueryAllowlistAsync(int limit, int offset, CancellationToken cancellationToken = default);
+
+    /// <summary>新增一条全局白名单；参数校验与审计写入由 Application / 存储层完成。</summary>
+    /// <param name="ruleId">可选：规则 ID 匹配条件。</param>
+    /// <param name="pathPattern">可选：文件路径 glob 匹配条件。</param>
+    /// <param name="fingerprintHex">可选：64 字符 SHA-256 十六进制指纹。</param>
+    /// <param name="reason">登记原因（5 ~ 256 字符）。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>已持久化的白名单条目。</returns>
+    Task<AllowlistEntry> AddAllowlistAsync(
+        string? ruleId,
+        string? pathPattern,
+        string? fingerprintHex,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>按身份标识删除白名单条目。</summary>
+    /// <param name="id">条目身份标识。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default);
 }

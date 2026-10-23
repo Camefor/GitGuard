@@ -2,12 +2,13 @@
 using GitGuard.Application.Hooks;
 using GitGuard.Application.Scanning;
 using GitGuard.Core.Model;
+using GitGuard.Core.Policy;
 
 namespace GitGuard.Desktop.Services;
 
 /// <summary>
-/// <see cref="IRepositoryOperations"/> 的 Application 组合根实现（GGD-0042）：
-/// 列表 / 登记 / 移除走主会话的仓库用例；详情与扫描通过 <see cref="GitGuardSession.CreateScopedSession"/> 绑定目标仓库，
+/// <see cref="IRepositoryOperations"/> 的 Application 组合根实现（GGD-0042，GGD-0044 起含白名单）：
+/// 列表 / 登记 / 移除与全局白名单走主会话用例；详情与扫描通过 <see cref="GitGuardSession.CreateScopedSession"/> 绑定目标仓库，
 /// 共享同一用户数据目录与用户配置目录。全部操作以 <c>Task.Run</c> 移出 UI 线程。
 /// </summary>
 public sealed class RepositoryOperations : IRepositoryOperations
@@ -84,4 +85,28 @@ public sealed class RepositoryOperations : IRepositoryOperations
     /// <inheritdoc />
     public Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default) =>
         Task.Run(() => _session.CreateAuditView().Execute(runId), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<AllowlistPage> QueryAllowlistAsync(
+        int limit,
+        int offset,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => _session.CreateAllowlistList().Execute(new AllowlistQuery(limit, offset)), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<AllowlistEntry> AddAllowlistAsync(
+        string? ruleId,
+        string? pathPattern,
+        string? fingerprintHex,
+        string reason,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () => _session
+                .CreateAllowlistAdd()
+                .Execute(ruleId, pathPattern, fingerprintHex, reason, Environment.UserName),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.Run(() => _session.CreateAllowlistRemove().Execute(id), cancellationToken);
 }

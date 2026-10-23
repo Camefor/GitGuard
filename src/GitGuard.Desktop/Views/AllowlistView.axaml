@@ -1,0 +1,298 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GitGuard.Desktop.ViewModels"
+             x:Class="GitGuard.Desktop.Views.AllowlistView"
+             x:DataType="vm:AllowlistViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.sectionTitle">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.pageMessage">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="#2E7D32" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#C62828" />
+    </Style>
+    <Style Selector="TextBlock.itemTitle">
+      <Setter Property="FontFamily" Value="Consolas" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.itemMeta">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.itemReason">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSelectedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardSidebarTextBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardSidebarHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="32" RowSpacing="16">
+
+    <!-- 顶部：返回、仓库上下文与刷新 -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+      <Button Grid.Column="0"
+              Content="{Binding BackButtonText}"
+              Command="{Binding BackCommand}"
+              CornerRadius="8"
+              VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Spacing="3">
+        <TextBlock Text="{Binding Title}"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+        <TextBlock Text="{Binding RepositoryName}"
+                   FontSize="13"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+        <TextBlock Text="{Binding RepositoryPath}"
+                   FontSize="11"
+                   Classes="hint" />
+      </StackPanel>
+      <Button Grid.Column="2"
+              Content="{Binding RefreshButtonText}"
+              Command="{Binding RefreshCommand}"
+              IsEnabled="{Binding !IsLoadingPage}"
+              CornerRadius="8"
+              VerticalAlignment="Center" />
+    </Grid>
+
+    <!-- 全局提示、操作结果与加载状态 -->
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <StackPanel Grid.Column="0" Spacing="4">
+        <TextBlock Text="{Binding GlobalHint}" Classes="hint" />
+        <TextBlock Text="{Binding PageMessage}"
+                   IsVisible="{Binding HasPageMessage}"
+                   Classes="pageMessage"
+                   Classes.error="{Binding IsPageMessageError}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  IsVisible="{Binding IsLoadingPage}">
+        <ProgressBar IsIndeterminate="True" Width="96" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding LoadingText}"
+                   Classes="hint"
+                   VerticalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+
+    <!-- 左栏：条目列表；右栏：新增表单与删除确认 -->
+    <Grid Grid.Row="2" ColumnDefinitions="*,420" ColumnSpacing="16">
+
+      <Border Grid.Column="0"
+              Background="{DynamicResource GitGuardSurfaceBrush}"
+              BorderBrush="{DynamicResource GitGuardBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+          <TextBlock Grid.Row="0"
+                     Text="{Binding EntriesTitle}"
+                     Classes="sectionTitle" />
+
+          <Grid Grid.Row="1" Margin="0,12,0,0">
+            <ListBox ItemsSource="{Binding Entries}"
+                     Background="Transparent"
+                     BorderThickness="0">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="10,8" />
+                  <Setter Property="Margin" Value="0,1" />
+                  <Setter Property="CornerRadius" Value="8" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:AllowlistEntryItemViewModel">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="{Binding RuleIdText}"
+                                 IsVisible="{Binding HasRuleId}"
+                                 Classes="itemTitle" />
+                      <TextBlock Text="{Binding PathPatternText}"
+                                 IsVisible="{Binding HasPathPattern}"
+                                 Classes="itemTitle"
+                                 FontSize="11"
+                                 FontWeight="Normal" />
+                      <TextBlock Text="{Binding FingerprintPreview}"
+                                 IsVisible="{Binding HasFingerprint}"
+                                 Classes="itemMeta"
+                                 FontFamily="Consolas"
+                                 TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Reason}"
+                                 Classes="itemReason"
+                                 Margin="0,2,0,0" />
+                      <TextBlock Text="{Binding MetaText}"
+                                 Classes="itemMeta" />
+                      <TextBlock Text="{Binding ExpiryText}"
+                                 IsVisible="{Binding HasExpiry}"
+                                 Classes="itemMeta" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Content="{Binding $parent[ListBox].((vm:AllowlistViewModel)DataContext).DeleteButtonText}"
+                            Command="{Binding $parent[ListBox].((vm:AllowlistViewModel)DataContext).RequestDeleteCommand}"
+                            CommandParameter="{Binding}"
+                            IsEnabled="{Binding !$parent[ListBox].((vm:AllowlistViewModel)DataContext).IsBusy}"
+                            Foreground="#C62828"
+                            CornerRadius="8"
+                            Padding="10,4"
+                            FontSize="11"
+                            VerticalAlignment="Top" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <TextBlock Text="{Binding EmptyText}"
+                       IsVisible="{Binding IsEmpty}"
+                       Classes="hint"
+                       Margin="8,12"
+                       VerticalAlignment="Top" />
+          </Grid>
+
+          <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" Margin="0,12,0,0">
+            <Button Grid.Column="0"
+                    Content="{Binding PreviousPageText}"
+                    Command="{Binding PreviousPageCommand}"
+                    IsEnabled="{Binding CanGoPrevious}"
+                    CornerRadius="8"
+                    Padding="10,4"
+                    FontSize="11" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding PageText}"
+                       Classes="hint"
+                       FontSize="10"
+                       TextAlignment="Center"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="2"
+                    Content="{Binding NextPageText}"
+                    Command="{Binding NextPageCommand}"
+                    IsEnabled="{Binding CanGoNext}"
+                    CornerRadius="8"
+                    Padding="10,4"
+                    FontSize="11" />
+          </Grid>
+
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1"
+              Background="{DynamicResource GitGuardSurfaceBrush}"
+              BorderBrush="{DynamicResource GitGuardBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="20">
+        <ScrollViewer>
+          <StackPanel Spacing="12">
+
+            <TextBlock Text="{Binding FormTitle}"
+                       Classes="sectionTitle" />
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding RuleLabel}" Classes="fieldLabel" />
+              <TextBox Text="{Binding NewRuleId}"
+                       Watermark="{Binding RuleWatermark}"
+                       CornerRadius="8" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding PathLabel}" Classes="fieldLabel" />
+              <TextBox Text="{Binding NewPathPattern}"
+                       Watermark="{Binding PathWatermark}"
+                       CornerRadius="8" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding FingerprintLabel}" Classes="fieldLabel" />
+              <TextBox Text="{Binding NewFingerprint}"
+                       Watermark="{Binding FingerprintWatermark}"
+                       CornerRadius="8"
+                       FontFamily="Consolas"
+                       FontSize="11" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding ReasonLabel}" Classes="fieldLabel" />
+              <TextBox Text="{Binding NewReason}"
+                       Watermark="{Binding ReasonWatermark}"
+                       CornerRadius="8"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       MinHeight="64" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding FormMessage}"
+                       IsVisible="{Binding HasFormMessage}"
+                       Classes="error"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+
+            <Button Content="{Binding AddButtonText}"
+                    Command="{Binding AddCommand}"
+                    IsEnabled="{Binding CanSubmit}"
+                    Classes="primary"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center" />
+
+            <Border IsVisible="{Binding HasPendingDelete}"
+                    Background="#FFF3CD"
+                    CornerRadius="8"
+                    Padding="14"
+                    Margin="0,4,0,0">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding DeleteConfirmPrompt}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="#5C4500" />
+                <TextBlock Text="{Binding PendingDeleteSummary}"
+                           FontFamily="Consolas"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="#5C4500" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="{Binding ConfirmDeleteButtonText}"
+                          Command="{Binding ConfirmDeleteCommand}"
+                          IsEnabled="{Binding !IsBusy}"
+                          CornerRadius="8" />
+                  <Button Content="{Binding CancelButtonText}"
+                          Command="{Binding CancelDeleteCommand}"
+                          CornerRadius="8" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+    </Grid>
+  </Grid>
+</UserControl>

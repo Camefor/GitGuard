@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using GitGuard.Application.Hooks;
+using GitGuard.Core;
 using GitGuard.Core.Model;
 using GitGuard.Desktop.Services;
 
@@ -551,6 +552,265 @@ internal static class DesktopText
         language == DesktopLanguage.English
             ? "The scan finished, but the audit record could not be written."
             : "扫描已完成，但审计记录写入失败。";
+
+    /// <summary>仓库详情页的白名单入口按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Allowlist" : "白名单";
+
+    /// <summary>白名单页标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AllowlistTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Allowlist" : "白名单管理";
+
+    /// <summary>返回仓库详情按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistBackButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Back to repository" : "返回仓库详情";
+
+    /// <summary>刷新白名单按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistRefreshButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Refresh" : "刷新";
+
+    /// <summary>白名单条目列表标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AllowlistEntriesTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Allowlist entries" : "白名单条目";
+
+    /// <summary>新增白名单表单标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string AllowlistFormTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Add allowlist entry" : "新增白名单条目";
+
+    /// <summary>白名单全局作用域与匹配条件提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistGlobalHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Entries are stored in the local audit database and apply to every registered repository. Provide at least one of rule ID, path glob, or fingerprint."
+            : "白名单保存在本机审计库，对所有已登记仓库生效；规则 ID、路径 glob、指纹三者至少填写一项。";
+
+    /// <summary>规则 ID 字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AllowlistRuleLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Rule ID" : "规则 ID";
+
+    /// <summary>路径 glob 字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AllowlistPathLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Path glob" : "路径 glob";
+
+    /// <summary>指纹字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AllowlistFingerprintLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Fingerprint" : "指纹";
+
+    /// <summary>原因字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string AllowlistReasonLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Reason (at least 5 characters)" : "原因（至少 5 字符）";
+
+    /// <summary>规则 ID 输入水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string AllowlistRuleWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "e.g. GGD/SECRET/AWS_ACCESS_KEY"
+            : "例如 GGD/SECRET/AWS_ACCESS_KEY";
+
+    /// <summary>路径 glob 输入水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string AllowlistPathWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "e.g. src/**/*.cs" : "例如 src/**/*.cs";
+
+    /// <summary>指纹输入水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string AllowlistFingerprintWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "64-character SHA-256 hex" : "64 位 SHA-256 十六进制";
+
+    /// <summary>原因输入水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string AllowlistReasonWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Why this match is allowed (audited)"
+            : "说明放行原因（写入审计）";
+
+    /// <summary>添加白名单按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistAddButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Add" : "添加";
+
+    /// <summary>白名单空状态。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistEmpty(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "No allowlist entries yet. Use the form on the right to add one."
+            : "尚未登记白名单条目。在右侧填写条件即可新增。";
+
+    /// <summary>白名单加载提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistLoading(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Loading allowlist…" : "正在加载白名单…";
+
+    /// <summary>白名单分页状态。</summary>
+    /// <param name="currentPage">当前页（1-based）。</param>
+    /// <param name="totalPages">总页数（至少 1）。</param>
+    /// <param name="totalCount">白名单条目总数。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化分页文本。</returns>
+    internal static string AllowlistPage(int currentPage, int totalPages, int totalCount, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"Page {currentPage} of {totalPages} · {totalCount} entries"
+            : $"第 {currentPage} / {totalPages} 页 · 共 {totalCount} 条";
+
+    /// <summary>上一页按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistPreviousPage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Previous" : "上一页";
+
+    /// <summary>下一页按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistNextPage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Next" : "下一页";
+
+    /// <summary>删除白名单按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistDeleteButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Delete" : "删除";
+
+    /// <summary>删除二次确认提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistDeleteConfirmPrompt(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Delete this allowlist entry? Subsequent scans will no longer allow matching content."
+            : "确认删除该白名单条目？删除后后续扫描将不再放行匹配内容。";
+
+    /// <summary>确认删除按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistConfirmDeleteButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Confirm delete" : "确认删除";
+
+    /// <summary>取消删除按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string AllowlistCancelButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Cancel" : "取消";
+
+    /// <summary>匹配条件缺失校验提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistValidationAtLeastOne(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Provide at least one of rule ID, path glob, or fingerprint."
+            : "请至少填写规则 ID、路径 glob 或指纹之一。";
+
+    /// <summary>原因过短校验提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistValidationReasonTooShort(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "The reason must contain at least 5 characters."
+            : "原因至少需要 5 个字符。";
+
+    /// <summary>原因过长校验提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistValidationReasonTooLong(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "The reason cannot exceed 256 characters."
+            : "原因不能超过 256 个字符。";
+
+    /// <summary>规则 ID 格式校验提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistValidationRuleId(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "The rule ID format is invalid. Expected a value like GGD/SECRET/AWS_ACCESS_KEY."
+            : "规则 ID 格式不合法，应形如 GGD/SECRET/AWS_ACCESS_KEY。";
+
+    /// <summary>指纹格式校验提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistValidationFingerprint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "The fingerprint must be a 64-character hexadecimal SHA-256 value."
+            : "指纹必须是 64 位十六进制 SHA-256 文本。";
+
+    /// <summary>白名单新增成功提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistAddedMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Allowlist entry added." : "白名单条目已添加。";
+
+    /// <summary>白名单删除成功提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistDeletedMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Allowlist entry deleted." : "白名单条目已删除。";
+
+    /// <summary>白名单条目登记信息。</summary>
+    /// <param name="createdBy">登记人。</param>
+    /// <param name="createdAt">登记时间（UTC，展示时转本地时区）。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化登记信息。</returns>
+    internal static string AllowlistEntryMeta(string createdBy, DateTimeOffset createdAt, DesktopLanguage language)
+    {
+        string timestamp = createdAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        return language == DesktopLanguage.English
+            ? $"Added by {createdBy} on {timestamp}"
+            : $"由 {createdBy} 于 {timestamp} 登记";
+    }
+
+    /// <summary>白名单条目过期时间。</summary>
+    /// <param name="expiresAt">过期时间（UTC，展示时转本地时区）。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化过期时间。</returns>
+    internal static string AllowlistExpires(DateTimeOffset expiresAt, DesktopLanguage language)
+    {
+        string timestamp = expiresAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        return language == DesktopLanguage.English ? $"Expires {timestamp}" : $"过期时间 {timestamp}";
+    }
+
+    /// <summary>白名单管理错误提示（按稳定错误码映射；未知错误回退原始消息）。</summary>
+    /// <param name="errorCode">错误码。</param>
+    /// <param name="fallbackMessage">原始消息。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string AllowlistError(string errorCode, string fallbackMessage, DesktopLanguage language) =>
+        (errorCode, language) switch
+        {
+            (AllowlistException.ALLOWLIST_VALIDATION_FAILED, DesktopLanguage.English) =>
+                "The allowlist entry is invalid. Check the rule ID, path glob, fingerprint, and reason.",
+            (AllowlistException.ALLOWLIST_NOT_FOUND, DesktopLanguage.English) =>
+                "The allowlist entry no longer exists.",
+            (AllowlistException.ALLOWLIST_VALIDATION_FAILED, _) =>
+                "白名单参数不合法，请检查规则 ID、路径 glob、指纹与原因。",
+            (AllowlistException.ALLOWLIST_NOT_FOUND, _) =>
+                "白名单条目已不存在。",
+            _ => fallbackMessage,
+        };
 
     /// <summary>仓库操作错误提示（按稳定错误码映射；未知错误回退原始消息）。</summary>
     /// <param name="errorCode">错误码。</param>

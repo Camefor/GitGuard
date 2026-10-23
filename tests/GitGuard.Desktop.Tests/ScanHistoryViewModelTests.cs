@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Hooks;
 using GitGuard.Core.Model;
+using GitGuard.Core.Policy;
 using GitGuard.Desktop.Localization;
 using GitGuard.Desktop.Services;
 using GitGuard.Desktop.ViewModels;
@@ -379,6 +380,23 @@ public sealed class ScanHistoryViewModelTests
             LoadedIds.Add(runId);
             return LoadHandler(runId);
         }
+
+        public Task<AllowlistPage> QueryAllowlistAsync(
+            int limit,
+            int offset,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("扫描历史测试不读取白名单。");
+
+        public Task<AllowlistEntry> AddAllowlistAsync(
+            string? ruleId,
+            string? pathPattern,
+            string? fingerprintHex,
+            string reason,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("扫描历史测试不新增白名单。");
+
+        public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("扫描历史测试不删除白名单。");
     }
 
     /// <summary>记录调用的编辑器启动器假对象。</summary>

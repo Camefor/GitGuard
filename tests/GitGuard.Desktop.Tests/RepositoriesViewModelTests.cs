@@ -2,6 +2,7 @@
 using GitGuard.Application.Hooks;
 using GitGuard.Core;
 using GitGuard.Core.Model;
+using GitGuard.Core.Policy;
 using GitGuard.Desktop.Localization;
 using GitGuard.Desktop.Services;
 using GitGuard.Desktop.ViewModels;
@@ -365,6 +366,69 @@ public sealed class RepositoriesViewModelTests
         viewModel.History.Runs.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task OpenAllowlistCommand_ShowsGlobalAllowlistAndBackClosesIt()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        var entry = AllowlistEntry.Create(
+            "GGD/SECRET/AWS_KEY",
+            "src/**",
+            null,
+            "测试放行原因",
+            new DateTimeOffset(2026, 10, 20, 9, 30, 0, TimeSpan.Zero),
+            "tester");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+            QueryAllowlistHandler = (limit, offset) =>
+            {
+                limit.Should().Be(AllowlistViewModel.PAGE_SIZE);
+                offset.Should().Be(0);
+                return Task.FromResult(new AllowlistPage(new[] { entry }, 1));
+            },
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+
+        await viewModel.OpenAllowlistCommand.ExecuteAsync(null);
+
+        viewModel.IsAllowlistVisible.Should().BeTrue();
+        viewModel.CanInteract.Should().BeFalse();
+        viewModel.Allowlist.RepositoryName.Should().Be("甲仓库");
+        viewModel.Allowlist.RepositoryPath.Should().Be(repository.RepoPath);
+        viewModel.Allowlist.Entries.Should().ContainSingle();
+        viewModel.Allowlist.Entries[0].Reason.Should().Be("测试放行原因");
+
+        viewModel.Allowlist.BackCommand.Execute(null);
+
+        viewModel.IsAllowlistVisible.Should().BeFalse();
+        viewModel.CanInteract.Should().BeTrue();
+        viewModel.Allowlist.Entries.Should().BeEmpty();
+        viewModel.Allowlist.RepositoryName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SelectingAnotherRepository_WhileAllowlistOpen_ClosesAllowlist()
+    {
+        var first = CreateRepository("repo-a", "甲仓库");
+        var second = CreateRepository("repo-b", "乙仓库");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { first, second }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+        await viewModel.OpenAllowlistCommand.ExecuteAsync(null);
+        viewModel.IsAllowlistVisible.Should().BeTrue();
+
+        viewModel.SelectedRepository = viewModel.Repositories[1];
+
+        viewModel.IsAllowlistVisible.Should().BeFalse();
+        viewModel.Allowlist.Entries.Should().BeEmpty();
+    }
+
     private static ScanRun CreateRun(string repoPath, Guid runId)
     {
         var finding = Finding.Create(
@@ -450,6 +514,15 @@ public sealed class RepositoriesViewModelTests
         internal Func<Guid, Task<ScanRun?>> LoadScanRunHandler { get; set; } =
             _ => Task.FromResult<ScanRun?>(null);
 
+        internal Func<int, int, Task<AllowlistPage>> QueryAllowlistHandler { get; set; } =
+            (_, _) => Task.FromResult(new AllowlistPage(Array.Empty<AllowlistEntry>(), 0));
+
+        internal Func<string?, string?, string?, string, Task<AllowlistEntry>> AddAllowlistHandler { get; set; } =
+            (_, _, _, _) => Task.FromException<AllowlistEntry>(new NotSupportedException("测试未配置 AddAllowlistHandler。"));
+
+        internal Func<Guid, Task> RemoveAllowlistHandler { get; set; } =
+            _ => Task.FromException(new NotSupportedException("测试未配置 RemoveAllowlistHandler。"));
+
         internal int ListCalls { get; private set; }
 
         internal int RegisterCalls { get; private set; }
@@ -463,6 +536,12 @@ public sealed class RepositoriesViewModelTests
         internal int QueryScanHistoryCalls { get; private set; }
 
         internal int LoadScanRunCalls { get; private set; }
+
+        internal int QueryAllowlistCalls { get; private set; }
+
+        internal int AddAllowlistCalls { get; private set; }
+
+        internal int RemoveAllowlistCalls { get; private set; }
 
         public Task<IReadOnlyList<RegisteredRepository>> ListAsync(CancellationToken cancellationToken = default)
         {
@@ -508,6 +587,32 @@ public sealed class RepositoriesViewModelTests
         {
             LoadScanRunCalls++;
             return LoadScanRunHandler(runId);
+        }
+
+        public Task<AllowlistPage> QueryAllowlistAsync(
+            int limit,
+            int offset,
+            CancellationToken cancellationToken = default)
+        {
+            QueryAllowlistCalls++;
+            return QueryAllowlistHandler(limit, offset);
+        }
+
+        public Task<AllowlistEntry> AddAllowlistAsync(
+            string? ruleId,
+            string? pathPattern,
+            string? fingerprintHex,
+            string reason,
+            CancellationToken cancellationToken = default)
+        {
+            AddAllowlistCalls++;
+            return AddAllowlistHandler(ruleId, pathPattern, fingerprintHex, reason);
+        }
+
+        public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            RemoveAllowlistCalls++;
+            return RemoveAllowlistHandler(id);
         }
     }
 }

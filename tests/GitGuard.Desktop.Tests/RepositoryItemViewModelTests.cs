@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Hooks;
 using GitGuard.Core.Model;
+using GitGuard.Core.Policy;
 using GitGuard.Desktop.Localization;
 using GitGuard.Desktop.Services;
 using GitGuard.Desktop.ViewModels;
@@ -146,5 +147,22 @@ public sealed class RepositoryItemViewModelTests
 
         public Task<ScanRun?> LoadScanRunAsync(Guid runId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("本测试不读取扫描明细。");
+
+        public Task<AllowlistPage> QueryAllowlistAsync(
+            int limit,
+            int offset,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不读取白名单。");
+
+        public Task<AllowlistEntry> AddAllowlistAsync(
+            string? ruleId,
+            string? pathPattern,
+            string? fingerprintHex,
+            string reason,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不新增白名单。");
+
+        public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不删除白名单。");
     }
 }

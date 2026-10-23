@@ -23,6 +23,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
     private bool _isDetailLoading;
     private bool _isDetailVisible;
     private bool _isHistoryVisible;
+    private bool _isAllowlistVisible;
     private bool _isScanning;
     private bool _isRemoveConfirmationVisible;
     private string? _listMessage;
@@ -63,10 +64,12 @@ public sealed class RepositoriesViewModel : SectionViewModel
             editorLauncher ?? new ShellEditorLauncher(),
             CloseHistory,
             language);
+        Allowlist = new AllowlistViewModel(operations, CloseAllowlist, language);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         AddCommand = new AsyncRelayCommand(AddAsync);
         ScanCommand = new AsyncRelayCommand(ScanAsync);
         OpenHistoryCommand = new AsyncRelayCommand(OpenHistoryAsync);
+        OpenAllowlistCommand = new AsyncRelayCommand(OpenAllowlistAsync);
         RequestRemoveCommand = new RelayCommand(RequestRemove);
         ConfirmRemoveCommand = new AsyncRelayCommand(ConfirmRemoveAsync);
         CancelRemoveCommand = new RelayCommand(CancelRemove);
@@ -81,6 +84,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>当前仓库的扫描历史子页面（GGD-0043）。</summary>
     public ScanHistoryViewModel History { get; }
 
+    /// <summary>全局白名单管理子页面（GGD-0044）。</summary>
+    public AllowlistViewModel Allowlist { get; }
+
     /// <summary>刷新仓库列表命令。</summary>
     public IAsyncRelayCommand RefreshCommand { get; }
 
@@ -92,6 +98,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
 
     /// <summary>打开当前仓库的扫描历史命令。</summary>
     public IAsyncRelayCommand OpenHistoryCommand { get; }
+
+    /// <summary>打开白名单管理命令。</summary>
+    public IAsyncRelayCommand OpenAllowlistCommand { get; }
 
     /// <summary>请求移除（显示二次确认）命令。</summary>
     public IRelayCommand RequestRemoveCommand { get; }
@@ -121,6 +130,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
             }
 
             CloseHistory();
+            CloseAllowlist();
             IsRemoveConfirmationVisible = false;
             _ = LoadSelectedDetailAsync(value);
         }
@@ -180,6 +190,19 @@ public sealed class RepositoriesViewModel : SectionViewModel
         }
     }
 
+    /// <summary>是否展示白名单管理子页面（覆盖仓库详情）。</summary>
+    public bool IsAllowlistVisible
+    {
+        get => _isAllowlistVisible;
+        private set
+        {
+            if (SetProperty(ref _isAllowlistVisible, value))
+            {
+                OnPropertyChanged(nameof(CanInteract));
+            }
+        }
+    }
+
     /// <summary>是否正在扫描。</summary>
     public bool IsScanning
     {
@@ -232,8 +255,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>是否展示「请选择仓库」占位。</summary>
     public bool IsSelectPromptVisible => !IsDetailVisible && Repositories.Count > 0;
 
-    /// <summary>详情操作（扫描 / 移除 / 扫描历史）当前是否可用。</summary>
-    public bool CanInteract => IsDetailVisible && !IsBusy && !IsDetailLoading && !IsHistoryVisible;
+    /// <summary>详情操作（扫描 / 移除 / 扫描历史 / 白名单）当前是否可用。</summary>
+    public bool CanInteract =>
+        IsDetailVisible && !IsBusy && !IsDetailLoading && !IsHistoryVisible && !IsAllowlistVisible;
 
     /// <summary>列表级消息是否可见。</summary>
     public bool HasListMessage => !string.IsNullOrWhiteSpace(ListMessage);
@@ -340,6 +364,9 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>扫描历史按钮文案。</summary>
     public string ScanHistoryButtonText => DesktopText.ScanHistoryButton(_language);
 
+    /// <summary>白名单按钮文案。</summary>
+    public string AllowlistButtonText => DesktopText.AllowlistButton(_language);
+
     /// <summary>移除登记按钮文案。</summary>
     public string RemoveButtonText => DesktopText.RepositoryRemoveButton(_language);
 
@@ -385,6 +412,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         }
 
         History.Relocalize(language);
+        Allowlist.Relocalize(language);
         NotifyLocalizedLabels();
         if (_currentDetail is not null)
         {
@@ -529,6 +557,30 @@ public sealed class RepositoriesViewModel : SectionViewModel
         IsHistoryVisible = false;
     }
 
+    private async Task OpenAllowlistAsync()
+    {
+        RepositoryItemViewModel? item = SelectedRepository;
+        if (item is null || IsBusy || IsDetailLoading)
+        {
+            return;
+        }
+
+        IsAllowlistVisible = true;
+        await Allowlist.OpenAsync(item.DisplayName, item.RepoPath).ConfigureAwait(true);
+    }
+
+    /// <summary>关闭白名单页并释放其进行中的请求（返回仓库详情）。</summary>
+    private void CloseAllowlist()
+    {
+        if (!_isAllowlistVisible)
+        {
+            return;
+        }
+
+        Allowlist.Deactivate();
+        IsAllowlistVisible = false;
+    }
+
     private void RequestRemove()
     {
         if (SelectedRepository is null || IsBusy)
@@ -671,6 +723,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         OnPropertyChanged(nameof(NoScanText));
         OnPropertyChanged(nameof(ScanButtonText));
         OnPropertyChanged(nameof(ScanHistoryButtonText));
+        OnPropertyChanged(nameof(AllowlistButtonText));
         OnPropertyChanged(nameof(RemoveButtonText));
         OnPropertyChanged(nameof(RemoveConfirmPrompt));
         OnPropertyChanged(nameof(ConfirmRemoveButtonText));

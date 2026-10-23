@@ -6,7 +6,7 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 开发中，2026-10-23）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）也已落地。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）与全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）也已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -30,11 +30,11 @@
 - 文本 / JSON 报告、严重度策略、配置文件 + SQLite 白名单、`exclude` 路径排除
 - `--no-verify` 与 `GITGUARD_SKIP=1` 绕过检测及 SQLite 审计落库
 - 中英文输出、Native AOT 单文件发布
-- `GitGuard.Desktop` 桌面端：Avalonia 11.3 LTS 导航壳、中 / 英即时切换、跟随系统明暗主题；「仓库」页支持登记 / 移除本地 Git 仓库、查看 Git 与 Hook 状态、最近扫描摘要并立即执行全量扫描（`GGD-0042`）；扫描历史页支持按仓库分页浏览 ScanRun 时间线、查看脱敏 Finding 明细并在外部编辑器中打开文件行号（`GGD-0043`）
+- `GitGuard.Desktop` 桌面端：Avalonia 11.3 LTS 导航壳、中 / 英即时切换、跟随系统明暗主题；「仓库」页支持登记 / 移除本地 Git 仓库、查看 Git 与 Hook 状态、最近扫描摘要并立即执行全量扫描（`GGD-0042`）；扫描历史页支持按仓库分页浏览 ScanRun 时间线、查看脱敏 Finding 明细并在外部编辑器中打开文件行号（`GGD-0043`）；白名单页支持分页查看全局条目，按规则 / 路径 / 指纹新增，删除二次确认（`GGD-0044`）
 
 尚未实现（不影响核心试用）：
 
-- Avalonia 桌面端其余业务页面：白名单管理、规则库、设置与日志导出（`GGD-0044` ~ `GGD-0046`）
+- Avalonia 桌面端其余业务页面：规则库、设置与日志导出（`GGD-0045` ~ `GGD-0046`），以及三平台打包与 CI（`GGD-0047`）
 
 ## 快速开始（从源码构建）
 
@@ -381,7 +381,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1490 用例（1481 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1508 用例（1499 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 七类测试作业（Core / Detection / Infrastructure / Application / CLI / Desktop / E2E）；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
