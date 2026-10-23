@@ -2,6 +2,7 @@
 using GitGuard.Application.Hooks;
 using GitGuard.Core;
 using GitGuard.Core.Model;
+using GitGuard.Core.Rules;
 using GitGuard.Desktop.Services;
 
 namespace GitGuard.Desktop.Localization;
@@ -838,4 +839,245 @@ internal static class DesktopText
                 "仓库登记已不存在。",
             _ => fallbackMessage,
         };
+
+    /// <summary>规则库刷新按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RulesRefreshButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Refresh" : "刷新";
+
+    /// <summary>规则库搜索框水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string RulesSearchWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Search by rule ID or name" : "按规则 ID 或名称搜索";
+
+    /// <summary>来源筛选标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesSourceFilterLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Source" : "来源";
+
+    /// <summary>类别筛选标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesCategoryFilterLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Category" : "类别";
+
+    /// <summary>仅显示已启用规则复选框。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化文案。</returns>
+    internal static string RulesEnabledOnly(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Enabled only" : "仅显示已启用";
+
+    /// <summary>规则目录加载提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RulesLoading(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Loading rule catalog…" : "正在加载规则目录…";
+
+    /// <summary>规则列表标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string RulesListTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Rules" : "规则列表";
+
+    /// <summary>规则详情标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string RulesDetailTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Rule details" : "规则详情";
+
+    /// <summary>未选择规则时的提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RulesSelectPrompt(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Select a rule to inspect its metadata. Regular expressions stay hidden until you reveal them."
+            : "选择一条规则查看元信息；正则默认隐藏，需手动展开。";
+
+    /// <summary>规则 ID 字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesRuleIdLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Rule ID" : "规则 ID";
+
+    /// <summary>规则名称字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesRuleNameLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Name" : "名称";
+
+    /// <summary>类别字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesCategoryFieldLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Category" : "类别";
+
+    /// <summary>严重度字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesSeverityFieldLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Severity" : "严重度";
+
+    /// <summary>来源字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesSourceFieldLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Source" : "来源";
+
+    /// <summary>启用状态字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesStatusFieldLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Status" : "状态";
+
+    /// <summary>正则字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RulesPatternLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Regular expression" : "正则表达式";
+
+    /// <summary>正则默认隐藏提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RulesPatternHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Regex content may reveal matching logic and is hidden by default."
+            : "正则可能暴露匹配逻辑，默认隐藏。";
+
+    /// <summary>显示正则按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RulesPatternShow(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Show regex" : "显示正则";
+
+    /// <summary>隐藏正则按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RulesPatternHide(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Hide regex" : "隐藏正则";
+
+    /// <summary>正则隐藏状态的占位文本。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化占位文本。</returns>
+    internal static string RulesPatternHidden(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Hidden by default. Use \"Show regex\" to reveal it."
+            : "默认隐藏，点击「显示正则」查看。";
+
+    /// <summary>规则列表空状态。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RulesEmpty(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "No rules match the current search and filters."
+            : "没有符合当前搜索与筛选条件的规则。";
+
+    /// <summary>Gitleaks 分类空状态。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RulesGitleaksEmpty(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Gitleaks does not expose a static rule catalog. Switch to All to browse built-in and custom rules."
+            : "Gitleaks 不提供静态规则清单；切换到「全部」浏览内置与自定义规则。";
+
+    /// <summary>规则数量摘要。</summary>
+    /// <param name="total">规则总数。</param>
+    /// <param name="enabled">有效启用数量。</param>
+    /// <param name="visible">当前显示数量。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化摘要。</returns>
+    internal static string RulesSummary(int total, int enabled, int visible, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"{total} rules · {enabled} enabled · {visible} shown"
+            : $"共 {total} 条 · 启用 {enabled} 条 · 当前显示 {visible} 条";
+
+    /// <summary>规则目录加载失败提示。</summary>
+    /// <param name="message">底层错误消息。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RulesLoadFailed(string message, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"Failed to load the rule catalog: {message}"
+            : $"规则目录加载失败：{message}";
+
+    /// <summary>Gitleaks 已启用说明。</summary>
+    /// <param name="executable">可执行文件路径或 PATH 说明。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string RulesGitleaksEnabledInfo(string executable, DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? $"Gitleaks rules are produced dynamically by the external engine during scans (GLK/SECRET/*) and are not part of this static catalog. Adapter enabled; executable: {executable}."
+            : $"Gitleaks 规则由外部引擎在扫描时动态产生（GLK/SECRET/*），不进入此静态规则目录。适配器已启用；可执行文件：{executable}。";
+
+    /// <summary>Gitleaks 未启用说明。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string RulesGitleaksDisabledInfo(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Gitleaks rules are produced dynamically by the external engine during scans and are not part of this static catalog. Adapter disabled (rules.secrets.use_gitleaks = false)."
+            : "Gitleaks 规则由外部引擎在扫描时动态产生，不进入此静态规则目录。适配器未启用（rules.secrets.use_gitleaks = false）。";
+
+    /// <summary>Gitleaks 在 PATH 中查找时的说明。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化说明。</returns>
+    internal static string RulesGitleaksSearchPath(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "gitleaks from PATH" : "PATH 中的 gitleaks";
+
+    /// <summary>规则来源标签。</summary>
+    /// <param name="source">规则来源。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RuleSourceLabel(RuleSource source, DesktopLanguage language) => source switch
+    {
+        RuleSource.Builtin => language == DesktopLanguage.English ? "Built-in" : "内置",
+        RuleSource.User => language == DesktopLanguage.English ? "Custom" : "自定义",
+        RuleSource.Gitleaks => "Gitleaks",
+        _ => source.ToString(),
+    };
+
+    /// <summary>规则来源筛选项标签。</summary>
+    /// <param name="key">筛选标识（ALL / BUILTIN / USER / GITLEAKS）。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RuleSourceFilterLabel(string key, DesktopLanguage language) => key switch
+    {
+        "ALL" => language == DesktopLanguage.English ? "All sources" : "全部来源",
+        "BUILTIN" => language == DesktopLanguage.English ? "Built-in" : "内置",
+        "USER" => language == DesktopLanguage.English ? "Custom" : "自定义",
+        "GITLEAKS" => "Gitleaks",
+        _ => key,
+    };
+
+    /// <summary>规则类别标签。</summary>
+    /// <param name="category">类别段（SECRET / PRIVACY / LOCALPATH / URL）。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RuleCategoryLabel(string category, DesktopLanguage language) => category switch
+    {
+        "SECRET" => language == DesktopLanguage.English ? "Secret" : "秘密",
+        "PRIVACY" => language == DesktopLanguage.English ? "Privacy" : "隐私",
+        "LOCALPATH" => language == DesktopLanguage.English ? "Local path" : "本地路径",
+        "URL" => "URL",
+        _ => category,
+    };
+
+    /// <summary>规则类别筛选项标签。</summary>
+    /// <param name="key">筛选标识（ALL / SECRET / PRIVACY / LOCALPATH / URL）。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RuleCategoryFilterLabel(string key, DesktopLanguage language) =>
+        string.Equals(key, "ALL", StringComparison.Ordinal)
+            ? language == DesktopLanguage.English ? "All categories" : "全部类别"
+            : RuleCategoryLabel(key, language);
+
+    /// <summary>规则启用状态标签。</summary>
+    /// <param name="enabled">是否有效启用。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string RuleEnabledLabel(bool enabled, DesktopLanguage language) =>
+        enabled
+            ? language == DesktopLanguage.English ? "Enabled" : "已启用"
+            : language == DesktopLanguage.English ? "Disabled" : "已禁用";
 }

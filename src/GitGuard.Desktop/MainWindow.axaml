@@ -89,9 +89,12 @@
             CornerRadius="12">
       <ContentControl Content="{Binding CurrentPage}">
         <ContentControl.DataTemplates>
-          <!-- 仓库页（GGD-0042）优先匹配；其余区块暂用骨架模板 -->
+          <!-- 仓库页（GGD-0042）与规则页（GGD-0045）优先匹配；其余区块暂用骨架模板 -->
           <DataTemplate DataType="vm:RepositoriesViewModel">
             <views:RepositoriesView />
+          </DataTemplate>
+          <DataTemplate DataType="vm:RulesViewModel">
+            <views:RulesView />
           </DataTemplate>
           <DataTemplate DataType="vm:SectionViewModel" x:DataType="vm:SectionViewModel">
             <StackPanel Margin="32" Spacing="12">

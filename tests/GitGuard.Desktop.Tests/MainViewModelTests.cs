@@ -1,5 +1,7 @@
 ﻿using FluentAssertions;
+using GitGuard.Application.Rules;
 using GitGuard.Desktop.Localization;
+using GitGuard.Desktop.Services;
 using GitGuard.Desktop.ViewModels;
 
 namespace GitGuard.Desktop.Tests;
@@ -88,5 +90,44 @@ public sealed class MainViewModelTests
         viewModel.WindowTitle.Should().Be("GitGuard 桌面端");
     }
 
+    [Fact]
+    public async Task RulesNavigation_WithRuleOperations_BuildsAndLoadsRulesPage()
+    {
+        var fake = new FakeRuleOperations();
+        var viewModel = new MainViewModel(new AppState("0.1.0"), ruleOperations: fake);
+
+        viewModel.SelectedNavigation = viewModel.NavigationItems[1];
+        var rulesPage = viewModel.CurrentPage.Should().BeOfType<RulesViewModel>().Subject;
+
+        await rulesPage.EnsureLoadedAsync(TestContext.Current.CancellationToken);
+
+        fake.Calls.Should().Be(1);
+        rulesPage.Title.Should().Be("规则");
+        rulesPage.IsLoading.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RulesNavigation_WithoutRuleOperations_KeepsSkeletonPage()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedNavigation = viewModel.NavigationItems[1];
+
+        viewModel.CurrentPage.Should().BeOfType<SectionViewModel>();
+        viewModel.CurrentPage.Title.Should().Be("规则");
+    }
+
     private static MainViewModel CreateViewModel() => new MainViewModel(new AppState("0.1.0"));
+
+    /// <summary>规则目录假对象：返回空目录，仅统计加载次数。</summary>
+    private sealed class FakeRuleOperations : IRuleOperations
+    {
+        internal int Calls { get; private set; }
+
+        public Task<RuleCatalogSnapshot> LoadCatalogAsync(CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(new RuleCatalogSnapshot(Array.Empty<RuleCatalogEntry>(), false, null));
+        }
+    }
 }

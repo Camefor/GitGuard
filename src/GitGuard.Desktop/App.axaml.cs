@@ -28,7 +28,8 @@ public sealed partial class App : Avalonia.Application
                 DataContext = new MainViewModel(
                     appState,
                     new RepositoryOperations(session),
-                    new ShellEditorLauncher()),
+                    new ShellEditorLauncher(),
+                    new RuleOperations(session)),
             };
         }
 

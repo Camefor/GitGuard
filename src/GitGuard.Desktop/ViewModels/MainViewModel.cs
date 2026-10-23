@@ -30,11 +30,15 @@ public sealed class MainViewModel : ObservableObject
     /// <param name="editorLauncher">
     /// 外部编辑器启动器；<see langword="null"/> 时由仓库页使用默认实现（单测可注入假对象）。
     /// </param>
+    /// <param name="ruleOperations">
+    /// 规则目录操作服务；<see langword="null"/> 时规则页保持骨架（ViewModel 单测与设计预览不访问真实数据）。
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="appState"/> 为 <see langword="null"/>。</exception>
     public MainViewModel(
         AppState appState,
         IRepositoryOperations? repositoryOperations = null,
-        IEditorLauncher? editorLauncher = null)
+        IEditorLauncher? editorLauncher = null,
+        IRuleOperations? ruleOperations = null)
     {
         _appState = appState ?? throw new ArgumentNullException(nameof(appState));
 
@@ -42,7 +46,7 @@ public sealed class MainViewModel : ObservableObject
             Enum.GetValues<DesktopSection>().Select(section => new NavigationItemViewModel(section, appState.Language)));
         _pages = Enum.GetValues<DesktopSection>().ToDictionary(
             section => section,
-            section => CreatePage(section, appState.Language, repositoryOperations, editorLauncher));
+            section => CreatePage(section, appState.Language, repositoryOperations, editorLauncher, ruleOperations));
 
         _windowTitle = DesktopText.WindowTitle(appState.Language);
         _tagline = DesktopText.Tagline(appState.Language);
@@ -115,17 +119,28 @@ public sealed class MainViewModel : ObservableObject
         DesktopSection section,
         DesktopLanguage language,
         IRepositoryOperations? repositoryOperations,
-        IEditorLauncher? editorLauncher) =>
-        section == DesktopSection.Repositories && repositoryOperations is not null
-            ? new RepositoriesViewModel(repositoryOperations, language, editorLauncher)
-            : new SectionViewModel(section, language);
+        IEditorLauncher? editorLauncher,
+        IRuleOperations? ruleOperations) =>
+        section switch
+        {
+            DesktopSection.Repositories when repositoryOperations is not null =>
+                new RepositoriesViewModel(repositoryOperations, language, editorLauncher),
+            DesktopSection.Rules when ruleOperations is not null =>
+                new RulesViewModel(ruleOperations, language),
+            _ => new SectionViewModel(section, language),
+        };
 
     private static void EnsurePageLoaded(SectionViewModel page)
     {
-        if (page is RepositoriesViewModel repositoriesPage)
+        // 首次进入页面时异步加载数据；失败由各 ViewModel 转为可展示消息
+        switch (page)
         {
-            // 首次进入仓库页时异步加载列表；失败由 ViewModel 转为可展示消息
-            _ = repositoriesPage.EnsureLoadedAsync();
+            case RepositoriesViewModel repositoriesPage:
+                _ = repositoriesPage.EnsureLoadedAsync();
+                break;
+            case RulesViewModel rulesPage:
+                _ = rulesPage.EnsureLoadedAsync();
+                break;
         }
     }
 
