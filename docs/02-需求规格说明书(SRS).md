@@ -51,7 +51,7 @@
 - **描述**：MVP 必须内置以下四类检测器：
   - **SecretDetector**：匹配常见凭据格式（JWT、Slack、GitHub、AWS、通用 `password = "..."`）、主流平台 Token（Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face）及 Azure 存储密钥。
   - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱、护照、座机、美国 SSN、姓名与地址组合。
-  - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\`、UNC 共享路径、`/opt` `/srv` `/data` 部署目录等。
+  - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\`、UNC 共享路径、`/opt` `/srv` `/data` 部署目录等；Markdown 围栏代码块内的示例路径不命中（`GGD-0040`，支持反引号 / 波浪线围栏，围栏与目标行跨 unified-0 差异缺口时保守回落为正常检测）。
   - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` / `password=` 查询参数、Slack / Discord Webhook、AWS 预签名 URL、RFC 1918 私网段与环回段；可按 `rules.url.public_hostname_whitelist` 对可信公共文档主机抑制命中（`GGD-0039`）。
 - **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 扩充），严重度分布为 Critical 7 / High 17 / Medium 9 / Low 7；可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
 - **关联领域规则**：`DR-01, DR-02`
@@ -369,3 +369,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.21 | 2026-10-22 | GGD-0037：§2.5 补充 40 条规则严重度分布；§2.9 增加误报治理流程链接；§2.11.1 校正基线 `entries` 实际字段（`fingerprint` / `rule_id` / `file_path`，读取仅强制校验指纹） |
 | 0.1.22 | 2026-10-23 | GGD-0038：§2.12 接线 `hooks.*`（安装期 Hook 子集 / 可执行文件路径覆盖 / 全禁用退出码 13）与 `scan.pre_commit` / `scan.pre_push`（仅 Hook 模式生效，跳过不产生绕过事件）；「仅警告」项收敛为 `scan.fail_closed`；§8 FR-070 追溯扩展至 `TC-FR-070-01~08` |
 | 0.1.23 | 2026-10-23 | GGD-0039：§2.5 UrlDetector 补公共主机白名单；§2.12 新增 `rules.url.public_hostname_whitelist` 语义（规范化 / 非法项 13 / 项目级列表替换）并更新实现状态；§8 FR-070 追溯扩展至 `TC-FR-070-01~09` |
+| 0.1.24 | 2026-10-23 | GGD-0040：§2.5 LocalPathDetector 补 Markdown 围栏代码块感知（反引号 / 波浪线、≤3 空格缩进、闭合长度校验；跨 unified-0 差异缺口保守回落）；仅作用于 LocalPath，Url 与白名单行为不变 |

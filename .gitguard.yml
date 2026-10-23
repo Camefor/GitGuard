@@ -22,3 +22,12 @@ allowlist:
     - rule_id: GGD/PRIVACY/EMAIL
       path_pattern: tests/GitGuard.Detection.Tests/DetectorTests.cs
       reason: "URL 主机提取测试中的示例邮箱形态文本，非真实邮箱"
+    - rule_id: GGD/LOCALPATH/UNIX-HOME
+      path_pattern: tests/GitGuard.Detection.Tests/DetectorTests.cs
+      reason: "Markdown 围栏代码块测试中的示例主目录路径，非真实路径"
+    - rule_id: GGD/LOCALPATH/UNC-SHARE
+      path_pattern: tests/GitGuard.Detection.Tests/DetectorTests.cs
+      reason: "Markdown 围栏代码块测试中的示例 UNC 路径，非真实共享"
+    - rule_id: GGD/LOCALPATH/UNIX-HOME
+      path_pattern: tests/GitGuard.Cli.Tests/CliScanCommandTests.cs
+      reason: "Markdown 围栏代码块 CLI 测试中的示例主目录路径，非真实路径"

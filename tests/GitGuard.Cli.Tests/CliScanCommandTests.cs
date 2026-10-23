@@ -295,6 +295,49 @@ public sealed class CliScanCommandTests
         harness.Error.Should().Contain("GGD/URL/TOKEN-IN-QUERY");
     }
 
+    // GGD-0040：Markdown 围栏代码块内的 LocalPath 命中不产出 Finding
+    [Fact]
+    public async Task MarkdownFencedLocalPath_IsCleanEvenWhenLowSeverityBlocks()
+    {
+        using var harness = new CliHarness();
+        const string content = "```bash\n"
+            + "cd /home/alice/projects/app\n"
+            + "```\n";
+        harness.WriteFile("notes.markdown", content);
+        harness.Stage("notes.markdown");
+        harness.WriteProjectConfig("""
+            version: 1
+            policy:
+              low: block
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged", "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        using var document = JsonDocument.Parse(harness.Output);
+        JsonElement root = document.RootElement;
+        root.GetProperty("result").GetString().Should().Be("Clean");
+        root.GetProperty("findings").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task MarkdownPathOutsideFence_StillBlocks()
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("notes.md", "cd /home/bob/projects/app\n");
+        harness.Stage("notes.md");
+        harness.WriteProjectConfig("""
+            version: 1
+            policy:
+              low: block
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged");
+
+        exitCode.Should().Be(ExitCodes.BLOCKED);
+        harness.Error.Should().Contain("GGD/LOCALPATH/UNIX-HOME");
+    }
+
     [Fact]
     public async Task PushScan_ReadsStdinAndReportsCommitSha()
     {

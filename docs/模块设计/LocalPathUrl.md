@@ -4,7 +4,7 @@
 
 ## 1. 模块定位
 
-- **一句话定位**：识别开发者本地绝对路径泄漏（如 `C:/Users/rushe/Desktop/project`、`C:\Users\rushe\Desktop`）与可疑 URL（含凭据、含 Token 查询参数、内网保留地址），命中后按配置输出 Finding。
+- **一句话定位**：识别开发者本地绝对路径泄漏（如 `C:/Users/rushe/Desktop/project`、`C:\Users\rushe\Desktop`）与可疑 URL（含凭据、含 Token 查询参数、内网保留地址），命中后按配置输出 Finding；Markdown 围栏代码块内的路径视为示例内容，不参与 LocalPath 判定。
 - **所属限界上下文**：Scanning Context
 - **承担 FR**：`FR-021`
 - **承担 DR**：`DR-02`（脱敏）
@@ -31,7 +31,8 @@
 **降级策略**：
 
 - 在 `.gitignore`、`README.md`、`docs/**` 中出现时自动降级一级（Low 规则无可降级即不命中）。
-- （P2）示例代码块（Markdown 的三反引号段落）感知：本版本未实现，代码块内路径仍按普通文本行扫描。
+- Markdown 围栏代码块感知（GGD-0040）：`.md` / `.markdown` 中位于围栏内的变更行整行跳过 LocalPath 规则，不产出 Finding（不再降级）。围栏支持反引号（```` ``` ````）与波浪线（`~~~`）、最多 3 个前导空格；闭合围栏须同字符且长度 ≥ 开标记，仅允许尾随空白。反引号围栏的信息串不得含反引号。
+- 保守策略：差异为 unified-0，仅含变更行。围栏开标记与目标行之间出现行号缺口时无法确认块状态，重置为围栏外并正常检测（宁可多报，不可漏报）；未闭合围栏覆盖至当前连续差异段末尾。非 Markdown 文件不做围栏解析，Url 检测器也不受围栏影响。
 
 ### 3.2 Url 规则
 
@@ -71,11 +72,13 @@
 ```mermaid
 flowchart LR
     Line[差异行] --> Match{格式匹配}
-    Match -- 命中 --> Path{文档 / 示例路径?}
+    Match -- 命中 --> Fence{LocalPath 且 Markdown 围栏内?}
+    Fence -- 是 --> Drop[不产出 Finding]
+    Fence -- 否 --> Path{文档 / 示例路径?}
     Path -- 是 --> Step[严重度降一级\nLow 无可降即丢弃]
     Path -- 否 --> Host{URL 主机在白名单?}
     Step --> Host
-    Host -- 是 --> Drop[不产出 Finding]
+    Host -- 是 --> Drop
     Host -- 否 --> Mask[脱敏：Core Masker]
     Mask --> Finding
 ```
@@ -105,7 +108,7 @@ flowchart LR
 - [x] URL 带 Token 的脱敏输出不含原 Token。
 - [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，7 条 LocalPath + 8 条 Url 规则全覆盖）。
 - [x] 公共 URL 主机白名单（GGD-0039）：精确 / 通配主机抑制、大小写与端口无关、仅关联最近的前置 URL；配置加载期规范化与非法项 FailClosed（`DetectorTests` / `GitGuardConfigLoaderTests` / `CliScanCommandTests`）。
-- [ ] （P2）Markdown 代码块感知。
+- [x] Markdown 围栏代码块感知（GGD-0040）：围栏内 Low / Medium 路径均不产出 Finding、围栏外仍命中；反引号 / 波浪线围栏、≤3 空格缩进、闭合长度、未闭合围栏、`~~` 不闭合；跨差异缺口保守回落；非 Markdown 文件与 Url 检测器不受影响（`DetectorTests` / `CliScanCommandTests`）。
 
 ## 10. 演进与扩展位
 
@@ -120,3 +123,4 @@ flowchart LR
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；文档文件降级明确为 glob（`.gitignore` / `README.md` / `docs/**`）+ Low 丢弃；示例文件降级明确为文件名前缀匹配；脱敏统一由 Core `Masker` 承担（§5 示例对齐）；公开 URL 主机白名单与 Markdown 代码块感知记为 P2（本版本未实现） |
 | 0.1.2 | 2026-10-22 | GGD-0033：LocalPath 扩充至 7 条（UNC-SHARE / DEV-DIRS / HOME-TILDE），Url 扩充至 8 条（Slack / Discord Webhook、密码查询参数、AWS 预签名 URL）；§9 勾选样本覆盖项 |
 | 0.1.3 | 2026-10-23 | GGD-0039：实现 `rules.url.public_hostname_whitelist`（§3.2 / §6 / §7 / §9）——精确主机与 `*.` 通配、大小写不敏感、按命中位置最近的 URL 解析主机并抑制 Finding；默认空列表不改变行为；Markdown 代码块感知仍为 P2 |
+| 0.1.4 | 2026-10-23 | GGD-0040：实现 Markdown 围栏代码块感知（§1 / §3.1 / §6 / §9）——`.md` / `.markdown` 中围栏内行跳过 LocalPath 规则；支持反引号 / 波浪线、≤3 空格缩进与闭合长度校验；unified-0 跨差异缺口保守回落为正常检测；仅作用于 LocalPath，Url 与白名单行为不变 |

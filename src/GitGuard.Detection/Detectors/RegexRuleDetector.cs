@@ -137,6 +137,14 @@ public abstract class RegexRuleDetector : IRuleTimingAwareDetector
     /// <returns>抑制返回 <see langword="true"/>（不产出 Finding，但仍参与规则耗时统计）。</returns>
     protected virtual bool ShouldSuppressMatch(DetectionRule rule, ChangedLine line, Match match) => false;
 
+    /// <summary>
+    /// 文件级行抑制钩子（如 LocalPath 的 Markdown 围栏代码块感知）：每个文件调用一次，
+    /// 返回不参与规则扫描的变更行号；默认不抑制。
+    /// </summary>
+    /// <param name="change">文件变更（提供全部变更行用于分析上下文）。</param>
+    /// <returns>抑制行号集合；<see langword="null"/> 表示无抑制。</returns>
+    protected virtual IReadOnlySet<int>? GetSuppressedLineNumbers(FileChange change) => null;
+
     private static DetectionRule[] SelectRules(
         IReadOnlyList<DetectionRule> rules,
         string category,
@@ -290,8 +298,15 @@ public abstract class RegexRuleDetector : IRuleTimingAwareDetector
             yield break;
         }
 
+        IReadOnlySet<int>? suppressedLineNumbers = GetSuppressedLineNumbers(change);
+
         foreach (ChangedLine line in change.Lines)
         {
+            if (suppressedLineNumbers is not null && suppressedLineNumbers.Contains(line.Number))
+            {
+                continue;
+            }
+
             foreach (DetectionRule rule in _rules)
             {
                 if (!MatchesFileGlobs(rule, change.Path) || ShouldSkipRuleForLine(rule, line) || !IsContextSatisfied(rule, line.Text))

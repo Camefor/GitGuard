@@ -394,6 +394,120 @@ public sealed class DetectorTests
             "白名单主机只覆盖最近的 URL，不能抑制其他主机的命中");
     }
 
+    // ===== Markdown 围栏代码块（模块设计 LocalPathUrl §3.1 / GGD-0040） =====
+    [Fact]
+    public async Task LocalPathDetector_MarkdownFence_ShouldSuppressPathsInsideBlock()
+    {
+        IDetector detector = TestSupport.CreateDetector("LOCALPATH");
+
+        List<Finding> findings = await TestSupport.DetectLinesAsync(
+            detector,
+            "guide.md",
+            "```powershell",
+            "cd /home/alice/projects/app",
+            "```",
+            "cd /home/bob/projects/app");
+
+        Finding finding = SingleFinding(findings, "GGD/LOCALPATH/UNIX-HOME");
+        finding.LineNumber.Should().Be(4, "围栏内路径不产出 Finding，围栏外仍正常命中");
+    }
+
+    [Fact]
+    public async Task LocalPathDetector_MarkdownFence_ShouldSuppressMediumSeverityPath()
+    {
+        IDetector detector = TestSupport.CreateDetector("LOCALPATH");
+
+        List<Finding> findings = await TestSupport.DetectLinesAsync(
+            detector,
+            "notes.md",
+            "~~~",
+            "backup = \\\\fileserver\\share\\data",
+            "~~~");
+
+        findings.Should().BeEmpty("围栏内的 UNC 路径（Medium）整条不产出 Finding，而非仅降级");
+    }
+
+    [Fact]
+    public async Task LocalPathDetector_MarkdownFence_ShouldHonorTildeAndClosingLength()
+    {
+        IDetector detector = TestSupport.CreateDetector("LOCALPATH");
+
+        List<Finding> findings = await TestSupport.DetectLinesAsync(
+            detector,
+            "notes.md",
+            "~~~",
+            "/home/alice/projects/app",
+            "~~",
+            "~~~~",
+            "/home/carol/projects/app");
+
+        Finding finding = SingleFinding(findings, "GGD/LOCALPATH/UNIX-HOME");
+        finding.LineNumber.Should().Be(5, "长度不足的 ~~ 是围栏内容，只有 >= 开标记长度的 ~~~ 才能闭合");
+    }
+
+    [Fact]
+    public async Task LocalPathDetector_UnclosedMarkdownFence_ShouldSuppressRemainingLines()
+    {
+        IDetector detector = TestSupport.CreateDetector("LOCALPATH");
+
+        List<Finding> findings = await TestSupport.DetectLinesAsync(
+            detector,
+            "notes.md",
+            "   ```",
+            "   /home/alice/projects/app",
+            "cd /home/bob/projects/app");
+
+        findings.Should().BeEmpty("最多 3 空格缩进的开标记有效，未闭合围栏延续到差异段末尾");
+    }
+
+    [Fact]
+    public async Task LocalPathDetector_MarkdownFenceAcrossDiffGap_ShouldFallBackToReporting()
+    {
+        IDetector detector = TestSupport.CreateDetector("LOCALPATH");
+        var lines = new[]
+        {
+            new ChangedLine(10, "```"),
+            new ChangedLine(20, "cd /home/alice/projects/app"),
+        };
+        var change = new FileChange("notes.md", lines);
+
+        List<Finding> findings = await TestSupport.CollectAsync(detector, change);
+
+        SingleFinding(findings, "GGD/LOCALPATH/UNIX-HOME").LineNumber.Should().Be(
+            20,
+            "unified-0 差异缺少中间上下文，围栏状态未知时保守回落为正常检测");
+    }
+
+    [Fact]
+    public async Task LocalPathDetector_FenceMarkersInNonMarkdownFile_ShouldNotSuppress()
+    {
+        IDetector detector = TestSupport.CreateDetector("LOCALPATH");
+
+        List<Finding> findings = await TestSupport.DetectLinesAsync(
+            detector,
+            "notes.txt",
+            "```",
+            "cd /home/alice/projects/app",
+            "```");
+
+        SingleFinding(findings, "GGD/LOCALPATH/UNIX-HOME").LineNumber.Should().Be(2, "围栏感知仅作用于 Markdown 文件");
+    }
+
+    [Fact]
+    public async Task UrlDetector_MarkdownFencedBlock_ShouldStillReport()
+    {
+        IDetector detector = TestSupport.CreateDetector("URL");
+
+        List<Finding> findings = await TestSupport.DetectLinesAsync(
+            detector,
+            "guide.md",
+            "```bash",
+            "git clone https://user:pass@git.example.com/org/repo.git",
+            "```");
+
+        SingleFinding(findings, "GGD/URL/CREDENTIALS-IN-URL").LineNumber.Should().Be(2, "围栏抑制仅属于 LocalPath 类别");
+    }
+
     // ===== 装配期契约 =====
     [Fact]
     public void Detectors_Names_ShouldMatchDesignContracts()
