@@ -86,7 +86,7 @@ public sealed class RuleCatalogTests
     private static GitGuardConfig CreateConfig(
         ImmutableArray<DetectionRule>? customRules = null,
         SecretRulesSettings? secrets = null,
-        CategoryRulesSettings? url = null)
+        UrlRulesSettings? url = null)
     {
         GitGuardConfig defaults = GitGuardConfig.Default;
         return new GitGuardConfig(

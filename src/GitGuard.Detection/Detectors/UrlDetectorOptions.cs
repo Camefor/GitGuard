@@ -10,4 +10,10 @@ public sealed record UrlDetectorOptions
     /// （模块设计 LocalPathUrl §3.2：URL 出现在 example / sample / demo 开头的文件中）。
     /// </summary>
     public IReadOnlyList<string> SampleFilePrefixes { get; init; } = new[] { "example", "sample", "demo" };
+
+    /// <summary>
+    /// 公共文档主机名白名单（<c>rules.url.public_hostname_whitelist</c>）：精确主机名或
+    /// <c>*.example.com</c> 通配，大小写不敏感；命中主机的 URL 规则发现项不产出。默认空（不抑制）。
+    /// </summary>
+    public IReadOnlyList<string> PublicHostnameWhitelist { get; init; } = Array.Empty<string>();
 }

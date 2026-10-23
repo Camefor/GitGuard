@@ -108,7 +108,7 @@ internal sealed class RulesSectionDto
     public RuleCategorySectionDto? LocalPath { get; set; }
 
     /// <summary>URL 检测类别。</summary>
-    public RuleCategorySectionDto? Url { get; set; }
+    public UrlRulesSectionDto? Url { get; set; }
 
     /// <summary>自定义规则列表（FR-080）；列表整体替换，项目级声明即接管用户级。</summary>
     public List<CustomRuleSectionDto>? Custom { get; set; }
@@ -142,7 +142,7 @@ internal sealed class CustomRuleSectionDto
     public bool? Enabled { get; set; }
 }
 
-/// <summary>规则类别通用 DTO（<c>enabled</c> + <c>disabled_rules</c>）；<c>rules.local_path</c> / <c>rules.url</c> 直接使用。</summary>
+/// <summary>规则类别通用 DTO（<c>enabled</c> + <c>disabled_rules</c>）；<c>rules.local_path</c> 直接使用。</summary>
 internal sealed class RuleCategorySectionDto
 {
     /// <summary>是否启用该类别（<see langword="false"/> 时不装配其检测器）。</summary>
@@ -150,6 +150,22 @@ internal sealed class RuleCategorySectionDto
 
     /// <summary>禁用的规则 ID 列表。</summary>
     public List<string>? DisabledRules { get; set; }
+}
+
+/// <summary>
+/// <c>rules.url</c> 段落 DTO：通用类别开关 + 公共文档主机名白名单
+/// （模块设计 LocalPathUrl §7；不继承 <see cref="RuleCategorySectionDto"/> 理由同 <see cref="SecretRulesSectionDto"/>）。
+/// </summary>
+internal sealed class UrlRulesSectionDto
+{
+    /// <summary>是否启用该类别（<see langword="false"/> 时不装配其检测器）。</summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>禁用的规则 ID 列表。</summary>
+    public List<string>? DisabledRules { get; set; }
+
+    /// <summary>公共文档主机名白名单（精确主机或 <c>*.example.com</c> 通配）。</summary>
+    public List<string>? PublicHostnameWhitelist { get; set; }
 }
 
 /// <summary>
@@ -255,6 +271,7 @@ internal sealed class AllowlistEntryDto
 [YamlSerializable(typeof(RuleCategorySectionDto))]
 [YamlSerializable(typeof(SecretRulesSectionDto))]
 [YamlSerializable(typeof(PrivacyRulesSectionDto))]
+[YamlSerializable(typeof(UrlRulesSectionDto))]
 [YamlSerializable(typeof(PolicySectionDto))]
 [YamlSerializable(typeof(ExcludeSectionDto))]
 [YamlSerializable(typeof(AllowlistSectionDto))]

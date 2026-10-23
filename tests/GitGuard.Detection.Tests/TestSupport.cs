@@ -28,6 +28,12 @@ internal static class TestSupport
     /// <returns>Privacy 检测器。</returns>
     public static PrivacyDetector CreatePrivacyDetector(PrivacyDetectorOptions? options = null) => new PrivacyDetector(_rules, _factory, options);
 
+    /// <summary>装配 URL 检测器（可注入公共主机名白名单等选项）。</summary>
+    /// <param name="options">检测器选项；<see langword="null"/> 使用默认值。</param>
+    /// <returns>URL 检测器。</returns>
+    public static UrlDetector CreateUrlDetector(UrlDetectorOptions? options = null) =>
+        new UrlDetector(_rules, _factory, options);
+
     /// <summary>按规则类别段（<c>SECRET</c> / <c>PRIVACY</c> / <c>LOCALPATH</c> / <c>URL</c>）装配内置检测器。</summary>
     /// <param name="category">规则类别段（规则 ID 第 2 段）。</param>
     /// <returns>使用默认选项的检测器实例。</returns>

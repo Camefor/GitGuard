@@ -150,6 +150,7 @@ rules:
   url:
     enabled: true
     disabled_rules: []
+    public_hostname_whitelist: []    # 精确主机或 *.example.com；命中主机的 URL 规则 Finding 不产出
 
   custom:
     - id: USR/SECRET/INTERNAL-TOKEN   # 必须以 USR/ 开头；类别段仅限 SECRET/PRIVACY/LOCALPATH/URL
@@ -192,6 +193,8 @@ allowlist:
 
 **Gitleaks 适配器语义（GGD-0035）**：`rules.secrets.use_gitleaks` 默认 `false`，开启后 `DetectorAssembly` 在内置 SECRET 检测器之后装配 `GitleaksAdapter`（检测顺序 `Secret → Gitleaks → Privacy → LocalPath → Url`）。`gitleaks_path` 支持 `~` 展开；未配置或仅裸名称时按 PATH 查找（Windows 自动补 `.exe`），空白字符串 → `CONFIG_INVALID`（退出码 13），项目级与用户级按字段覆盖。启动期探测失败（文件缺失 / 无法执行 / `version` 探测失败）→ 警告并禁用适配器，扫描继续使用内置规则；可运行但非 8.x 的版本 → 警告但仍可用。扫描期非零退出码（0 / 1 除外）、报告缺失或 JSON 非法 → `DETECTOR_FAILED`（退出码 11），不重试。Gitleaks 规则 ID 映射为 `GLK/SECRET/*`；`disabled_rules` 同时接受原始 ID 与 GLK 命名空间写法（大小写不敏感），`GGD/` / `USR/` 条目由内置规则选择消费。多引擎命中按（提交、文件、行、指纹）去重，优先级 `USR > GLK > GGD`，严重度取最高。
 
+**URL 公共主机名白名单语义（GGD-0039）**：`rules.url.public_hostname_whitelist` 默认 `[]`，项目级声明整体替换用户级列表。列表项支持精确主机名（`github.com`）与 `*.example.com` 通配（覆盖任意层级子域，不覆盖裸域 `example.com`）；加载期去空白 / 末尾根点、转小写并去重，空白项或含协议、端口、路径、空白、非法通配的项 → `CONFIG_INVALID`（退出码 13）。`UrlDetector` 在严重度调整后、产出 Finding 前按命中位置向前最近的 `scheme://` 解析主机（跳过用户信息与端口），命中白名单则抑制该条 Finding；无法解析主机时保持原判定。白名单仅作用于 URL 类别规则，且不产生 `PolicyOverride`（属于检测器级降噪，而非策略降级）。
+
 ## 8. 质量属性
 
 | 属性 | 目标 |
@@ -213,6 +216,7 @@ allowlist:
 - [x] 降级审计：`policy.high: warn` 与 `disabled_rules: [GGD/SECRET/AWS-AKID]` 首次装配各写一条 `PolicyOverride`，同 Session 多次装配不重复；本地路径规则不被误判为禁用（`AuditEventWiringTests`，GGD-0015）。
 - [x] 自定义规则（GGD-0034）：加载期编译与校验（`USR/` 前缀、类别、必填字段、非法正则、重复 ID、空白上下文关键字 → 13）、项目级整体替换用户级；规则目录追加顺序与 `User` 来源；`enabled` / `disabled_rules` / 类别开关对有效启用的组合；检测器命中、上下文 / glob 过滤与 200ms 超时 FailClosed（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests`）。
 - [x] Hook 配置（GGD-0038）：`hooks.*` 默认值 / 解析 / 项目级按字段覆盖、未知子键警告、空白 `gitguard_executable_path` → 13；安装期按子集注册与显式 `--hook` 覆盖、全禁用 → 13、可执行文件缺失 → 13；`scan.pre_commit` / `scan.pre_push` 仅 Hook 模式生效且跳过不产生绕过事件（`GitGuardConfigLoaderTests` / `CliHookLifecycleTests` / `CliScanCommandTests` / `HookScriptBuilderTests`）。
+- [x] URL 公共主机名白名单（GGD-0039）：默认空；规范化（trim / 末尾根点 / 小写 / 去重）与项目级列表替换；空白 / 协议 / 端口 / 路径 / 非法通配 → 13；精确主机与 `*.` 通配的抑制边界、大小写与端口无关、仅关联最近前置 URL；CLI 端到端验证白名单内 Clean、白名单外仍阻断（`GitGuardConfigLoaderTests` / `DetectorTests` / `CliScanCommandTests`）。
 
 ## 10. 演进与扩展位
 
@@ -235,3 +239,4 @@ allowlist:
 | 0.1.9 | 2026-10-22 | GGD-0034：§1 承担 FR 补 `FR-080`；§3 / §6.2 / §7 新增 `rules.custom` 自定义规则（加载期校验、列表替换、`RuleSource.User` 追加、有效启用语义、200ms 超时与超长行不跳过）；§9 增补配置 / 目录 / 检测测试项 |
 | 0.1.10 | 2026-10-22 | GGD-0035：§7 Schema 补 `rules.secrets.gitleaks_path`，并新增 Gitleaks 适配器配置语义（开关、路径解析、启动期降级 / 扫描期 FailClosed、`GLK/` 过滤与跨引擎去重） |
 | 0.1.11 | 2026-10-23 | GGD-0038：§7 Schema 新增 `hooks` 段（安装期 Hook 子集与可执行文件路径覆盖），标注 `scan.pre_commit` / `scan.pre_push` 为 Hook 模式专用；§9 增补 Hook 配置测试项 |
+| 0.1.12 | 2026-10-23 | GGD-0039：§7 Schema 新增 `rules.url.public_hostname_whitelist` 与配置语义（规范化、非法项 FailClosed、按最近前置 URL 主机抑制 Finding、不产生 PolicyOverride）；§9 增补白名单测试项 |

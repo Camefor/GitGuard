@@ -251,6 +251,50 @@ public sealed class CliScanCommandTests
         exitCode.Should().Be(ExitCodes.USAGE_ERROR);
     }
 
+    // GGD-0039：rules.url.public_hostname_whitelist 按主机抑制 URL 规则命中
+    [Fact]
+    public async Task UrlTokenInQueryOnWhitelistedHost_IsClean()
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("app/settings.txt", "endpoint = \"https://docs.example.com/callback?token=abc123\"\n");
+        harness.Stage("app/settings.txt");
+        harness.WriteProjectConfig("""
+            version: 1
+            rules:
+              url:
+                public_hostname_whitelist:
+                  - docs.example.com
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged", "--format", "json");
+
+        exitCode.Should().Be(ExitCodes.SUCCESS);
+        using var document = JsonDocument.Parse(harness.Output);
+        JsonElement root = document.RootElement;
+        root.GetProperty("result").GetString().Should().Be("Clean");
+        root.GetProperty("findings").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task UrlTokenInQueryOnNonWhitelistedHost_Blocks()
+    {
+        using var harness = new CliHarness();
+        harness.WriteFile("app/settings.txt", "endpoint = \"https://internal.example.net/callback?token=abc123\"\n");
+        harness.Stage("app/settings.txt");
+        harness.WriteProjectConfig("""
+            version: 1
+            rules:
+              url:
+                public_hostname_whitelist:
+                  - docs.example.com
+            """);
+
+        int exitCode = await harness.RunAsync("scan", "--staged");
+
+        exitCode.Should().Be(ExitCodes.BLOCKED);
+        harness.Error.Should().Contain("GGD/URL/TOKEN-IN-QUERY");
+    }
+
     [Fact]
     public async Task PushScan_ReadsStdinAndReportsCommitSha()
     {

@@ -49,7 +49,8 @@
 **降级策略**：
 
 - URL 出现在以 `example`、`sample`、`demo` 开头的文件名（大小写不敏感）中 → 命中但严重度降一级（Low 保持 Low，命中记录保留）。
-- 公共文档类 URL（`github.com`、`api.github.com` 等）不触发命中：由规则集本身保证（无凭据 / Token / 内网特征即不命中）；显式主机白名单 `rules.url.public_hostname_whitelist` 为 P2，本版本未实现。
+- 公共文档类 URL（`github.com`、`api.github.com` 等）不触发命中：由规则集本身保证（无凭据 / Token / 内网特征即不命中）。
+- 公共主机名白名单（`rules.url.public_hostname_whitelist`，GGD-0039）：命中行可解析出所属 URL 主机且主机在列表中时，该条 Finding 不产出。支持精确主机（`github.com`）与 `*.` 通配（`*.example.com` 覆盖任意层级子域，不覆盖裸域）；比较大小写不敏感。主机解析取命中位置之前最近的 `scheme://`，跳过用户信息与端口；无法解析主机（裸 IP / 内网域名等）时保持原判定，避免误抑制。默认空列表不改变现有行为。
 
 ## 4. 外部依赖
 
@@ -72,8 +73,10 @@ flowchart LR
     Line[差异行] --> Match{格式匹配}
     Match -- 命中 --> Path{文档 / 示例路径?}
     Path -- 是 --> Step[严重度降一级\nLow 无可降即丢弃]
-    Path -- 否 --> Mask[脱敏：Core Masker]
-    Step --> Mask
+    Path -- 否 --> Host{URL 主机在白名单?}
+    Step --> Host
+    Host -- 是 --> Drop[不产出 Finding]
+    Host -- 否 --> Mask[脱敏：Core Masker]
     Mask --> Finding
 ```
 
@@ -85,7 +88,7 @@ flowchart LR
 | `rules.local_path.disabled_rules` | string[] | [] | - |
 | `rules.url.enabled` | bool | true | - |
 | `rules.url.disabled_rules` | string[] | [] | - |
-| `rules.url.public_hostname_whitelist` | string[] | 见默认 | 公共文档 TLD/域名白名单 |
+| `rules.url.public_hostname_whitelist` | string[] | `[]` | 公共文档主机白名单：精确主机或 `*.example.com` 通配，大小写不敏感；命中主机的 URL 规则 Finding 不产出。项目级声明整体替换用户级列表；空白项或含协议 / 端口 / 路径的非法项 → 退出码 13 |
 
 ## 8. 质量属性
 
@@ -101,7 +104,8 @@ flowchart LR
 - [x] 文档文件（`.gitignore` / `README.md` / `docs/**`）中 Low 规则不命中。
 - [x] URL 带 Token 的脱敏输出不含原 Token。
 - [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，7 条 LocalPath + 8 条 Url 规则全覆盖）。
-- [ ] （P2）Markdown 代码块感知与公共 URL 主机白名单。
+- [x] 公共 URL 主机白名单（GGD-0039）：精确 / 通配主机抑制、大小写与端口无关、仅关联最近的前置 URL；配置加载期规范化与非法项 FailClosed（`DetectorTests` / `GitGuardConfigLoaderTests` / `CliScanCommandTests`）。
+- [ ] （P2）Markdown 代码块感知。
 
 ## 10. 演进与扩展位
 
@@ -115,3 +119,4 @@ flowchart LR
 | 0.1.0 | 2026-10-15 | 初始化：4 条 LocalPath + 4 条 Url 规则 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；文档文件降级明确为 glob（`.gitignore` / `README.md` / `docs/**`）+ Low 丢弃；示例文件降级明确为文件名前缀匹配；脱敏统一由 Core `Masker` 承担（§5 示例对齐）；公开 URL 主机白名单与 Markdown 代码块感知记为 P2（本版本未实现） |
 | 0.1.2 | 2026-10-22 | GGD-0033：LocalPath 扩充至 7 条（UNC-SHARE / DEV-DIRS / HOME-TILDE），Url 扩充至 8 条（Slack / Discord Webhook、密码查询参数、AWS 预签名 URL）；§9 勾选样本覆盖项 |
+| 0.1.3 | 2026-10-23 | GGD-0039：实现 `rules.url.public_hostname_whitelist`（§3.2 / §6 / §7 / §9）——精确主机与 `*.` 通配、大小写不敏感、按命中位置最近的 URL 解析主机并抑制 Finding；默认空列表不改变行为；Markdown 代码块感知仍为 P2 |

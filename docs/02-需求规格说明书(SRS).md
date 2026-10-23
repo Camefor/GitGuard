@@ -52,7 +52,7 @@
   - **SecretDetector**：匹配常见凭据格式（JWT、Slack、GitHub、AWS、通用 `password = "..."`）、主流平台 Token（Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face）及 Azure 存储密钥。
   - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱、护照、座机、美国 SSN、姓名与地址组合。
   - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\`、UNC 共享路径、`/opt` `/srv` `/data` 部署目录等。
-  - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` / `password=` 查询参数、Slack / Discord Webhook、AWS 预签名 URL、RFC 1918 私网段与环回段。
+  - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` / `password=` 查询参数、Slack / Discord Webhook、AWS 预签名 URL、RFC 1918 私网段与环回段；可按 `rules.url.public_hostname_whitelist` 对可信公共文档主机抑制命中（`GGD-0039`）。
 - **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 40 条（Secret 16 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 扩充），严重度分布为 Critical 7 / High 17 / Medium 9 / Low 7；可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
 - **关联领域规则**：`DR-01, DR-02`
 - **关联测试用例**：`TC-FR-021-S-*`（Secret）/ `TC-FR-021-P-*`（Privacy）/ `TC-FR-021-L-*`（LocalPath）/ `TC-FR-021-U-*`（Url）；每条规则由 `BuiltinRuleFixtureTests` 覆盖 ≥3 正例 / ≥3 反例 / 边界正反例
@@ -169,10 +169,11 @@
   - `exclude.paths`：glob 匹配仓库相对路径；`exclude.files`：glob 匹配任意目录下的文件名。命中文件在扫描管线中直接跳过（暂存区与推送共用），不产生 Finding，也不计入 `skipped_files`；空项 → 退出码 13。
   - `hooks.pre_commit` / `hooks.pre_push` / `hooks.post_commit_bypass_detection`（bool，默认 true）：`gitguard install` 未显式给出 `--hook` 时按开关注册 Hook 子集；显式 `--hook` 始终优先；三项全为 `false` 且未显式指定 → FailClosed（退出码 13）。`hooks.gitguard_executable_path`（string?，默认自动探测）：覆盖固化到分发脚本的可执行文件路径，支持 `~` / 相对路径，安装期文件不存在或为空白 → 退出码 13（`GGD-0038`）。
   - `scan.pre_commit: false` / `scan.pre_push: false`：仅控制 Hook 模式扫描（分发脚本携带隐藏选项 `--hook-mode`），手动 `scan --staged` / `scan --push` 始终执行；跳过时退出码 0、无 ScanRun（`GGD-0038`）。`pre-commit` 跳过仍写入 `skipped=false` 的待提交标记，`post-commit` 不将其误判为绕过事件。
+  - `rules.url.public_hostname_whitelist`（string[]，默认 `[]`）：公共文档主机白名单，精确主机或 `*.example.com` 通配，大小写不敏感；命中主机的 URL 规则 Finding 不产出。加载期去空白 / 末尾根点、转小写并去重，空白或含协议 / 端口 / 路径 / 非法通配的项 → 退出码 13；项目级声明整体替换用户级列表（`GGD-0039`）。
   - `scan.fail_closed: false`：仅警告，MVP 行为恒为 FailClosed（DR-03）。
-- **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）；`hooks.*` 与 `scan.pre_commit` / `scan.pre_push` 接线于 `GGD-0038`。
-- **v0.2 实现状态**：除 `scan.fail_closed` 仍为「仅警告」外，其余字段均生效（`exclude` 自 `GGD-0019`、`hooks.*` 与 Hook 模式扫描开关自 `GGD-0038` 起生效）。
-- **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-08`
+- **实现**：`GitGuard.Application.Configuration.GitGuardConfigLoader`（`GGD-0009`）；`hooks.*` 与 `scan.pre_commit` / `scan.pre_push` 接线于 `GGD-0038`；`rules.url.public_hostname_whitelist` 接线于 `GGD-0039`。
+- **v0.2 实现状态**：除 `scan.fail_closed` 仍为「仅警告」外，其余字段均生效（`exclude` 自 `GGD-0019`、`hooks.*` 与 Hook 模式扫描开关自 `GGD-0038`、URL 主机白名单自 `GGD-0039` 起生效）。
+- **关联测试用例**：`TC-FR-070-01` ~ `TC-FR-070-09`
 
 ### 2.12.1 `FR-071` 用户级配置
 
@@ -327,7 +328,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-050` | 3.5 | `模块设计/Hook.md` / `模块设计/Audit.md` | `TC-FR-050-01` / `TC-DR-06-01`（`BypassDetectionServiceTests` / `PendingScanRecorderTests` / `FilePendingScanStoreTests` / `GitAccessBypassTests` / `SqliteAuditStoreBypassTests` / `CliBypassTests` / `HookEndToEndTests` / E2E S8） | 已实现 |
 | `FR-060` | 3.6 | `模块设计/Cli.md` | `TC-FR-060-01~04`（`ScanAllUseCaseTests` / `GitAccessFullScanTests` / `CliScanAllTests`） | 已实现（`GGD-0031`） |
 | `FR-061` | 3.6 | `模块设计/Cli.md` | `TC-FR-061-01~05`（`BaselineUseCaseTests` / `CliScanBaselineTests` / `ExitCodeMapperTests`） | 已实现（`GGD-0032`） |
-| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~08`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests` / `CliHookLifecycleTests` / `HookScriptBuilderTests`） | 已实现 |
+| `FR-070` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01~09`（`GitGuardConfigLoaderTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests` / `CliHookLifecycleTests` / `HookScriptBuilderTests` / `DetectorTests`） | 已实现 |
 | `FR-071` | 全部 | `模块设计/Policy.md` | `TC-FR-070-01`（`GitGuardConfigLoaderTests`） | 已实现 |
 | `FR-080` | 3.2 | `模块设计/Policy.md` / `06-API接口设计` §5.7 | `TC-FR-080-01~04`（`GitGuardConfigLoaderTests` / `RuleCatalogTests` / `CustomRuleDetectorTests` / `CliRulesCommandTests`） | 已实现（`GGD-0034`） |
 | `FR-090` | 3.2 | `模块设计/Secret.md` + `ADR-0003` | `TC-FR-090-01~04`（`GitleaksAdapterTests` / `GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests` / `GitGuardConfigLoaderTests` / `GitGuardSessionTests` / `ScanStagedUseCaseTests` / `CliScanCommandTests`） | 已实现（`GGD-0035`） |
@@ -367,3 +368,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.20 | 2026-10-22 | GGD-0036：§4 审计接口补充 `gitguard audit view <run-id>`（单次运行摘要与 Finding 明细，脱敏输出，退出码 7 / 30）并标记已实现 |
 | 0.1.21 | 2026-10-22 | GGD-0037：§2.5 补充 40 条规则严重度分布；§2.9 增加误报治理流程链接；§2.11.1 校正基线 `entries` 实际字段（`fingerprint` / `rule_id` / `file_path`，读取仅强制校验指纹） |
 | 0.1.22 | 2026-10-23 | GGD-0038：§2.12 接线 `hooks.*`（安装期 Hook 子集 / 可执行文件路径覆盖 / 全禁用退出码 13）与 `scan.pre_commit` / `scan.pre_push`（仅 Hook 模式生效，跳过不产生绕过事件）；「仅警告」项收敛为 `scan.fail_closed`；§8 FR-070 追溯扩展至 `TC-FR-070-01~08` |
+| 0.1.23 | 2026-10-23 | GGD-0039：§2.5 UrlDetector 补公共主机白名单；§2.12 新增 `rules.url.public_hostname_whitelist` 语义（规范化 / 非法项 13 / 项目级列表替换）并更新实现状态；§8 FR-070 追溯扩展至 `TC-FR-070-01~09` |

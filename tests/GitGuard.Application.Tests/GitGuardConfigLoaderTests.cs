@@ -38,6 +38,7 @@ public sealed class GitGuardConfigLoaderTests
         config.Privacy.Enabled.Should().BeTrue();
         config.LocalPath.Enabled.Should().BeTrue();
         config.Url.Enabled.Should().BeTrue();
+        config.Url.PublicHostnameWhitelist.Should().BeEmpty("默认不抑制任何 URL 发现项");
         config.LogVerbose.Should().BeFalse();
         config.Allowlist.Should().BeEmpty();
         config.LoadedConfigFiles.Should().BeEmpty();
@@ -544,7 +545,85 @@ public sealed class GitGuardConfigLoaderTests
 
         Action act = () => CreateLoader(project.Root).Load();
 
-        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("rules.*.disabled_rules");
+        act.Should().Throw<ConfigurationException>().Which.Message.Should().Contain("rules.url.disabled_rules");
+    }
+
+    [Fact]
+    public void Load_UrlPublicHostnameWhitelist_NormalizesAndDeduplicates()
+    {
+        using var project = new TempDirectory();
+        const string yaml = """
+            version: 1
+            rules:
+              url:
+                public_hostname_whitelist:
+                  - " Docs.Example.COM. "
+                  - "*.GitHub.com"
+                  - "docs.example.com"
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        GitGuardConfig config = CreateLoader(project.Root).Load();
+
+        config.Url.PublicHostnameWhitelist.Should().Equal(
+            "docs.example.com",
+            "*.github.com");
+        config.Url.PublicHostnameWhitelist.Should().HaveCount(2, "重复主机（含大小写 / 末尾根点差异）应被去重");
+    }
+
+    [Fact]
+    public void Load_ProjectUrlPublicHostnameWhitelist_ReplacesUserLevelList()
+    {
+        using var project = new TempDirectory();
+        string userConfigPath = Path.Combine(project.Root, "user-config.yml");
+        const string userYaml = """
+            version: 1
+            rules:
+              url:
+                public_hostname_whitelist:
+                  - docs.example.com
+            """;
+        const string projectYaml = """
+            version: 1
+            rules:
+              url:
+                public_hostname_whitelist:
+                  - "*.internal.example.com"
+            """;
+        File.WriteAllText(userConfigPath, userYaml);
+        File.WriteAllText(ProjectConfigPath(project), projectYaml);
+
+        GitGuardConfig config = CreateLoader(project.Root, userConfigPath).Load();
+
+        config.Url.PublicHostnameWhitelist.Should().ContainSingle()
+            .Which.Should().Be("*.internal.example.com", "列表字段整体替换，项目级声明即接管用户级");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(".")]
+    [InlineData("https://docs.example.com")]
+    [InlineData("docs.example.com:443")]
+    [InlineData("docs.example.com/path")]
+    [InlineData("exa mple.com")]
+    [InlineData("*.*.example.com")]
+    public void Load_InvalidUrlPublicHostnameWhitelist_FailClosed(string entry)
+    {
+        using var project = new TempDirectory();
+        string yaml = $"""
+            version: 1
+            rules:
+              url:
+                public_hostname_whitelist:
+                  - "{entry}"
+            """;
+        File.WriteAllText(ProjectConfigPath(project), yaml);
+
+        Action act = () => CreateLoader(project.Root).Load();
+
+        ConfigurationException exception = act.Should().Throw<ConfigurationException>().Subject.Single();
+        exception.ErrorCode.Should().Be(ConfigurationException.CONFIG_INVALID);
+        exception.Message.Should().Contain("rules.url.public_hostname_whitelist");
     }
 
     [Fact]

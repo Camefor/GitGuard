@@ -95,7 +95,10 @@ internal static class DetectorAssembly
 
         if (config.Url.Enabled)
         {
-            detectors.Add(new UrlDetector(rules, factory));
+            detectors.Add(new UrlDetector(rules, factory, new UrlDetectorOptions
+            {
+                PublicHostnameWhitelist = config.Url.PublicHostnameWhitelist,
+            }));
         }
 
         if (detectors.Count == 0)

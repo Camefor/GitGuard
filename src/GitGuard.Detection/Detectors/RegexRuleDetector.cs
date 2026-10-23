@@ -128,6 +128,15 @@ public abstract class RegexRuleDetector : IRuleTimingAwareDetector
     /// <returns>最终严重度；返回 <see langword="null"/> 表示丢弃本次命中。</returns>
     protected virtual Severity? AdjustSeverity(DetectionRule rule, FileChange change) => rule.Severity;
 
+    /// <summary>
+    /// 命中抑制钩子（如 URL 公共主机名白名单）：在严重度调整后、产出前调用；默认不抑制。
+    /// </summary>
+    /// <param name="rule">当前规则。</param>
+    /// <param name="line">命中行（提供 URL 主机解析上下文）。</param>
+    /// <param name="match">命中的正则结果（含原文位置）。</param>
+    /// <returns>抑制返回 <see langword="true"/>（不产出 Finding，但仍参与规则耗时统计）。</returns>
+    protected virtual bool ShouldSuppressMatch(DetectionRule rule, ChangedLine line, Match match) => false;
+
     private static DetectionRule[] SelectRules(
         IReadOnlyList<DetectionRule> rules,
         string category,
@@ -187,14 +196,14 @@ public abstract class RegexRuleDetector : IRuleTimingAwareDetector
     }
 
     /// <summary>
-    /// 执行规则正则并返回首个命中的敏感原文：优先取第 1 捕获组（规则以非捕获组包裹上下文时，
+    /// 执行规则正则并返回首个有效命中：优先取第 1 捕获组（规则以非捕获组包裹上下文时，
     /// 捕获组即敏感值），无捕获组时取整体匹配。匹配超时抛 <see cref="DetectionException"/>（FailClosed）。
     /// </summary>
     /// <param name="rule">当前规则。</param>
     /// <param name="lineText">命中行文本。</param>
-    /// <returns>敏感原文；无命中返回 <see langword="null"/>。</returns>
+    /// <returns>首个捕获值非空的 <see cref="Match"/>；无命中返回 <see langword="null"/>。</returns>
     /// <exception cref="DetectionException">正则匹配超时（模块设计 Secret §4：200ms / 规则）。</exception>
-    private static string? MatchValue(DetectionRule rule, string lineText)
+    private static Match? FindMatch(DetectionRule rule, string lineText)
     {
         MatchCollection matches;
         try
@@ -214,18 +223,20 @@ public abstract class RegexRuleDetector : IRuleTimingAwareDetector
 
         foreach (Match match in matches)
         {
-            string value = match.Groups.Count > 1 && match.Groups[1].Success
-                ? match.Groups[1].Value
-                : match.Value;
-
-            if (value.Length > 0)
+            if (ValueOf(match).Length > 0)
             {
-                return value;
+                return match;
             }
         }
 
         return null;
     }
+
+    /// <summary>取命中的敏感原文：优先第 1 捕获组，无捕获组时取整体匹配（脱敏 / 指纹对象）。</summary>
+    /// <param name="match">正则命中。</param>
+    /// <returns>敏感原文（可能为空串）。</returns>
+    private static string ValueOf(Match match) =>
+        match.Groups.Count > 1 && match.Groups[1].Success ? match.Groups[1].Value : match.Value;
 
     /// <summary>执行规则声明的全部校验器（构造期已保证校验器存在）。</summary>
     /// <param name="validators">本检测器支持的校验器表。</param>
@@ -290,13 +301,15 @@ public abstract class RegexRuleDetector : IRuleTimingAwareDetector
 
                 // 仅统计真正执行正则 / 校验器的求值；文件 glob 与上下文门禁的短路不计入规则耗时
                 long startedTimestamp = timingSink is null ? 0 : Stopwatch.GetTimestamp();
-                string? value = MatchValue(rule, line.Text);
+                Match? match = FindMatch(rule, line.Text);
+                string? value = match is null ? null : ValueOf(match);
                 Severity? severity = value is not null && ValidateValue(_validators, rule, value)
                     ? AdjustSeverity(rule, change)
                     : null;
-                timingSink?.Record(rule.RuleId, Stopwatch.GetTimestamp() - startedTimestamp, severity is not null);
+                bool suppressed = severity is not null && match is { } hit && ShouldSuppressMatch(rule, line, hit);
+                timingSink?.Record(rule.RuleId, Stopwatch.GetTimestamp() - startedTimestamp, severity is not null && !suppressed);
 
-                if (severity is null)
+                if (severity is null || suppressed)
                 {
                     continue;
                 }

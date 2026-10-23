@@ -17,6 +17,12 @@ public sealed class DetectorTests
 
     private static readonly string[] _crossCategoryValidators = new[] { "shannon-entropy" };
 
+    private static readonly string[] _docsHostnameWhitelist = new[] { "docs.example.com" };
+
+    private static readonly string[] _wildcardHostnameWhitelist = new[] { "*.example.com" };
+
+    private static readonly string[] _githubHostnameWhitelist = new[] { "github.com" };
+
     // ===== TC-FR-021：六条验收用例（docs/16-测试方案.md §4） =====
     [Fact]
     public async Task TC_FR_021_S_01_AwsAccessKeyId_ShouldHitWithCriticalSeverity()
@@ -297,6 +303,95 @@ public sealed class DetectorTests
             "docs_url = \"https://api.github.com/repos/org/project\"");
 
         findings.Should().BeEmpty("公开 URL 不含凭据 / token / 私网地址");
+    }
+
+    [Fact]
+    public async Task UrlDetector_WhitelistedHost_ShouldSuppressTokenFinding()
+    {
+        UrlDetector detector = TestSupport.CreateUrlDetector(new UrlDetectorOptions
+        {
+            PublicHostnameWhitelist = _docsHostnameWhitelist,
+        });
+
+        List<Finding> findings = await TestSupport.DetectSingleLineAsync(
+            detector,
+            TestSupport.NEUTRAL_SCAN_PATH,
+            "endpoint = \"https://docs.example.com/callback?token=abc123\"");
+
+        findings.Should().BeEmpty("命中主机在白名单中：公共文档 URL 不产出 Finding");
+    }
+
+    [Fact]
+    public async Task UrlDetector_WildcardWhitelist_ShouldSuppressSubdomainButNotApex()
+    {
+        UrlDetector detector = TestSupport.CreateUrlDetector(new UrlDetectorOptions
+        {
+            PublicHostnameWhitelist = _wildcardHostnameWhitelist,
+        });
+
+        List<Finding> subdomain = await TestSupport.DetectSingleLineAsync(
+            detector,
+            TestSupport.NEUTRAL_SCAN_PATH,
+            "https://api.docs.example.com/cb?token=abc123");
+        List<Finding> apex = await TestSupport.DetectSingleLineAsync(
+            detector,
+            TestSupport.NEUTRAL_SCAN_PATH,
+            "https://example.com/cb?token=abc123");
+
+        subdomain.Should().BeEmpty("*.example.com 覆盖任意层级子域");
+        apex.Should().ContainSingle(
+            finding => finding.RuleId == "GGD/URL/TOKEN-IN-QUERY",
+            "*.example.com 不匹配裸域 example.com");
+    }
+
+    [Fact]
+    public async Task UrlDetector_Whitelist_ShouldMatchCaseInsensitivelyAndIgnorePositions()
+    {
+        UrlDetector detector = TestSupport.CreateUrlDetector(new UrlDetectorOptions
+        {
+            PublicHostnameWhitelist = _githubHostnameWhitelist,
+        });
+
+        List<Finding> findings = await TestSupport.DetectSingleLineAsync(
+            detector,
+            TestSupport.NEUTRAL_SCAN_PATH,
+            "https://User:Pass@GitHub.com:443/org/repo");
+
+        findings.Should().BeEmpty("主机比较大小写不敏感，且凭据 / 端口不影响主机提取");
+    }
+
+    [Fact]
+    public async Task UrlDetector_NonWhitelistedHost_ShouldStillHit()
+    {
+        UrlDetector detector = TestSupport.CreateUrlDetector(new UrlDetectorOptions
+        {
+            PublicHostnameWhitelist = _docsHostnameWhitelist,
+        });
+
+        List<Finding> findings = await TestSupport.DetectSingleLineAsync(
+            detector,
+            TestSupport.NEUTRAL_SCAN_PATH,
+            "https://internal.example.net/cb?token=abc123");
+
+        findings.Should().ContainSingle(finding => finding.RuleId == "GGD/URL/TOKEN-IN-QUERY");
+    }
+
+    [Fact]
+    public async Task UrlDetector_Whitelist_ShouldAssociateMatchWithNearestPrecedingUrl()
+    {
+        UrlDetector detector = TestSupport.CreateUrlDetector(new UrlDetectorOptions
+        {
+            PublicHostnameWhitelist = _docsHostnameWhitelist,
+        });
+
+        List<Finding> findings = await TestSupport.DetectSingleLineAsync(
+            detector,
+            TestSupport.NEUTRAL_SCAN_PATH,
+            "first=\"https://other.example.net/cb?token=abc123\"; second=\"https://docs.example.com/x\"");
+
+        findings.Should().ContainSingle(
+            finding => finding.RuleId == "GGD/URL/TOKEN-IN-QUERY",
+            "白名单主机只覆盖最近的 URL，不能抑制其他主机的命中");
     }
 
     // ===== 装配期契约 =====

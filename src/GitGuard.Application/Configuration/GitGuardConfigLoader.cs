@@ -61,7 +61,7 @@ public sealed class GitGuardConfigLoader
             ["rules.secrets"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules", "use_gitleaks", "gitleaks_path", "min_entropy"),
             ["rules.privacy"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules", "require_context", "test_file_patterns"),
             ["rules.local_path"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules"),
-            ["rules.url"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules"),
+            ["rules.url"] = ImmutableHashSet.Create(StringComparer.Ordinal, "enabled", "disabled_rules", "public_hostname_whitelist"),
             ["rules.custom[]"] = ImmutableHashSet.Create(StringComparer.Ordinal, "id", "name", "severity", "pattern", "context_keywords", "file_path_globs", "enabled"),
             ["policy"] = ImmutableHashSet.Create(StringComparer.Ordinal, "critical", "high", "medium", "low"),
             ["allowlist"] = ImmutableHashSet.Create(StringComparer.Ordinal, "entries"),
@@ -282,10 +282,11 @@ public sealed class GitGuardConfigLoader
                 },
             Url = BothNull(user?.Url, project?.Url)
                 ? null
-                : new RuleCategorySectionDto
+                : new UrlRulesSectionDto
                 {
                     Enabled = project?.Url?.Enabled ?? user?.Url?.Enabled,
                     DisabledRules = project?.Url?.DisabledRules ?? user?.Url?.DisabledRules,
+                    PublicHostnameWhitelist = project?.Url?.PublicHostnameWhitelist ?? user?.Url?.PublicHostnameWhitelist,
                 },
 
             // 列表替换语义：项目级声明 custom 即整体接管用户级
@@ -368,7 +369,7 @@ public sealed class GitGuardConfigLoader
             secrets,
             privacy,
             BuildCategoryRules(rules.LocalPath),
-            BuildCategoryRules(rules.Url),
+            BuildUrlRules(rules.Url),
             logFile,
             merged.Logging?.Verbose ?? false,
             allowlist,
@@ -467,6 +468,75 @@ public sealed class GitGuardConfigLoader
         Enabled = dto?.Enabled ?? true,
         DisabledRules = NormalizeList(dto?.DisabledRules, "rules.*.disabled_rules"),
     };
+
+    /// <summary>映射 <c>rules.url</c>：白名单项须为主机名（精确或 <c>*.example.com</c>）→ 否则 13。</summary>
+    private static UrlRulesSettings BuildUrlRules(UrlRulesSectionDto? dto) => new UrlRulesSettings
+    {
+        Enabled = dto?.Enabled ?? true,
+        DisabledRules = NormalizeList(dto?.DisabledRules, "rules.url.disabled_rules"),
+        PublicHostnameWhitelist = NormalizeHostnameWhitelist(dto?.PublicHostnameWhitelist),
+    };
+
+    /// <summary>
+    /// 规范化公共主机名白名单：去空白 / 末尾根点、转小写、去重；
+    /// 仅接受精确主机名或 <c>*.example.com</c> 通配，协议 / 路径 / 端口 / 空白等一律 FailClosed（退出码 13）。
+    /// </summary>
+    private static ImmutableArray<string> NormalizeHostnameWhitelist(List<string>? values)
+    {
+        if (values is null || values.Count == 0)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<string>(values.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ConfigurationException("rules.url.public_hostname_whitelist 含空项；列表项必须为主机名");
+            }
+
+            string host = value.Trim().TrimEnd('.').ToLowerInvariant();
+            string candidate = host.StartsWith("*.", StringComparison.Ordinal) ? host[2..] : host;
+            if (!IsValidHostname(candidate))
+            {
+                throw new ConfigurationException(
+                    $"rules.url.public_hostname_whitelist 含非法主机名「{value}」；仅支持精确主机名或 *.example.com 通配，"
+                    + "不得包含协议、路径、端口或空白");
+            }
+
+            if (seen.Add(host))
+            {
+                builder.Add(host);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static bool IsValidHostname(string candidate)
+    {
+        if (candidate.Length is 0 or > 253)
+        {
+            return false;
+        }
+
+        if (candidate[0] == '.' || candidate[^1] == '.' || candidate.Contains("..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        foreach (char c in candidate)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '-' && c != '.')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// 编译 <c>rules.custom</c> 声明的自定义规则（FR-080）：ID 必须为 <c>USR/</c> 前缀且类别段属于四类检测器，

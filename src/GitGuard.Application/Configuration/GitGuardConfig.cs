@@ -26,7 +26,7 @@ public sealed record GitGuardConfig
         SecretRulesSettings.Default,
         PrivacyRulesSettings.Default,
         CategoryRulesSettings.Default,
-        CategoryRulesSettings.Default,
+        UrlRulesSettings.Default,
         LogFileSettings.Default,
         logVerbose: false,
         allowlist: ImmutableArray<AllowlistEntry>.Empty,
@@ -54,7 +54,7 @@ public sealed record GitGuardConfig
         SecretRulesSettings secrets,
         PrivacyRulesSettings privacy,
         CategoryRulesSettings localPath,
-        CategoryRulesSettings url,
+        UrlRulesSettings url,
         LogFileSettings logFile,
         bool logVerbose,
         IReadOnlyList<AllowlistEntry> allowlist,
@@ -105,7 +105,7 @@ public sealed record GitGuardConfig
     public CategoryRulesSettings LocalPath { get; }
 
     /// <summary>URL 检测类别设置（<c>rules.url</c>）。</summary>
-    public CategoryRulesSettings Url { get; }
+    public UrlRulesSettings Url { get; }
 
     /// <summary>文件日志设置（<c>logging.file</c>）。</summary>
     public LogFileSettings LogFile { get; }
@@ -149,6 +149,28 @@ public sealed record CategoryRulesSettings
 
     /// <summary>禁用的规则 ID 列表（内置规则 ID，如 <c>GGD/SECRET/AWS-AKID</c>）。</summary>
     public IReadOnlyList<string> DisabledRules { get; init; } = ImmutableArray<string>.Empty;
+}
+
+/// <summary>
+/// URL 检测类别设置（<c>rules.url</c>）：在通用类别开关之上增加公共主机名白名单，
+/// 命中白名单主机的 URL 规则发现项不产出（模块设计 LocalPathUrl §3.2）。
+/// </summary>
+public sealed record UrlRulesSettings
+{
+    /// <summary>默认设置：启用、无禁用规则、白名单为空（不抑制任何 Finding）。</summary>
+    public static UrlRulesSettings Default { get; } = new UrlRulesSettings();
+
+    /// <summary>是否启用 URL 检测。</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>禁用的规则 ID 列表。</summary>
+    public IReadOnlyList<string> DisabledRules { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>
+    /// 公共文档主机名白名单（<c>public_hostname_whitelist</c>）：精确主机名或 <c>*.example.com</c> 通配，
+    /// 大小写不敏感；命中的 URL 主机不再产出 URL 类别发现项。
+    /// </summary>
+    public IReadOnlyList<string> PublicHostnameWhitelist { get; init; } = ImmutableArray<string>.Empty;
 }
 
 /// <summary>秘密检测类别设置（<c>rules.secrets</c>）。</summary>

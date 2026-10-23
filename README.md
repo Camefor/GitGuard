@@ -6,7 +6,7 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发中，2026-10-22）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎与 `audit view` 已落地。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、40 条内置规则、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -329,6 +329,10 @@ scan:
   pre_commit: true    # false = Hook 模式跳过暂存区扫描（手动 scan 不受影响）
   pre_push: true      # false = Hook 模式跳过推送范围扫描
 
+rules:
+  url:
+    public_hostname_whitelist: []   # 可信公共文档主机，如 github.com / "*.example.com"
+
 exclude:
   paths:
     - "**/bin/**"
@@ -336,6 +340,8 @@ exclude:
   files:
     - "*.min.js"
 ```
+
+- `rules.url.public_hostname_whitelist`：精确主机或 `*.example.com` 通配（不覆盖裸域），大小写不敏感；命中主机的 URL 规则 Finding 不产出。默认空列表；空白项或含协议 / 端口 / 路径的非法项 → 退出码 13。
 
 常用环境变量：
 
@@ -373,7 +379,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1368 用例（1359 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1384 用例（1375 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 六类测试作业；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
