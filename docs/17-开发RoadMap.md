@@ -81,7 +81,7 @@
   - 规则数量增长带来误报与扫描耗时压力 → 夹具正反例、ReDoS 用例与规则级耗时基线共同约束。
   - 3 个月稳定运行是日历条件 → 以 `AGENT-GUIDE.md` 会话记录持续跟踪 P0 Bug；不伪造提前完成。
 - **退出条件**：
-  - [ ] 规则库 ≥ 60 条（当前 45，`GGD-0048` 已完成，`GGD-0049` ~ `GGD-0051` 推进中）。
+  - [ ] 规则库 ≥ 60 条（当前 50，`GGD-0048` / `GGD-0049` 已完成，`GGD-0050` ~ `GGD-0051` 推进中）。
   - [ ] 连续稳定运行 3 个月（2026-10-24 ~ 2027-01-24）且无 P0 Bug（用户验收）。
   - [ ] 三平台发行冒烟通过（承接 v0.3，待首次 Release runner 验证）。
   - [ ] 文档稳定：规则清单 / README / 误报治理指南与实现一致，无失效链接。
@@ -122,7 +122,7 @@
 | 3 | `GGD-0046` | 全局设置、跨仓库日志与导出（已完成） | P2 | 3d |
 | 3 | `GGD-0047` | 三平台打包、CI 冒烟与文档（已完成） | P2 | 3d |
 | 4 | `GGD-0048` | 规则库扩充第一批：Secret 16→21（DigitalOcean / HashiCorp Vault / Postman / Shopify / PyPI，已完成） | P1 | 2d |
-| 4 | `GGD-0049` | 规则库扩充第二批：Privacy 9→14 | P1 | 2d |
+| 4 | `GGD-0049` | 规则库扩充第二批：Privacy 9→14（IBAN / US-PHONE / UK-NINO / CN-LICENSE-PLATE / DATE-OF-BIRTH，已完成） | P1 | 2d |
 | 4 | `GGD-0050` | 规则库扩充第三批：LocalPath 7→12 | P2 | 1d |
 | 4 | `GGD-0051` | 规则库扩充第四批：Url 8→13 | P2 | 1d |
 | 4 | `GGD-0052` | v1.0 文档稳定化：规则清单、README、误报治理指南、链接与版本一致性 | P2 | 2d |
@@ -193,3 +193,4 @@ flowchart LR
 | 0.1.25 | 2026-10-23 | `GGD-0046` 完成：桌面全局设置（语言 / 主题 / Gitleaks 覆盖持久化、跟随系统深色模式）与跨仓库日志（20 条分页、结果 / 时间范围筛选、与 CLI 同契约的 JSON / CSV 导出）；§2.3 交付物与 §3 任务表标记完成，新增 41 例测试 |
 | 0.1.26 | 2026-10-23 | `GGD-0047` 完成：桌面端 `--smoke-test` 无界面发行冒烟、Windows MSIX / macOS DMG / Linux AppImage 打包脚本与图标资产、CI `desktop-package-smoke` 及 Release 三平台桌面作业；§2.3 交付物与 §3 任务表标记完成，新增 10 例 Desktop 测试（全量 1578） |
 | 0.1.27 | 2026-10-24 | v1.0 启动（用户指令）：§1 v1.0 由候选转为正式阶段；新增 §2.4 阶段 4 范围、交付物、风险与退出条件；§3 登记 `GGD-0048` ~ `GGD-0053`。`GGD-0048` 完成：Secret 规则 16→21（DigitalOcean / HashiCorp Vault / Postman / Shopify / PyPI），新增 5 个夹具文件 40 个用例，规则库 40→45，全量 1618 用例 |
+| 0.1.28 | 2026-10-24 | GGD-0049 完成：Privacy 规则 9→14（IBAN / US-PHONE / UK-NINO / CN-LICENSE-PLATE / DATE-OF-BIRTH），新增 `iban-checksum` 校验器与 5 个夹具文件 40 个用例，规则库 45→50，§2.4 当前进度与 §3 任务表同步 |

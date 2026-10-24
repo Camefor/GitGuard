@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/DATE-OF-BIRTH（Low）：yyyy-MM-dd / yyyy/MM/dd / yyyy.MM.dd，同行含 birth / dob / 生日 / 出生日期
+[positive]
+date_of_birth = "1990-05-20"
+dob: 1985/12/31
+出生日期：2000.01.01
+
+[negative]
+birth = "1990-13-01"
+dob = "1990-00-10"
+birth_date = "90-05-20"
+
+[edge]
+hit: 生日=1999-02-28
+miss: 出生日期：1999-02

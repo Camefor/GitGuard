@@ -2,7 +2,7 @@
 
 ## 1. 模块定位
 
-- **一句话定位**：识别可能的个人隐私信息，重点覆盖**中国大陆场景**：手机号、身份证、银行卡、邮箱（含上下文校验，降低误报）。
+- **一句话定位**：识别可能的个人隐私信息，重点覆盖**中国大陆场景**（手机号、身份证、银行卡、邮箱，含上下文校验以降误报），并补充 IBAN、美国电话、英国 NINO 等国际隐私标识。
 - **所属限界上下文**：Scanning Context
 - **承担 FR**：`FR-021`
 - **承担 DR**：`DR-02`（零明文留存，个人数据严格脱敏）
@@ -34,8 +34,13 @@
 | `GGD/PRIVACY/CN-LANDLINE` | 中国大陆座机号 | Medium | `0` 开头区号 + 7~8 位号码（分隔符可选）；上下文含 `phone` / `tel` / `电话` / `座机` |
 | `GGD/PRIVACY/US-SSN` | 美国社会安全号（SSN） | Medium | `3-2-4` 位数字；上下文含 `ssn` / `social security` / `社保号` |
 | `GGD/PRIVACY/CN-NAME-ADDRESS` | 姓名 + 地址组合（P2） | Medium | 关键字 `姓名` / `住址` / `地址` + 冒号 + ≥2 字符具体值 |
+| `GGD/PRIVACY/IBAN` | IBAN 国际银行账号 | High | `[A-Z]{2}[0-9]{2}` + 11~30 位字母数字 + `iban-checksum`（ISO 13616 模 97）；上下文含 `iban` / `bank` / `银行` / `账户` |
+| `GGD/PRIVACY/US-PHONE` | 美国电话号码 | Medium | NANP 区号 / 交换码均以 `2-9` 开头，分隔符 `-` / `.` / 空格；上下文含 `phone` / `tel` / `mobile` / `cell` / `电话` |
+| `GGD/PRIVACY/UK-NINO` | 英国国民保险号（NINO） | Medium | 两字母前缀（排除 D/F/I/Q/U/V，第二位另排除 O）+ 6 位数字 + `A-D` 后缀；上下文含 `nino` / `ni number` / `national insurance` / `国民保险` |
+| `GGD/PRIVACY/CN-LICENSE-PLATE` | 中国机动车号牌 | Medium | 省级简称 + 发牌机关字母 + 5~6 位序号（支持新能源与挂 / 学 / 警 / 港 / 澳）；上下文含 `车牌` / `号牌` / `plate` / `license` |
+| `GGD/PRIVACY/DATE-OF-BIRTH` | 出生日期 | Low | `yyyy-MM-dd` / `yyyy/MM/dd` / `yyyy.MM.dd`，年份限 19xx / 20xx；上下文含 `birth` / `dob` / `date of birth` / `生日` / `出生日期` |
 
-> v0.2（GGD-0033）在 MVP 5 条基础上新增护照、座机、SSN 与姓名地址组合，共 9 条；`CN-NAME-ADDRESS` 按 P2 计划提前启用。
+> v0.2（GGD-0033）在 MVP 5 条基础上新增护照、座机、SSN 与姓名地址组合，共 9 条；`CN-NAME-ADDRESS` 按 P2 计划提前启用。v1.0（GGD-0049）新增 IBAN、美国电话、英国 NINO、中国车牌与出生日期 5 条，共 14 条，国际隐私标识开始纳入规则库。
 
 ## 4. 外部依赖
 
@@ -43,6 +48,7 @@
 | --- | --- | --- |
 | Regex 引擎 | 格式判定 | 单规则禁用 + FailClosed |
 | Luhn 算法实现（内置纯 C#） | 银行卡号校验 | - |
+| IBAN 模 97 校验（内置纯 C#） | 国际银行账号校验 | - |
 
 ## 5. 数据模型
 
@@ -89,12 +95,13 @@ flowchart LR
 - [x] 验证 `require_context = true` 下，裸的 11 位数字不触发手机号命中。
 - [x] 验证测试文件路径自动降级。
 - [x] 验证脱敏输出格式稳定（供用户肉眼识别）。
-- [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，9 条 Privacy 规则全覆盖）。
+- [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，14 条 Privacy 规则全覆盖）。
+- [x] IBAN 模 97 校验器覆盖合法示例、错误校验位与畸形输入（`IbanChecksumTests`）。
 
 ## 10. 演进与扩展位
 
 - `CN-NAME-ADDRESS`：已于 v0.2（GGD-0033）提前启用。
-- 国际化隐私数据（欧盟 IBAN 等）：三期按需；美国 SSN 已于 v0.2 启用。
+- 国际化隐私数据：美国 SSN 已于 v0.2 启用；IBAN / 美国电话 / 英国 NINO 已于 v1.0（GGD-0049）启用，其余按需扩展。
 - NER 模型：**不**引入，保持纯规则（避免模型依赖和 DR-01 风险）。
 
 ## 11. 变更记录
@@ -104,3 +111,4 @@ flowchart LR
 | 0.1.0 | 2026-10-15 | 初始化：5 条 MVP 规则 + 测试文件自动降级策略 |
 | 0.1.1 | 2026-10-16 | 与 GGD-0006 实现同步：输出契约定为 `IAsyncEnumerable<Finding>`（ADR-0003）；CN-MOBILE 正则改用 ASCII `[0-9]`（防全角数字误报）、移除 `fake` 标签语义（改为测试文件路径降一级）；脱敏统一由 Core `Masker` 承担；`test_file_patterns` 明确为路径子串（大小写不敏感） |
 | 0.1.2 | 2026-10-22 | GGD-0033：规则库扩充至 9 条（新增 CN-PASSPORT / CN-LANDLINE / US-SSN / CN-NAME-ADDRESS）；§10 同步 P2 规则启用状态；§9 勾选样本覆盖项 |
+| 0.1.3 | 2026-10-24 | GGD-0049：规则库扩充至 14 条（新增 IBAN / US-PHONE / UK-NINO / CN-LICENSE-PLATE / DATE-OF-BIRTH），新增 `iban-checksum` 声明式校验器；§4 依赖、§9 覆盖项与 §10 国际化扩展位同步 |

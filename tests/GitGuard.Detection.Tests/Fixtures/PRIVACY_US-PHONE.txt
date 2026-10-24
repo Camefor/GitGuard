@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/US-PHONE（Medium）：NANP 号码（区号 / 交换码 2-9 开头），同行含 phone / tel / mobile / cell / 电话
+[positive]
+phone = "(415) 555-2671"
+mobile: 212-555-0198
+电话：650.555.0123
+
+[negative]
+phone = "(115) 555-2671"
+tel = "415-555-267"
+fax = "415-555-2671"
+
+[edge]
+hit: cell: (212) 555-0198
+miss: phone = "415-555-26710"

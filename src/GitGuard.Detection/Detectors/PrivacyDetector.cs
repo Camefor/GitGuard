@@ -5,8 +5,8 @@ using GitGuard.Detection.Validation;
 namespace GitGuard.Detection.Detectors;
 
 /// <summary>
-/// Privacy 检测器（模块设计 Privacy）：扫描个人隐私数据泄漏，承载 <c>GGD/PRIVACY/*</c> 9 条内置规则。
-/// 类别特有语义：身份证 / 银行卡经声明式校验器（校验位 / Luhn）拦截误报；
+/// Privacy 检测器（模块设计 Privacy）：扫描个人隐私数据泄漏，承载 <c>GGD/PRIVACY/*</c> 14 条内置规则。
+/// 类别特有语义：身份证 / 银行卡 / IBAN 经声明式校验器（校验位 / Luhn / 模 97）拦截误报；
 /// 上下文关键字可经配置关闭；测试文件路径命中时严重度降一级但保留记录（模块设计 Privacy §6）。
 /// </summary>
 public sealed class PrivacyDetector : RegexRuleDetector
@@ -51,6 +51,7 @@ public sealed class PrivacyDetector : RegexRuleDetector
         {
             ["luhn"] = LuhnChecksum.IsValid,
             ["cn-id-checksum"] = CnIdCardValidator.IsValid,
+            ["iban-checksum"] = IbanChecksum.IsValid,
         };
         return validators;
     }

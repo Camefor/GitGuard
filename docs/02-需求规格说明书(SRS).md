@@ -50,10 +50,10 @@
 
 - **描述**：MVP 必须内置以下四类检测器：
   - **SecretDetector**：匹配常见凭据格式（JWT、Slack、GitHub、AWS、通用 `password = "..."`）、主流平台 Token（Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face / DigitalOcean / HashiCorp Vault / Postman / Shopify / PyPI）及 Azure 存储密钥。
-  - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱、护照、座机、美国 SSN、姓名与地址组合。
+  - **PrivacyDetector**：中国大陆手机号（`^1[3-9]\d{9}$` + 上下文）、18 位身份证（含校验位）、邮箱、护照、座机、美国 SSN、姓名与地址组合，以及 IBAN（模 97 校验）、美国电话、英国 NINO、中国机动车号牌、出生日期（`GGD-0049`）。
   - **LocalPathDetector**：Windows 驱动器盘符、`~/`、`/Users/`、`/home/`、`/workspace/volumes/`、`C:\Users\`、UNC 共享路径、`/opt` `/srv` `/data` 部署目录等；Markdown 围栏代码块内的示例路径不命中（`GGD-0040`，支持反引号 / 波浪线围栏，围栏与目标行跨 unified-0 差异缺口时保守回落为正常检测）。
   - **UrlDetector**：含用户名密码的 URL（`://user:pass@`）、含 `token=` / `apikey=` / `password=` 查询参数、Slack / Discord Webhook、AWS 预签名 URL、RFC 1918 私网段与环回段；可按 `rules.url.public_hostname_whitelist` 对可信公共文档主机抑制命中（`GGD-0039`）。
-- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 45 条（Secret 21 / Privacy 9 / LocalPath 7 / Url 8；GGD-0033 / GGD-0048 扩充），严重度分布为 Critical 11 / High 18 / Medium 9 / Low 7；可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
+- **处理规则**：每个检测器实现 `IDetector`，`DetectAsync` 返回 `IAsyncEnumerable<Finding>`（流式产出，ADR-0003）；装配与运行顺序固定为 Secret → Privacy → LocalPath → Url（`Application/Composition/DetectorAssembly.cs`）；内置规则共 50 条（Secret 21 / Privacy 14 / LocalPath 7 / Url 8；GGD-0033 / GGD-0048 / GGD-0049 扩充），严重度分布为 Critical 11 / High 19 / Medium 12 / Low 8；可按类别 `rules.<category>.enabled: false` 整类禁用，或用 `disabled_rules` 按规则 ID 禁用；四类全部禁用视为配置无效（FailClosed，退出码 13）。
 - **关联领域规则**：`DR-01, DR-02`
 - **关联测试用例**：`TC-FR-021-S-*`（Secret）/ `TC-FR-021-P-*`（Privacy）/ `TC-FR-021-L-*`（LocalPath）/ `TC-FR-021-U-*`（Url）；每条规则由 `BuiltinRuleFixtureTests` 覆盖 ≥3 正例 / ≥3 反例 / 边界正反例
 
@@ -316,7 +316,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-011` | 3.1 | 同上 | `TC-FR-010-04`（`UninstallHookUseCaseTests` / `HookEndToEndTests`） | 已实现 |
 | `FR-012` | 3.1 | `模块设计/Cli.md` / `模块设计/Hook.md` | `TC-FR-012-01`（`StatusUseCaseTests` / `CliHookLifecycleTests`） | 已实现 |
 | `FR-020` | 3.2 | `模块设计/Secret.md` / `Privacy.md` / `模块设计/Policy.md` | `TC-FR-020-01~05`（`ScanEndToEndTests` / `ScanStagedUseCaseTests` / `UnifiedDiffParserTests` / `CliScanCommandTests`） | 已实现 |
-| `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/LocalPathUrl.md` | `TC-FR-021-*`（`DetectorTests` / `BuiltinRuleFixtureTests` / `DetectorRobustnessTests`） | 已实现（45 条规则，GGD-0033 / GGD-0048） |
+| `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/LocalPathUrl.md` | `TC-FR-021-*`（`DetectorTests` / `BuiltinRuleFixtureTests` / `DetectorRobustnessTests`） | 已实现（50 条规则，GGD-0033 / GGD-0048 / GGD-0049） |
 | `FR-022` | 3.2 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `SeverityPolicyTests` / `PolicyDecisionTests` | 已实现 |
 | `FR-023` | 3.2 | `模块设计/Cli.md` / `06-API接口设计` §4.2 | `CliScanCommandTests` + E2E S1（text / JSON） | 部分实现（无逐规则建议文案） |
 | `FR-030` | 3.3 | `模块设计/Hook.md` | `TC-FR-030-01~02`（`ScanEndToEndTests` / `ScanPushUseCaseTests` / `PushUpdateTests`） | 已实现 |
@@ -373,3 +373,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.25 | 2026-10-23 | GGD-0046：§8 追溯矩阵 FR-100 更新为已实现（桌面四区页面与设置 / 日志导出，`TC-FR-100-01~12`；三平台打包待 `GGD-0047`） |
 | 0.1.26 | 2026-10-23 | GGD-0047：§1 桌面端范围指向 FR-100 与 11 / 12 / 14；§5.2 NFR-A-002 补三平台桌面安装包构建与发行冒烟；§8 FR-100 追溯扩展至 `TC-FR-100-13` 并标记三平台打包完成 |
 | 0.1.27 | 2026-10-24 | GGD-0048：§2.5 FR-021 规则库扩充至 45 条（Secret 21 / Privacy 9 / LocalPath 7 / Url 8），严重度分布更新为 Critical 11 / High 18 / Medium 9 / Low 7；§8 追溯矩阵同步 |
+| 0.1.28 | 2026-10-24 | GGD-0049：§2.5 FR-021 规则库扩充至 50 条（Secret 21 / Privacy 14 / LocalPath 7 / Url 8），严重度分布更新为 Critical 11 / High 19 / Medium 12 / Low 8；Privacy 新增 IBAN / 美国电话 / 英国 NINO / 中国车牌 / 出生日期与 `iban-checksum`；§8 追溯矩阵同步 |

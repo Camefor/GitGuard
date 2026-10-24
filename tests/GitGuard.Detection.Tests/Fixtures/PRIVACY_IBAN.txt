@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/IBAN（High）：ISO 13616 IBAN，同行含 iban / bank / 银行 / 账户，且通过模 97 校验
+[positive]
+iban = "DE89370400440532013000"
+bank_account: "GB82WEST12345698765432"
+银行账户：FR1420041010050500013M02606
+
+[negative]
+iban = "DE89370400440532013001"
+bank_account = "GB82WEST1234569876543"
+account = "de89370400440532013000"
+
+[edge]
+hit: iban=NL91ABNA0417164300
+miss: iban = "DE8937040044053201300O"

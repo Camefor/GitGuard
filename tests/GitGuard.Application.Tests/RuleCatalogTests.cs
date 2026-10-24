@@ -18,7 +18,7 @@ public sealed class RuleCatalogTests
     {
         ImmutableArray<RuleCatalogEntry> catalog = RuleCatalog.Build(GitGuardConfig.Default);
 
-        catalog.Should().HaveCount(45, "GGD-0048 后内置规则集为 45 条");
+        catalog.Should().HaveCount(50, "GGD-0049 后内置规则集为 50 条");
         catalog.Should().OnlyContain(entry => entry.Enabled);
         catalog.Should().OnlyContain(entry => entry.Source == RuleSource.Builtin);
         catalog.Select(entry => entry.RuleId).Should().OnlyHaveUniqueItems();
@@ -32,7 +32,7 @@ public sealed class RuleCatalogTests
 
         ImmutableArray<RuleCatalogEntry> catalog = RuleCatalog.Build(config);
 
-        catalog.Should().HaveCount(46);
+        catalog.Should().HaveCount(51);
         catalog[^1].RuleId.Should().Be("USR/SECRET/INTERNAL-TOKEN", "自定义规则保持列表顺序追加在内置规则之后");
         catalog[^1].Source.Should().Be(RuleSource.User);
         catalog[^1].Enabled.Should().BeTrue();
@@ -78,7 +78,7 @@ public sealed class RuleCatalogTests
 
         ImmutableArray<RuleCatalogEntry> catalog = RuleCatalog.Build(config);
 
-        catalog.Should().HaveCount(45);
+        catalog.Should().HaveCount(50);
         catalog.Where(entry => entry.Category == "URL").Should().OnlyContain(entry => !entry.Enabled);
         catalog.Where(entry => entry.Category != "URL").Should().OnlyContain(entry => entry.Enabled);
     }

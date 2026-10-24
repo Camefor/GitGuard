@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/UK-NINO（Medium）：两字母前缀 + 6 位数字 + A-D 后缀，同行含 nino / ni number / national insurance / 国民保险
+[positive]
+nino = "AB123456C"
+National Insurance: "CE 12 34 56 D"
+国民保险号：HJ123456A
+
+[negative]
+nino = "DF123456A"
+nino = "AB12345C"
+nino = "AB123456E"
+
+[edge]
+hit: nino=JG 12 34 56 B
+miss: nino=AB123456

@@ -1,0 +1,14 @@
+﻿; GGD/PRIVACY/CN-LICENSE-PLATE（Medium）：省级简称 + 发牌机关字母 + 5~6 位序号，同行含 车牌 / 号牌 / plate / license
+[positive]
+车牌号：京A12345
+license_plate = "粤B12345"
+car_plate: "沪AD12345"
+
+[negative]
+plate = "京I12345"
+plate = "京A1234"
+plate = "AB12345"
+
+[edge]
+hit: 车牌：粤B12345
+miss: 车牌：粤B12345Q9

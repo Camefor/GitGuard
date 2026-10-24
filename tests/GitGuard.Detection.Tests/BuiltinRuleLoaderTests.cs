@@ -8,7 +8,7 @@ using GitGuard.Detection.Rules;
 namespace GitGuard.Detection.Tests;
 
 /// <summary>
-/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 / GGD-0048 验收项——45 条规则完整载入、ID 契约、严重度映射、
+/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 / GGD-0048 / GGD-0049 验收项——50 条规则完整载入、ID 契约、严重度映射、
 /// 版本 / 重复 ID / 必填字段 / 正则编译等 FailClosed 行为。
 /// </summary>
 public sealed class BuiltinRuleLoaderTests
@@ -46,6 +46,11 @@ public sealed class BuiltinRuleLoaderTests
         ("GGD/PRIVACY/CN-LANDLINE", Severity.Medium),
         ("GGD/PRIVACY/US-SSN", Severity.Medium),
         ("GGD/PRIVACY/CN-NAME-ADDRESS", Severity.Medium),
+        ("GGD/PRIVACY/IBAN", Severity.High),
+        ("GGD/PRIVACY/US-PHONE", Severity.Medium),
+        ("GGD/PRIVACY/UK-NINO", Severity.Medium),
+        ("GGD/PRIVACY/CN-LICENSE-PLATE", Severity.Medium),
+        ("GGD/PRIVACY/DATE-OF-BIRTH", Severity.Low),
         ("GGD/LOCALPATH/UNIX-HOME", Severity.Low),
         ("GGD/LOCALPATH/WIN-USER", Severity.Low),
         ("GGD/LOCALPATH/WIN-DRIVE", Severity.Low),
@@ -101,10 +106,10 @@ public sealed class BuiltinRuleLoaderTests
         var rules = BuiltinRuleLoader.LoadEmbedded();
 
         rules.Where(rule => rule.RuleId.Split('/')[1] == "SECRET").Should().HaveCount(21);
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "PRIVACY").Should().HaveCount(9);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "PRIVACY").Should().HaveCount(14);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "LOCALPATH").Should().HaveCount(7);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "URL").Should().HaveCount(8);
-        rules.Should().HaveCount(45);
+        rules.Should().HaveCount(50);
     }
 
     [Fact]
@@ -119,6 +124,12 @@ public sealed class BuiltinRuleLoaderTests
         rules["GGD/PRIVACY/CN-BANKCARD"].Pattern.Validators.Should().Equal("luhn");
         rules["GGD/PRIVACY/CN-MOBILE"].Pattern.ContextKeywords.Should().Contain("手机");
         rules["GGD/PRIVACY/CN-BANKCARD"].Pattern.ContextKeywords.Should().BeEmpty();
+        rules["GGD/PRIVACY/IBAN"].Pattern.Validators.Should().Equal("iban-checksum");
+        rules["GGD/PRIVACY/IBAN"].Pattern.ContextKeywords.Should().Contain("iban");
+        rules["GGD/PRIVACY/US-PHONE"].Pattern.ContextKeywords.Should().Contain("phone");
+        rules["GGD/PRIVACY/UK-NINO"].Pattern.ContextKeywords.Should().Contain("nino");
+        rules["GGD/PRIVACY/CN-LICENSE-PLATE"].Pattern.ContextKeywords.Should().Contain("车牌");
+        rules["GGD/PRIVACY/DATE-OF-BIRTH"].Pattern.ContextKeywords.Should().Contain("出生日期");
         rules["GGD/SECRET/AWS-AKID"].Pattern.ContextKeywords.Should().BeEmpty();
         rules["GGD/SECRET/AWS-AKID"].Pattern.Validators.Should().BeEmpty();
         rules["GGD/SECRET/AWS-AKID"].Pattern.FilePathGlobs.Should().BeEmpty();
