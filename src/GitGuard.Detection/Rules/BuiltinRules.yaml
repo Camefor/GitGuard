@@ -284,6 +284,36 @@ rules:
     pattern: '(?:^|[\s"''=(])(~/[\w.-]+(?:/[\w.-]+)+)'
     enabled: true
 
+  - id: GGD/LOCALPATH/MAC-VOLUME
+    name: macOS 挂载卷绝对路径
+    severity: Low
+    pattern: '(?<![\w.-])/Volumes/[\w.-]+/'
+    enabled: true
+
+  - id: GGD/LOCALPATH/ROOT-HOME
+    name: root 用户主目录绝对路径
+    severity: Low
+    pattern: '(?<![\w.-])/root/[\w.-]+/'
+    enabled: true
+
+  - id: GGD/LOCALPATH/VAR-WWW
+    name: Web 站点部署绝对路径
+    severity: Low
+    pattern: '(?<![\w.-])/var/www/[\w.-]+/'
+    enabled: true
+
+  - id: GGD/LOCALPATH/CYGWIN-DRIVE
+    name: Cygwin 盘符绝对路径
+    severity: Low
+    pattern: '(?<![\w.-])/cygdrive/[a-z]/(?!(?i:Users)/)[\w.-]+/'
+    enabled: true
+
+  - id: GGD/LOCALPATH/WIN-INLINE
+    name: Windows 行内盘符绝对路径
+    severity: Low
+    pattern: '(?<=[\s"''=(])[A-Za-z]:[\\/](?!(?i:Users)[\\/])[\w.-]+[\\/]'
+    enabled: true
+
   # ===== Url（模块设计 LocalPathUrl §3.2） =====
   - id: GGD/URL/CREDENTIALS-IN-URL
     name: URL 带用户名密码

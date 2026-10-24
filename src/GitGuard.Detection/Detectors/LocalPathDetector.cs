@@ -5,7 +5,7 @@ using GitGuard.Core.Rules;
 namespace GitGuard.Detection.Detectors;
 
 /// <summary>
-/// LocalPath 检测器（模块设计 LocalPathUrl §3.1）：扫描本机绝对路径泄漏，承载 <c>GGD/LOCALPATH/*</c> 7 条规则。
+/// LocalPath 检测器（模块设计 LocalPathUrl §3.1）：扫描本机绝对路径泄漏，承载 <c>GGD/LOCALPATH/*</c> 12 条规则。
 /// 类别特有语义：文档文件（<c>.gitignore</c> / <c>README.md</c> / <c>docs/**</c>）中严重度降一级，Low 规则不命中；
 /// Markdown 围栏代码块内的路径视为示例内容，不产出 Finding。
 /// </summary>

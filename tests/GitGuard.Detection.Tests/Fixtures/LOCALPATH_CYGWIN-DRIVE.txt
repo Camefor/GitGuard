@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/CYGWIN-DRIVE（Low）：Cygwin /cygdrive/<盘符>/<目录>/ 绝对路径；Users 交由 UNIX-HOME
+[positive]
+cd /cygdrive/c/projects/gitguard
+/cygdrive/d/tools/bin/bash.exe
+export HOME=/cygdrive/e/work/
+
+[negative]
+/cygdrive/c/Users/alice/project/
+/cygdrive/cc/work/app/
+cygdrive/c/work/app/
+
+[edge]
+hit: pwd => /cygdrive/f/src/app/
+miss: /cygdrive/1/work/app/

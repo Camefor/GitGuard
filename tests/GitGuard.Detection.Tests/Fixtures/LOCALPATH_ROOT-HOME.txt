@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/ROOT-HOME（Low）：Linux root 用户主目录 /root/<目录>/ 绝对路径
+[positive]
+cd /root/projects/gitguard
+/root/deploy/release.sh --check
+WorkingDirectory=/root/app/current/
+
+[negative]
+/root/
+/rootfs/data/app/
+chroot/root/app/
+
+[edge]
+hit: export PATH=/root/.local/bin/
+miss: /root//deploy

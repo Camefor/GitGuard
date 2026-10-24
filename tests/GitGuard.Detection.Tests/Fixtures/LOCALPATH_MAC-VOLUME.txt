@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/MAC-VOLUME（Low）：macOS /Volumes/<卷名>/ 挂载点绝对路径
+[positive]
+cp -r /Volumes/ExternalSSD/gitguard/ ./backup
+open /Volumes/TimeMachine/backup.dmg
+rsync /Volumes/WorkDisk/projects/app/ remote:/data/
+
+[negative]
+/volumes/ExternalSSD/backup
+/Volume/ExternalSSD/backup
+mount_point = /Volumes
+
+[edge]
+hit: "volume": "/Volumes/WD_2TB/repo/"
+miss: /Volumes//backup

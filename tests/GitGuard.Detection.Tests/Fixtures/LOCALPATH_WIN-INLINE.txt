@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/WIN-INLINE（Low）：引号 / 等号 / 括号后的 Windows 盘符绝对路径；行首与 Users 交由 WIN-DRIVE / WIN-USER
+[positive]
+root = "D:\Projects\gitguard\"
+file: E:/work/repo/
+open('C:\Temp\build.log')
+
+[negative]
+D:\projects\gitguard\
+path = D:\Users\alice\app\
+url = https://example.com/D:/work/
+
+[edge]
+hit: WorkingDirectory=(F:\src\app\)
+miss: pattern = [A-Za-z]:\\path\\

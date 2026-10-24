@@ -1,0 +1,14 @@
+﻿; GGD/LOCALPATH/VAR-WWW（Low）：/var/www/<站点>/ Web 部署绝对路径
+[positive]
+DocumentRoot /var/www/gitguard/
+cd /var/www/html/
+conf: /var/www/my-site/public/
+
+[negative]
+/var/www/
+/var/wwwroot/app/
+var/www/app/
+
+[edge]
+hit: "root": "/var/www/vhosts/example/"
+miss: /var/www//html
