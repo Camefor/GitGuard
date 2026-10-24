@@ -1,4 +1,4 @@
-# GitGuard 内置规则集（v0.2：40 条）
+# GitGuard 内置规则集（v1.0 进行中：45 条；目标 60 条）
 # 依据：docs/模块设计/Secret.md §3、Privacy.md §3、LocalPathUrl.md §3；DDD §9 反模式（禁止在检测器代码中写死正则）。
 # 字段说明：
 #   id               规则 ID，必须符合 ^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$（13-开发规范 §4.1）
@@ -110,6 +110,36 @@ rules:
     severity: High
     pattern: '(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{86}==(?![A-Za-z0-9+/=])'
     context_keywords: [accountkey, azure, storage, 存储账户]
+    enabled: true
+
+  - id: GGD/SECRET/DIGITALOCEAN-TOKEN
+    name: DigitalOcean Personal Access Token
+    severity: Critical
+    pattern: '\bdop_v1_[0-9a-f]{64}\b'
+    enabled: true
+
+  - id: GGD/SECRET/HASHICORP-VAULT-TOKEN
+    name: HashiCorp Vault Token
+    severity: Critical
+    pattern: '\bhv[bsr]\.[A-Za-z0-9_-]{24,}\b'
+    enabled: true
+
+  - id: GGD/SECRET/POSTMAN-TOKEN
+    name: Postman API Key
+    severity: High
+    pattern: '\bPMAK-[A-Fa-f0-9]{24}-[A-Fa-f0-9]{34}\b'
+    enabled: true
+
+  - id: GGD/SECRET/SHOPIFY-TOKEN
+    name: Shopify Access Token
+    severity: Critical
+    pattern: '\bshp(?:at|ca|pa|ss)_[A-Fa-f0-9]{32}\b'
+    enabled: true
+
+  - id: GGD/SECRET/PYPI-TOKEN
+    name: PyPI API Token
+    severity: Critical
+    pattern: '\bpypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}\b'
     enabled: true
 
   # ===== Privacy（模块设计 Privacy §3） =====

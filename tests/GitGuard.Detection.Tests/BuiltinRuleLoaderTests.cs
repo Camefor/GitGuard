@@ -8,7 +8,7 @@ using GitGuard.Detection.Rules;
 namespace GitGuard.Detection.Tests;
 
 /// <summary>
-/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 验收项——40 条规则完整载入、ID 契约、严重度映射、
+/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 / GGD-0048 验收项——45 条规则完整载入、ID 契约、严重度映射、
 /// 版本 / 重复 ID / 必填字段 / 正则编译等 FailClosed 行为。
 /// </summary>
 public sealed class BuiltinRuleLoaderTests
@@ -32,6 +32,11 @@ public sealed class BuiltinRuleLoaderTests
         ("GGD/SECRET/SENDGRID-KEY", Severity.High),
         ("GGD/SECRET/HUGGINGFACE-TOKEN", Severity.High),
         ("GGD/SECRET/AZURE-STORAGE-KEY", Severity.High),
+        ("GGD/SECRET/DIGITALOCEAN-TOKEN", Severity.Critical),
+        ("GGD/SECRET/HASHICORP-VAULT-TOKEN", Severity.Critical),
+        ("GGD/SECRET/POSTMAN-TOKEN", Severity.High),
+        ("GGD/SECRET/SHOPIFY-TOKEN", Severity.Critical),
+        ("GGD/SECRET/PYPI-TOKEN", Severity.Critical),
         ("GGD/PRIVACY/CN-IDCARD-18", Severity.High),
         ("GGD/PRIVACY/CN-BANKCARD", Severity.High),
         ("GGD/PRIVACY/CN-MOBILE", Severity.Medium),
@@ -95,11 +100,11 @@ public sealed class BuiltinRuleLoaderTests
     {
         var rules = BuiltinRuleLoader.LoadEmbedded();
 
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "SECRET").Should().HaveCount(16);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "SECRET").Should().HaveCount(21);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "PRIVACY").Should().HaveCount(9);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "LOCALPATH").Should().HaveCount(7);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "URL").Should().HaveCount(8);
-        rules.Should().HaveCount(40);
+        rules.Should().HaveCount(45);
     }
 
     [Fact]

@@ -24,7 +24,7 @@
 | --- | --- | --- | --- |
 | `PolicyEvaluator` | `IAsyncEnumerable<Finding>`（ADR-0003 流式契约） | Finding | 抛 `DetectionException` 由上层 FailClosed |
 
-## 3. 核心规则（内置清单，16 条）
+## 3. 核心规则（内置清单，21 条）
 
 | RuleId | 名称 | 严重度 | 判定要点 |
 | --- | --- | --- | --- |
@@ -44,8 +44,13 @@
 | `GGD/SECRET/SENDGRID-KEY` | SendGrid API Key | High | `SG.` + 22 位 + `.` + 43 位字母数字 / `_` / `-` |
 | `GGD/SECRET/HUGGINGFACE-TOKEN` | Hugging Face Token | High | `hf_` + ≥ 34 位字母数字 |
 | `GGD/SECRET/AZURE-STORAGE-KEY` | Azure Storage Account Key | High | 86 位 Base64 + `==`，且同行含 `accountkey` / `azure` / `storage` / `存储账户` 上下文 |
+| `GGD/SECRET/DIGITALOCEAN-TOKEN` | DigitalOcean Personal Access Token | Critical | `dop_v1_` + 64 位小写十六进制 |
+| `GGD/SECRET/HASHICORP-VAULT-TOKEN` | HashiCorp Vault Token | Critical | `hvs.` / `hvb.` / `hvr.` + ≥24 位字母数字 / `_` / `-` |
+| `GGD/SECRET/POSTMAN-TOKEN` | Postman API Key | High | `PMAK-` + 24 位十六进制 + `-` + 34 位十六进制 |
+| `GGD/SECRET/SHOPIFY-TOKEN` | Shopify Access Token | Critical | `shpat_` / `shpca_` / `shppa_` / `shpss_` + 32 位十六进制 |
+| `GGD/SECRET/PYPI-TOKEN` | PyPI API Token | Critical | `pypi-AgEIcHlwaS5vcmc` + ≥50 位 Base64URL 字符 |
 
-> v0.2 规则升级（GGD-0033）在 MVP 8 条基础上新增 8 条高置信度平台 Token 规则；Azure 存储密钥依赖上下文关键字控制误报。GitleaksAdapter 已作为可选引擎接入（`GGD-0035`），默认关闭，启用后与内置 SECRET 规则并行检测并按指纹去重。
+> v0.2 规则升级（GGD-0033）在 MVP 8 条基础上新增 8 条高置信度平台 Token 规则；Azure 存储密钥依赖上下文关键字控制误报。v1.0 第一批（`GGD-0048`）再新增 5 条带固定前缀的高置信度平台 Token 规则，降低对弱启发式的依赖。GitleaksAdapter 已作为可选引擎接入（`GGD-0035`），默认关闭，启用后与内置 SECRET 规则并行检测并按指纹去重。
 
 ## 4. 外部依赖
 
@@ -75,7 +80,7 @@ flowchart LR
 **关键细节**：
 
 - 文件后缀过滤：`.lock`、`.min.js`、`.min.css` 整文件跳过；二进制文件过滤由上游差异收集（`FR-020`）承担。
-- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY` 及新增的 Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face 平台 Token 规则；跳过 `GENERIC-PASSWORD` / `AWS-SECRET` / `AZURE-STORAGE-KEY` 这类低置信度或依赖上下文的规则）。自定义 `USR/SECRET/*` 规则由用户显式声明，视为高置信度，超长行不跳过（`GGD-0034`）。
+- 行长 > 2048 字符的行按「可能是 minified」处理，仅做高置信度规则（`AWS-AKID` / `GITHUB-TOKEN` / `SLACK-TOKEN` / `PRIVATE-KEY` 及新增的 Google / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face / DigitalOcean / HashiCorp Vault / Postman / Shopify / PyPI 平台 Token 规则；跳过 `GENERIC-PASSWORD` / `AWS-SECRET` / `AZURE-STORAGE-KEY` 这类低置信度或依赖上下文的规则）。自定义 `USR/SECRET/*` 规则由用户显式声明，视为高置信度，超长行不跳过（`GGD-0034`）。
 - 熵值用来辅助判定 `AWS-SECRET`：仅在 Shannon 熵 > 4.0 时命中。
 
 ## 7. 配置项
@@ -98,7 +103,7 @@ flowchart LR
 
 ## 9. 测试要点
 
-- [x] 每条规则 ≥ 3 条 positive + 3 条 negative（`BuiltinRuleFixtureTests`，16 条 Secret 规则全覆盖）。
+- [x] 每条规则 ≥ 3 条 positive + 3 条 negative（`BuiltinRuleFixtureTests`，21 条 Secret 规则全覆盖）。
 - [x] `TC-FR-021-S-*` 测试全部通过。
 - [ ] ReDoS 用例集对正则进行回溯测试。
 - [x] GitleaksAdapter（`GGD-0035`）契约测试：Mock 子进程映射 / 行号还原 / 禁用规则 / 缺失报告 / 非法 JSON / 路径逃逸 / 临时目录清理（`GitleaksAdapterTests`），以及探测、路径定位与进程超时（`GitleaksProbeTests` / `GitleaksExecutableLocatorTests` / `GitleaksProcessRunnerTests`）。
@@ -124,3 +129,4 @@ flowchart LR
 | 0.1.4 | 2026-10-22 | GGD-0033：规则库扩充至 16 条 Secret 规则（新增 Google API Key / Stripe / npm / GitLab / OpenAI / SendGrid / Hugging Face / Azure Storage Key）；§6 长行高置信度规则集同步扩充；§9 勾选样本覆盖项 |
 | 0.1.5 | 2026-10-22 | GGD-0034：§6 明确自定义 `USR/SECRET/*` 规则视为高置信度，超长行不跳过（`SecretDetector` 按 `RuleSource.User` 保持求值） |
 | 0.1.6 | 2026-10-22 | GGD-0035：GitleaksAdapter 由扩展位转为已实现可选引擎——§1 / §2 / §3 / §4 去除 P2 表述并补充启动期降级与扫描期 FailClosed 语义；§7 明确 `gitleaks_path` 支持 `~`、PATH 查找与空白值 FailClosed；§9 勾选契约测试；§10 标注 v0.2 接入 |
+| 0.1.7 | 2026-10-24 | GGD-0048：§3 规则库扩充至 21 条（新增 DigitalOcean / HashiCorp Vault / Postman / Shopify / PyPI）；§6 长行高置信度规则集同步扩充；§9 样本覆盖更新为 21 条 |

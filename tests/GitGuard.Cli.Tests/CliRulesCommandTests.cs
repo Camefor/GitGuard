@@ -56,8 +56,8 @@ public sealed class CliRulesCommandTests
         using var document = JsonDocument.Parse(harness.Output);
         JsonElement root = document.RootElement;
         root.GetProperty("schema").GetString().Should().Be("gitguard.rules.list.v1");
-        root.GetProperty("total").GetInt32().Should().Be(16);
-        root.GetProperty("count").GetInt32().Should().Be(16);
+        root.GetProperty("total").GetInt32().Should().Be(21);
+        root.GetProperty("count").GetInt32().Should().Be(21);
         root.GetProperty("category").GetString().Should().Be("SECRET");
         root.GetProperty("enabled_only").GetBoolean().Should().BeTrue();
         JsonElement first = root.GetProperty("rules").EnumerateArray().First();
@@ -78,7 +78,7 @@ public sealed class CliRulesCommandTests
         exitCode.Should().Be(ExitCodes.SUCCESS);
         using var document = JsonDocument.Parse(harness.Output);
         JsonElement root = document.RootElement;
-        root.GetProperty("total").GetInt32().Should().Be(17);
+        root.GetProperty("total").GetInt32().Should().Be(22);
         JsonElement custom = root.GetProperty("rules").EnumerateArray()
             .Single(rule => rule.GetProperty("rule_id").GetString() == CUSTOM_RULE_ID);
         custom.GetProperty("source").GetString().Should().Be("User");
@@ -225,6 +225,6 @@ public sealed class CliRulesCommandTests
         finding.GetProperty("rule_id").GetString().Should().Be(CUSTOM_RULE_ID);
         finding.GetProperty("severity").GetString().Should().Be("Critical");
         document.RootElement.GetProperty("summary").GetProperty("rules_evaluated").GetInt32()
-            .Should().Be(41, "内置 40 条 + 自定义 1 条");
+            .Should().Be(46, "内置 45 条 + 自定义 1 条");
     }
 }
