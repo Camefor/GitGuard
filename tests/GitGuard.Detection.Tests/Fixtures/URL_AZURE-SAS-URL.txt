@@ -1,0 +1,14 @@
+﻿; GGD/URL/AZURE-SAS-URL（High）：Azure 存储 SAS URL，需同时包含 sv 日期版本与 sig 签名
+[positive]
+https://account.blob.core.windows.net/container/blob?sv=2024-11-04&sp=r&sig={{BASE64:32}}%3D
+https://account.queue.core.windows.net/queue?sv=2023-08-03&sig={{ALNUM:24}}
+url = "https://account.dfs.core.windows.net/fs?se=2026-12-31T00:00:00Z&sv=2022-11-02&sr=c&sig={{BASE64:40}}%3D"
+
+[negative]
+https://account.blob.core.windows.net/c/b?sv=2024-11-04&sig=
+https://account.blob.core.windows.net/c/b?sig={{ALNUM:24}}
+https://account.blob.core.windows.net/c/b?sv=latest&sig={{ALNUM:24}}
+
+[edge]
+hit: SAS=https://account.blob.core.windows.net/c/b?sp=r&sv=2025-01-05&sig={{ALNUM:32}}
+miss: https://account.blob.core.windows.net/c/b?sv=2024-11-04&sig={{ALNUM:8}}

@@ -1,0 +1,14 @@
+﻿; GGD/URL/FEISHU-WEBHOOK（High）：open.feishu.cn 自定义机器人 Webhook（UUID 令牌）
+[positive]
+https://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:8}}-{{HEX:4}}-{{HEX:4}}-{{HEX:4}}-{{HEX:12}}
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:8}}-{{HEX:4}}-{{HEX:4}}-{{HEX:4}}-{{HEX:12}}"
+FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:8}}-{{HEX:4}}-{{HEX:4}}-{{HEX:4}}-{{HEX:12}}
+
+[negative]
+https://open.feishu.cn/open-apis/bot/v2/hook/not-a-valid-token
+http://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:8}}-{{HEX:4}}-{{HEX:4}}-{{HEX:4}}-{{HEX:12}}
+https://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:32}}
+
+[edge]
+hit: curl -X POST "https://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:8}}-{{HEX:4}}-{{HEX:4}}-{{HEX:4}}-{{HEX:12}}"
+miss: https://open.feishu.cn/open-apis/bot/v2/hook/{{HEX:8}}-{{HEX:4}}-{{HEX:4}}-{{HEX:4}}

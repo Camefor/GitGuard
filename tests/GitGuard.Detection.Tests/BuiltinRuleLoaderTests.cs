@@ -8,7 +8,7 @@ using GitGuard.Detection.Rules;
 namespace GitGuard.Detection.Tests;
 
 /// <summary>
-/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 / GGD-0048 / GGD-0049 / GGD-0050 验收项——55 条规则完整载入、ID 契约、严重度映射、
+/// 内置规则加载器测试：覆盖 GGD-0006 / GGD-0033 / GGD-0048 / GGD-0049 / GGD-0050 / GGD-0051 验收项——60 条规则完整载入、ID 契约、严重度映射、
 /// 版本 / 重复 ID / 必填字段 / 正则编译等 FailClosed 行为。
 /// </summary>
 public sealed class BuiltinRuleLoaderTests
@@ -71,6 +71,11 @@ public sealed class BuiltinRuleLoaderTests
         ("GGD/URL/DISCORD-WEBHOOK", Severity.High),
         ("GGD/URL/PASSWORD-QUERY", Severity.High),
         ("GGD/URL/AWS-SIGNED-URL", Severity.High),
+        ("GGD/URL/GCP-SIGNED-URL", Severity.High),
+        ("GGD/URL/AZURE-SAS-URL", Severity.High),
+        ("GGD/URL/DB-URL-CREDENTIALS", Severity.High),
+        ("GGD/URL/OAUTH-REFRESH-TOKEN", Severity.High),
+        ("GGD/URL/FEISHU-WEBHOOK", Severity.High),
     ];
 
     [Fact]
@@ -113,8 +118,8 @@ public sealed class BuiltinRuleLoaderTests
         rules.Where(rule => rule.RuleId.Split('/')[1] == "SECRET").Should().HaveCount(21);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "PRIVACY").Should().HaveCount(14);
         rules.Where(rule => rule.RuleId.Split('/')[1] == "LOCALPATH").Should().HaveCount(12);
-        rules.Where(rule => rule.RuleId.Split('/')[1] == "URL").Should().HaveCount(8);
-        rules.Should().HaveCount(55);
+        rules.Where(rule => rule.RuleId.Split('/')[1] == "URL").Should().HaveCount(13);
+        rules.Should().HaveCount(60);
     }
 
     [Fact]

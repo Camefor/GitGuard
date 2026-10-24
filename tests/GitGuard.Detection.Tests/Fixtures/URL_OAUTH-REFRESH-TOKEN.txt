@@ -1,0 +1,14 @@
+﻿; GGD/URL/OAUTH-REFRESH-TOKEN（High）：URL 查询或片段中的 refresh_token 参数
+[positive]
+https://app.example.com/callback#refresh_token={{ALNUM:32}}
+https://app.example.com/auth?refresh_token={{ALNUM:24}}&scope=offline
+token_url=https://auth.example.com/token?refresh_token={{ALNUM:40}}
+
+[negative]
+https://app.example.com/callback#error=access_denied
+https://app.example.com/auth?refresh_token=
+https://app.example.com/auth?refresh_token={{ALNUM:8}}
+
+[edge]
+hit: "refresh_uri": "https://auth.example.com/o/token?client_id=web&refresh_token={{ALNUM:32}}"
+miss: refresh_token={{ALNUM:32}}

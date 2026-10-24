@@ -4,9 +4,9 @@
 
 面向开发者的本地 Git 敏感信息防泄漏工具：在 `git commit` 与 `git push` 前通过 Hook 拦截 Token、密钥、密码、手机号、本地路径、内网 URL 等敏感信息。所有扫描与审计均在本机完成，不上传任何数据。
 
-## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 功能开发完成，v1.0 开发中，2026-10-24）
+## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 功能开发完成，v1.0 开发中，2026-10-25）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、内置规则库、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。v1.0 已启动，内置规则库扩充至 55 条（第一批 Secret 规则 `GGD-0048`、第二批 Privacy 规则 `GGD-0049`、第三批 LocalPath 规则 `GGD-0050` 已落地），目标 60 条。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、内置规则库、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。v1.0 已启动，内置规则库扩充至 60 条（第一批 Secret 规则 `GGD-0048`、第二批 Privacy 规则 `GGD-0049`、第三批 LocalPath 规则 `GGD-0050`、第四批 Url 规则 `GGD-0051` 已落地），v1.0 规则库目标已达成。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -24,7 +24,7 @@
 - 基线文件：`scan --all --baseline <path>` 生成 `gitguard.baseline.v1`，后续全量扫描自动消费 `.gitguard-baseline.json`，历史噪声不阻断但保留在报告中
 - `gitguard audit list` / `audit view` / `audit export`：本地审计查询（分页 / 时间 / 结果筛选）、单次运行摘要与 Finding 明细、脱敏 JSON / CSV 导出
 - `gitguard allowlist add` / `remove` / `list`：按规则 / 路径 / 指纹管理 SQLite 白名单（无需 Git 仓库）
-- 55 条内置规则：Secret 21 / Privacy 14 / LocalPath 12 / Url 8（每条规则均含正反例夹具；v1.0 目标 60 条）
+- 60 条内置规则：Secret 21 / Privacy 14 / LocalPath 12 / Url 13（每条规则均含正反例夹具）
 - 自定义正则规则：`.gitguard.yml` 的 `rules.custom` 支持命名、严重度、上下文关键字与文件 glob；`gitguard rules list` / `view` 只读查看规则目录
 - 可选 Gitleaks 引擎：`rules.secrets.use_gitleaks: true` + `gitleaks_path` 接入外部 Gitleaks 8.x，命中映射为 `GLK/SECRET/*` 并与内置规则按指纹去重；可执行文件缺失时告警降级，不阻断扫描
 - 文本 / JSON 报告、严重度策略、配置文件 + SQLite 白名单、`exclude` 路径排除
@@ -407,7 +407,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1710 用例（1701 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1750 用例（1741 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 七类测试作业（Core / Detection / Infrastructure / Application / CLI / Desktop / E2E）；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；Windows MSIX 打包 + 发行冒烟（`desktop-package-smoke` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)

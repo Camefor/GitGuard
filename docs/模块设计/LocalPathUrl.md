@@ -51,6 +51,11 @@
 | `GGD/URL/DISCORD-WEBHOOK` | Discord Webhook URL | High | `https://discord.com` / `discordapp.com` / `canary` / `ptb` 的 `/api/webhooks/<id>/<token>` |
 | `GGD/URL/PASSWORD-QUERY` | 查询参数含密码 | High | 查询参数 `password` / `passwd` / `pwd` / `secret` 且值非空 |
 | `GGD/URL/AWS-SIGNED-URL` | AWS 预签名 URL | High | `X-Amz-Signature=` 或 `X-Amz-Credential=` 查询参数 |
+| `GGD/URL/GCP-SIGNED-URL` | Google Cloud 签名 URL | High | `X-Goog-Signature=` 或 `X-Goog-Credential=` 查询参数 |
+| `GGD/URL/AZURE-SAS-URL` | Azure SAS 令牌 URL | High | 同时含 `sv=YYYY-MM-DD` 与 `sig=`（≥16 字符），参数顺序不限 |
+| `GGD/URL/DB-URL-CREDENTIALS` | 数据库 URL 内嵌凭据 | High | `mysql` / `mariadb` / `postgres(ql)` / `mongodb(+srv)` / `redis(s)` / `amqp(s)` / `mssql` / `sqlserver` 的 `://user:pass@` |
+| `GGD/URL/OAUTH-REFRESH-TOKEN` | OAuth 刷新令牌 URL 参数 | High | `?` / `&` / `#` 后的 `refresh_token=`（值 ≥16 字符） |
+| `GGD/URL/FEISHU-WEBHOOK` | 飞书 Webhook URL | High | `open.feishu.cn/open-apis/bot/v2/hook/<UUID>` |
 
 **降级策略**：
 
@@ -111,7 +116,7 @@ flowchart LR
 - [x] Windows / Unix 路径分别覆盖。
 - [x] 文档文件（`.gitignore` / `README.md` / `docs/**`）中 Low 规则不命中。
 - [x] URL 带 Token 的脱敏输出不含原 Token。
-- [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，12 条 LocalPath + 8 条 Url 规则全覆盖）。
+- [x] 每条规则 ≥3 正例 / ≥3 反例 / 边界命中与不命中各 ≥1（`BuiltinRuleFixtureTests`，12 条 LocalPath + 13 条 Url 规则全覆盖）。
 - [x] 公共 URL 主机白名单（GGD-0039）：精确 / 通配主机抑制、大小写与端口无关、仅关联最近的前置 URL；配置加载期规范化与非法项 FailClosed（`DetectorTests` / `GitGuardConfigLoaderTests` / `CliScanCommandTests`）。
 - [x] Markdown 围栏代码块感知（GGD-0040）：围栏内 Low / Medium 路径均不产出 Finding、围栏外仍命中；反引号 / 波浪线围栏、≤3 空格缩进、闭合长度、未闭合围栏、`~~` 不闭合；跨差异缺口保守回落；非 Markdown 文件与 Url 检测器不受影响（`DetectorTests` / `CliScanCommandTests`）。
 
@@ -120,6 +125,7 @@ flowchart LR
 - 项目级自定义 IP / 路径白名单（P2）。
 - 更丰富的内网域名识别（`*.k8s.local` 等）。
 - v1.0 已补 macOS 挂载卷、root 主目录、Web 部署目录、Cygwin 盘符与 Windows 行内盘符路径（`GGD-0050`），后续可按真实项目误报数据继续细分平台路径。
+- v1.0 已补 Google Cloud / Azure 签名 URL、数据库 URL 内嵌凭据、OAuth 刷新令牌与飞书 Webhook（`GGD-0051`），云厂商签名参数与 IM Webhook 可按需继续扩展。
 
 ## 11. 变更记录
 
@@ -131,3 +137,4 @@ flowchart LR
 | 0.1.3 | 2026-10-23 | GGD-0039：实现 `rules.url.public_hostname_whitelist`（§3.2 / §6 / §7 / §9）——精确主机与 `*.` 通配、大小写不敏感、按命中位置最近的 URL 解析主机并抑制 Finding；默认空列表不改变行为；Markdown 代码块感知仍为 P2 |
 | 0.1.4 | 2026-10-23 | GGD-0040：实现 Markdown 围栏代码块感知（§1 / §3.1 / §6 / §9）——`.md` / `.markdown` 中围栏内行跳过 LocalPath 规则；支持反引号 / 波浪线、≤3 空格缩进与闭合长度校验；unified-0 跨差异缺口保守回落为正常检测；仅作用于 LocalPath，Url 与白名单行为不变 |
 | 0.1.5 | 2026-10-24 | GGD-0050：LocalPath 扩充至 12 条（MAC-VOLUME / ROOT-HOME / VAR-WWW / CYGWIN-DRIVE / WIN-INLINE），§3.1 / §9 / §10 同步；Url 规则保持 8 条 |
+| 0.1.6 | 2026-10-25 | GGD-0051：Url 扩充至 13 条（GCP-SIGNED-URL / AZURE-SAS-URL / DB-URL-CREDENTIALS / OAUTH-REFRESH-TOKEN / FEISHU-WEBHOOK），§3.2 / §9 / §10 同步 |

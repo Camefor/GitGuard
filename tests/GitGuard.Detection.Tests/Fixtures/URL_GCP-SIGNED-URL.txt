@@ -1,0 +1,14 @@
+﻿; GGD/URL/GCP-SIGNED-URL（High）：查询参数 X-Goog-Signature / X-Goog-Credential
+[positive]
+https://storage.googleapis.com/bucket/object?X-Goog-Signature={{HEX:64}}
+https://storage.googleapis.com/bucket/o?X-Goog-Credential={{ALNUM:16}}%2F20261025%2Fauto%2Fstorage%2Fgoog4_request
+url = "https://cdn.example.com/file?X-Goog-Signature={{HEX:32}}&X-Goog-Expires=3600"
+
+[negative]
+https://storage.googleapis.com/bucket/o?X-Goog-Date=20261025T000000Z
+https://storage.googleapis.com/bucket/o?x-goog-signature={{HEX:64}}
+X-Goog-Signature={{HEX:64}}
+
+[edge]
+hit: "download": "https://storage.googleapis.com/b/o?X-Goog-Signature={{HEX:64}}"
+miss: https://storage.googleapis.com/b/o?X-Goog-Signature=

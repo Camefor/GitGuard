@@ -7,7 +7,7 @@ namespace GitGuard.Detection.Tests;
 
 /// <summary>
 /// 内置规则样本测试（GGD-0006 验收）：逐行驱动目标规则所属检测器，
-/// 断言「命中 / 不命中」与设计一致，并校验 55 条规则样本覆盖度（每规则 ≥3 正 / ≥3 负）。
+/// 断言「命中 / 不命中」与设计一致，并校验 60 条规则样本覆盖度（每规则 ≥3 正 / ≥3 负）。
 /// </summary>
 public sealed class BuiltinRuleFixtureTests
 {

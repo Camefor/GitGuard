@@ -225,6 +225,6 @@ public sealed class CliRulesCommandTests
         finding.GetProperty("rule_id").GetString().Should().Be(CUSTOM_RULE_ID);
         finding.GetProperty("severity").GetString().Should().Be("Critical");
         document.RootElement.GetProperty("summary").GetProperty("rules_evaluated").GetInt32()
-            .Should().Be(56, "内置 55 条 + 自定义 1 条");
+            .Should().Be(61, "内置 60 条 + 自定义 1 条");
     }
 }

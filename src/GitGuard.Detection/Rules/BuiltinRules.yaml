@@ -1,4 +1,4 @@
-# GitGuard 内置规则集（v1.0 进行中：45 条；目标 60 条）
+# GitGuard 内置规则集（v1.0 进行中：60 条；目标 60 条）
 # 依据：docs/模块设计/Secret.md §3、Privacy.md §3、LocalPathUrl.md §3；DDD §9 反模式（禁止在检测器代码中写死正则）。
 # 字段说明：
 #   id               规则 ID，必须符合 ^(GGD|USR|GLK)/[A-Z]+/[A-Z0-9_-]+$（13-开发规范 §4.1）
@@ -361,4 +361,34 @@ rules:
     name: AWS 预签名 URL
     severity: High
     pattern: '[?&]X-Amz-(?:Signature|Credential)=([^&\s]+)'
+    enabled: true
+
+  - id: GGD/URL/GCP-SIGNED-URL
+    name: Google Cloud 签名 URL
+    severity: High
+    pattern: '[?&]X-Goog-(?:Signature|Credential)=[^&\s#]+'
+    enabled: true
+
+  - id: GGD/URL/AZURE-SAS-URL
+    name: Azure SAS 令牌 URL
+    severity: High
+    pattern: '[?&]sv=[0-9]{4}-[0-9]{2}-[0-9]{2}[^#\s"'']*?[?&]sig=[A-Za-z0-9%+/=]{16,}(?:&|$|[\s")])|[?&]sig=[A-Za-z0-9%+/=]{16,}[^#\s"'']*?[?&]sv=[0-9]{4}-[0-9]{2}-[0-9]{2}(?:&|$|[\s")])'
+    enabled: true
+
+  - id: GGD/URL/DB-URL-CREDENTIALS
+    name: 数据库 URL 内嵌凭据
+    severity: High
+    pattern: '(?i)\b(?:mysql|mariadb|postgres(?:ql)?|mongodb(?:\+srv)?|redis|rediss|amqp|amqps|mssql|sqlserver)://[^/\s:@]+:[^@\s/]+@'
+    enabled: true
+
+  - id: GGD/URL/OAUTH-REFRESH-TOKEN
+    name: OAuth 刷新令牌 URL 参数
+    severity: High
+    pattern: '[?&#]refresh_token=[A-Za-z0-9._~+/=-]{16,}'
+    enabled: true
+
+  - id: GGD/URL/FEISHU-WEBHOOK
+    name: 飞书 Webhook URL
+    severity: High
+    pattern: 'https://open\.feishu\.cn/open-apis/bot/v2/hook/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}'
     enabled: true
