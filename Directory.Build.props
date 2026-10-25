@@ -16,7 +16,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- 产品版本（06-API接口设计 §2 SemVer）：写入程序集、version 命令、Hook 标记行与审计 gitguard_version，须与 docs 变更记录一致 -->
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <!-- ADR-0002：Native AOT 为发行形态，非桌面端项目从骨架期起保持 trim-safe 分析 -->

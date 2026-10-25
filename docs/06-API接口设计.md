@@ -127,7 +127,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 {
   "schema": "gitguard.install.v1",
   "repo_path": "C:/Users/rushe/myproject",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "hooks": [
     {
       "hook": "pre-commit",
@@ -152,7 +152,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 {
   "schema": "gitguard.status.v1",
   "repo_path": "C:/Users/rushe/myproject",
-  "gitguard_version": "0.1.0",
+  "gitguard_version": "1.0.0",
   "git_version": "git version 2.53.0.windows.2",
   "configured_hooks_path": null,
   "hooks_directory": "C:/Users/rushe/myproject/.git/hooks",
@@ -179,7 +179,7 @@ JSON 走 stdout，为**单行紧凑格式**（无缩进；下方示例为便于�
 ```json
 {
   "schema": "gitguard.version.v1",
-  "gitguard_version": "0.1.0",
+  "gitguard_version": "1.0.0",
   "rules_version": 1,
   "git_version": "git version 2.53.0.windows.2",
   "git_failure": null,
@@ -638,3 +638,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.9 | 2026-10-22 | GGD-0034：§4.11 新增 `gitguard.rules.list.v1` / `gitguard.rules.view.v1` Schema（默认隐藏 `pattern`，`--show-pattern` 才输出）；§5.7 重写 `rules list` / `view` 选项、筛选与过滤语义、无仓库可用与退出码 7 / 40；§6 退出码 40 转为已使用 |
 | 0.1.10 | 2026-10-22 | GGD-0036：§4.8 注册 `audit view <run-id>`；§4.9 新增 `gitguard.audit.view.v1` Schema（`run` 对象 + `findings` 数组，字段与列表 / 导出一致）；§5.6 补充 `view` 选项、输出分流与退出码 7 / 14 / 30；§6 退出码 30 转为已使用 |
 | 0.1.11 | 2026-10-23 | GGD-0038：§5.1 `install` 缺省按 `hooks.*` 注册子集（显式 `--hook` 优先）、`gitguard_executable_path` 覆盖脚本路径、全禁用 / 路径不存在 → 13；§5.4 新增隐藏选项 `--hook-mode` 与 `scan.pre_commit` / `scan.pre_push` 跳过语义（不产生 ScanRun，pre-commit 仍写非绕过标记） |
+| 0.1.12 | 2026-10-25 | GGD-0053：§4.5 / §4.6 JSON 示例版本号同步为 1.0.0（契约字段不变） |

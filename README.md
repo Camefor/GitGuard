@@ -4,9 +4,9 @@
 
 面向开发者的本地 Git 敏感信息防泄漏工具：在 `git commit` 与 `git push` 前通过 Hook 拦截 Token、密钥、密码、手机号、本地路径、内网 URL 等敏感信息。所有扫描与审计均在本机完成，不上传任何数据。
 
-## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 功能开发完成，v1.0 开发中，2026-10-25）
+## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 功能开发完成，v1.0 发布基线就绪，2026-10-25）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、内置规则库、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。v1.0 已启动，内置规则库扩充至 60 条（第一批 Secret 规则 `GGD-0048`、第二批 Privacy 规则 `GGD-0049`、第三批 LocalPath 规则 `GGD-0050`、第四批 Url 规则 `GGD-0051` 已落地），v1.0 规则库目标已达成。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、内置规则库、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。v1.0 已启动，内置规则库扩充至 60 条（第一批 Secret 规则 `GGD-0048`、第二批 Privacy 规则 `GGD-0049`、第三批 LocalPath 规则 `GGD-0050`、第四批 Url 规则 `GGD-0051` 已落地），v1.0 规则库目标已达成。v1.0 发布基线（`GGD-0053`）已完成：版本号冻结为 1.0.0，Windows CLI / MSIX 发行冒烟已在本机通过，详见 [docs/20-v1.0发行说明.md](docs/20-v1.0发行说明.md)；macOS / Linux 原生冒烟与 3 个月稳定运行观察仍待完成。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -34,7 +34,7 @@
 
 尚未自动验证（不阻塞开发）：
 
-- macOS DMG / Linux AppImage 需由首次 Release 流水线在对应 runner 上确认；Windows MSIX 已在本机完成 CLI 审计 → 桌面端读取 / 导出的发行冒烟。
+- macOS DMG / Linux AppImage 需由首次 Release 流水线在对应 runner 上确认；Windows CLI 发行 zip / `SHA256SUMS` 与 MSIX 已在本机完成版本冒烟及 CLI 审计 → 桌面端读取 / 导出的发行冒烟。
 
 ## 快速开始（从源码构建）
 
@@ -430,5 +430,6 @@ dotnet test GitGuard.sln
 - CLI 命令契约：[docs/06-API接口设计.md](docs/06-API接口设计.md)
 - 发行与分发：[docs/14-部署文档.md](docs/14-部署文档.md)
 - 误报治理：[docs/19-误报治理指南.md](docs/19-误报治理指南.md)
+- v1.0 发行说明：[docs/20-v1.0发行说明.md](docs/20-v1.0发行说明.md)
 - 文档索引与导航：[docs/README.md](docs/README.md)
 - Agent 工作指南与任务台账：[docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md)
