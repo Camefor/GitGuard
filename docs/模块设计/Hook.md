@@ -6,7 +6,7 @@
 - **所属限界上下文**：Scanning Context
 - **承担 FR**：`FR-010, FR-011, FR-012, FR-030, FR-050`
 - **承担 DR**：`DR-04`（PreCommit 必须从 `git diff --cached` 取数据）、`DR-05`（不覆盖已有 Hook）、`DR-06`（绕过留痕）
-- **关联 ADR**：`ADR-0004`（Hook 分发器方案，待新增）
+- **关联 ADR**：`ADR-0004`（Hook 分发器方案）
 
 ## 2. 输入输出契约
 
@@ -286,3 +286,4 @@ GUARD_EXIT=0
 | 0.1.4 | 2026-10-21 | 与 GGD-0021 实现同步：§7 模板新增 POSIX sh 备份的 `$0` 保留执行（Husky `.husky/_/h` 按 `$0` 推导目标 Hook），要点表补对应说明；§10 勾选 TC-COMPAT-01~04（Husky / lefthook / pre-commit 真实安装矩阵） |
 | 0.1.5 | 2026-10-22 | GGD-0017：§5 待提交标记的 Git 目录解析由 `rev-parse --absolute-git-dir`（Git ≥ 2.13）改为 `rev-parse --git-dir` + 绝对化，兼容 Git 2.9 起版本 |
 | 0.1.6 | 2026-10-23 | GGD-0038：§6.2/§6.3/§7 分发脚本补 `--hook-mode`；§8 `hooks.*` 由规划 Schema 改为已接线（安装期子集注册 + 可执行文件路径覆盖 + 全禁用退出码 13），补运行期 `scan.pre_commit` / `scan.pre_push` 语义 |
+| 0.1.7 | 2026-10-25 | GGD-0052：§1 关联 ADR-0004 由「待新增」更正为已生效 |

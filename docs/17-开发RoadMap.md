@@ -84,7 +84,7 @@
   - [x] 规则库 ≥ 60 条（当前 60，`GGD-0048` / `GGD-0049` / `GGD-0050` / `GGD-0051` 已完成）。
   - [ ] 连续稳定运行 3 个月（2026-10-24 ~ 2027-01-24）且无 P0 Bug（用户验收）。
   - [ ] 三平台发行冒烟通过（承接 v0.3，待首次 Release runner 验证）。
-  - [ ] 文档稳定：规则清单 / README / 误报治理指南与实现一致，无失效链接。
+  - [x] 文档稳定：规则清单 / README / 误报治理指南与实现一致，无失效链接（`GGD-0052` 已完成）。
 
 ## 3. 任务分解
 
@@ -125,7 +125,7 @@
 | 4 | `GGD-0049` | 规则库扩充第二批：Privacy 9→14（IBAN / US-PHONE / UK-NINO / CN-LICENSE-PLATE / DATE-OF-BIRTH，已完成） | P1 | 2d |
 | 4 | `GGD-0050` | 规则库扩充第三批：LocalPath 7→12（MAC-VOLUME / ROOT-HOME / VAR-WWW / CYGWIN-DRIVE / WIN-INLINE，已完成） | P2 | 1d |
 | 4 | `GGD-0051` | 规则库扩充第四批：Url 8→13（GCP-SIGNED-URL / AZURE-SAS-URL / DB-URL-CREDENTIALS / OAUTH-REFRESH-TOKEN / FEISHU-WEBHOOK，已完成） | P2 | 1d |
-| 4 | `GGD-0052` | v1.0 文档稳定化：规则清单、README、误报治理指南、链接与版本一致性 | P2 | 2d |
+| 4 | `GGD-0052` | v1.0 文档稳定化：规则清单、README、误报治理指南、链接与版本一致性（已完成） | P2 | 2d |
 | 4 | `GGD-0053` | v1.0 发布基线：版本号 1.0.0、发行说明、三平台产物回归 | P1 | 2d |
 
 ## 4. 里程碑
@@ -196,3 +196,4 @@ flowchart LR
 | 0.1.28 | 2026-10-24 | GGD-0049 完成：Privacy 规则 9→14（IBAN / US-PHONE / UK-NINO / CN-LICENSE-PLATE / DATE-OF-BIRTH），新增 `iban-checksum` 校验器与 5 个夹具文件 40 个用例，规则库 45→50，§2.4 当前进度与 §3 任务表同步 |
 | 0.1.29 | 2026-10-24 | GGD-0050 完成：LocalPath 规则 7→12（MAC-VOLUME / ROOT-HOME / VAR-WWW / CYGWIN-DRIVE / WIN-INLINE），新增 5 个夹具文件 40 个用例，规则库 50→55，§2.4 当前进度与 §3 任务表同步 |
 | 0.1.30 | 2026-10-25 | GGD-0051 完成：Url 规则 8→13（GCP-SIGNED-URL / AZURE-SAS-URL / DB-URL-CREDENTIALS / OAUTH-REFRESH-TOKEN / FEISHU-WEBHOOK），新增 5 个夹具文件 40 个用例，规则库 55→60，§2.4 退出条件「规则库 ≥ 60 条」达成，§3 任务表同步 |
+| 0.1.31 | 2026-10-25 | GGD-0052 完成：文档稳定化——规则清单与 `BuiltinRules.yaml` 一致（60 条，21 / 14 / 12 / 13）、相对链接审计通过；`docs/README.md` 阶段基线、模块导航与 ADR-0004 链接更新；CONTEXT 当前阶段 / Gitleaks 集成状态更正；§2.4 退出条件「文档稳定」达成，§3 任务表同步 |
