@@ -51,7 +51,7 @@ internal static class UninstallCommand
             return UsageError.Report(runtime, hookError);
         }
 
-        HookUninstallReport report = runtime.Session.CreateUninstall().Execute(force, hooks);
+        HookUninstallReport report = runtime.Session.CreateHookManagementService().Uninstall(force, hooks);
         bool notInstalled = report.Results.All(static result => result.Disposition == HookUninstallDisposition.NotInstalled);
 
         runtime.Writer.WriteUninstall(report, notInstalled);

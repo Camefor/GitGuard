@@ -311,6 +311,20 @@ public sealed class GitGuardSession
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
     public UninstallHookUseCase CreateUninstall() => new UninstallHookUseCase(GitAccess, AuditStore, _clock, Version);
 
+    /// <summary>
+    /// 装配共享 Hook 管理服务（GGD-0054）：CLI 与桌面端复用同一套配置子集选择、可执行文件解析与安装 / 卸载语义。
+    /// <c>hooks</c> 设置惰性读取，卸载操作不要求配置文件可加载。
+    /// </summary>
+    /// <returns>已接线的共享 Hook 管理服务。</returns>
+    /// <exception cref="GitException">当前工作目录不构成 Git 仓库。</exception>
+    /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
+    public HookManagementService CreateHookManagementService() =>
+        new HookManagementService(
+            CreateInstall(),
+            CreateUninstall(),
+            new HookExecutableResolver(_options.WorkingDirectory),
+            () => Config.Hooks);
+
     /// <summary>装配审计列表用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
     /// <returns>已接线的列表用例。</returns>
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>

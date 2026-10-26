@@ -1,6 +1,4 @@
 ﻿using System.CommandLine;
-using GitGuard.Application.Composition;
-using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
 using GitGuard.Cli.Localization;
 using GitGuard.Cli.Logging;
@@ -56,17 +54,11 @@ internal static class InstallCommand
             return UsageError.Report(runtime, hookError);
         }
 
-        GitGuardConfig config = runtime.Session.Config;
-        hooks ??= ResolveConfiguredHooks(config.Hooks);
-        if (hooks.Count == 0)
-        {
-            throw new ConfigurationException(
-                "hooks 段已禁用全部 Hook（pre_commit / pre_push / post_commit_bypass_detection 均为 false），无可安装项；"
-                + "请调整配置或使用 --hook 显式指定");
-        }
-
-        string executablePath = ResolveExecutablePath(runtime, config.Hooks.ExecutablePath);
-        HookInstallReport report = runtime.Session.CreateInstall().Execute(executablePath, force, hooks);
+        HookManagementService hookService = runtime.Session.CreateHookManagementService();
+        IReadOnlyList<HookType> targets = hookService.ResolveHooks(hooks);
+        string executablePath = hookService.ResolveExecutablePath(runtime.Host.ExecutablePath ?? CliHost.ResolveExecutablePath())
+            ?? throw new ConfigurationException("无法确定 GitGuard 可执行文件路径，请配置 hooks.gitguard_executable_path。");
+        HookInstallReport report = hookService.Install(executablePath, force, targets);
 
         runtime.Writer.WriteInstall(report);
         runtime.Logger.Log(
@@ -75,47 +67,5 @@ internal static class InstallCommand
             runtime.Text.Get(CliTextKey.LogHookInstalled),
             new LogFields { RepoPath = report.RepoPath, ExitCode = ExitCodes.SUCCESS, TraceId = runtime.TraceId });
         return ExitCodes.SUCCESS;
-    }
-
-    /// <summary>按 <c>hooks.*</c> 注册开关生成默认安装集合（顺序固定：pre-commit → pre-push → post-commit）。</summary>
-    private static List<HookType> ResolveConfiguredHooks(HooksSettings settings)
-    {
-        var hooks = new List<HookType>(3);
-        if (settings.PreCommit)
-        {
-            hooks.Add(HookType.PreCommit);
-        }
-
-        if (settings.PrePush)
-        {
-            hooks.Add(HookType.PrePush);
-        }
-
-        if (settings.PostCommitBypassDetection)
-        {
-            hooks.Add(HookType.PostCommit);
-        }
-
-        return hooks;
-    }
-
-    /// <summary>
-    /// 解析固化到分发脚本的可执行文件路径：显式配置优先（支持 <c>~</c>，相对路径按当前目录绝对化），
-    /// 否则使用本进程路径；显式配置指向的文件不存在时 FailClosed（退出码 13）。
-    /// </summary>
-    private static string ResolveExecutablePath(CliRuntime runtime, string? configuredPath)
-    {
-        if (string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return runtime.Host.ExecutablePath ?? CliHost.ResolveExecutablePath();
-        }
-
-        string fullPath = Path.GetFullPath(GitGuardSession.ExpandUserPath(configuredPath));
-        if (!File.Exists(fullPath))
-        {
-            throw new ConfigurationException($"hooks.gitguard_executable_path 指向的文件不存在：{fullPath}");
-        }
-
-        return fullPath;
     }
 }

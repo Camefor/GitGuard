@@ -36,6 +36,39 @@ public sealed class GitGuardConfigOverridesTests
     }
 
     [Fact]
+    public void ApplyTo_OverridesHookExecutablePath()
+    {
+        GitGuardConfig config = GitGuardConfig.Default with
+        {
+            Hooks = HooksSettings.Default with { ExecutablePath = "from-config" },
+        };
+        var overrides = new GitGuardConfigOverrides
+        {
+            HookExecutablePath = "/opt/gitguard/gitguard",
+        };
+
+        GitGuardConfig result = overrides.ApplyTo(config);
+
+        result.Hooks.ExecutablePath.Should().Be("/opt/gitguard/gitguard");
+        result.Hooks.PreCommit.Should().BeTrue();
+        result.Hooks.PrePush.Should().BeTrue();
+        result.Hooks.PostCommitBypassDetection.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ApplyTo_WithoutHookExecutablePath_PreservesConfiguredPath()
+    {
+        GitGuardConfig config = GitGuardConfig.Default with
+        {
+            Hooks = HooksSettings.Default with { ExecutablePath = "from-config" },
+        };
+
+        GitGuardConfig result = new GitGuardConfigOverrides().ApplyTo(config);
+
+        result.Hooks.ExecutablePath.Should().Be("from-config");
+    }
+
+    [Fact]
     public void ApplyTo_WithoutValues_PreservesConfigValuesAndClearsPath()
     {
         GitGuardConfig config = GitGuardConfig.Default with
