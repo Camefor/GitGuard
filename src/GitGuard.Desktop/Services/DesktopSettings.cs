@@ -3,7 +3,7 @@
 namespace GitGuard.Desktop.Services;
 
 /// <summary>
-/// 桌面端持久化设置（GGD-0046）：语言、主题模式与可选的 Gitleaks 覆盖。
+/// 桌面端持久化设置（GGD-0046 / GGD-0055）：语言、主题模式、可选的 Gitleaks 覆盖与 GitGuard CLI 路径。
 /// 保存在用户数据目录的 <c>desktop-settings.json</c>，与 CLI 的 <c>config.yml</c> 相互独立；
 /// <see cref="Gitleaks"/> 为 <see langword="null"/> 时完全采用配置文件取值。
 /// </summary>
@@ -17,6 +17,12 @@ public sealed record DesktopSettings
 
     /// <summary>桌面端扫描的 Gitleaks 覆盖；<see langword="null"/> 表示采用配置文件设置。</summary>
     public DesktopGitleaksSettings? Gitleaks { get; init; }
+
+    /// <summary>
+    /// 用户通过文件选择器指定的 GitGuard CLI 可执行文件路径（GGD-0055）；
+    /// <see langword="null"/> 表示按配置 / PATH / 已知安装位置自动探测。仅保存在桌面设置中，不写回项目配置。
+    /// </summary>
+    public string? HookExecutablePath { get; init; }
 }
 
 /// <summary>

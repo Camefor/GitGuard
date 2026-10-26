@@ -267,6 +267,10 @@ public sealed class RepositoriesViewModelTests
         viewModel.HookRows[0].StatusText.Should().Be("Managed");
         viewModel.HookRows[2].StatusText.Should().Be("Unmanaged script");
         viewModel.LatestScanResultText.Should().Be("Blocked");
+        viewModel.InstallHookButtonText.Should().Be("Reinstall Hook");
+        viewModel.UninstallHookButtonText.Should().Be("Uninstall Hook");
+        viewModel.HookForceConfirmPrompt.Should().Contain("binary files or symbolic links");
+        viewModel.HookUninstallConfirmPrompt.Should().Contain("restores any original hook backups");
         viewModel.DetailMessage.Should().BeNull();
     }
 
@@ -429,6 +433,231 @@ public sealed class RepositoriesViewModelTests
         viewModel.Allowlist.Entries.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task InstallHooksCommand_AutoResolvedCli_InstallsAndRemembersPath()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        const string executablePath = @"C:\tools\gitguard.exe";
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(
+                CreateDetail(path, preCommitKind: HookStatusKind.Missing, postCommitKind: HookStatusKind.Missing)),
+            ResolveHookExecutableHandler = _ => Task.FromResult<string?>(executablePath),
+            InstallHooksHandler = (path, executable, force) =>
+            {
+                executable.Should().Be(executablePath);
+                force.Should().BeFalse();
+                return Task.FromResult(
+                    CreateDetail(path, preCommitKind: HookStatusKind.Managed, postCommitKind: HookStatusKind.Missing));
+            },
+        };
+        var settings = new FakeSettingsOperations();
+        var picker = new FakeCliPathPicker();
+        var viewModel = new RepositoriesViewModel(
+            fake,
+            DesktopLanguage.Chinese,
+            settingsOperations: settings,
+            cliPathPicker: picker);
+        await viewModel.EnsureLoadedAsync();
+        viewModel.HasManagedHooks.Should().BeFalse();
+
+        await viewModel.InstallHooksCommand.ExecuteAsync(null);
+
+        fake.ResolveHookExecutableCalls.Should().Be(1);
+        fake.InstallHooksCalls.Should().Be(1);
+        fake.LastInstallForce.Should().BeFalse();
+        picker.PickCalls.Should().Be(0);
+        settings.SaveCalls.Should().Be(1);
+        settings.Current.HookExecutablePath.Should().Be(executablePath);
+        viewModel.HasManagedHooks.Should().BeTrue();
+        viewModel.InstallHookButtonText.Should().Be("重新安装 Hook");
+        viewModel.DetailMessage.Should().Be("GitGuard Hook 已安装。");
+        viewModel.IsInstallingHooks.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InstallHooksCommand_NoCliFound_OpensPickerAndInstallsSelectedPath()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        string executablePath = Path.Combine(Path.GetTempPath(), $"gitguard-cli-{Guid.NewGuid():N}.exe");
+        File.WriteAllText(executablePath, string.Empty);
+        try
+        {
+            var fake = new FakeRepositoryOperations
+            {
+                ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+                LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+                ResolveHookExecutableHandler = _ => Task.FromResult<string?>(null),
+            };
+            var settings = new FakeSettingsOperations();
+            var picker = new FakeCliPathPicker { PickHandler = _ => Task.FromResult<string?>(executablePath) };
+            var viewModel = new RepositoriesViewModel(
+                fake,
+                DesktopLanguage.Chinese,
+                settingsOperations: settings,
+                cliPathPicker: picker);
+            await viewModel.EnsureLoadedAsync();
+
+            await viewModel.InstallHooksCommand.ExecuteAsync(null);
+
+            picker.PickCalls.Should().Be(1);
+            picker.LastTitle.Should().Be("选择 GitGuard CLI 可执行文件");
+            fake.InstallHooksCalls.Should().Be(1);
+            fake.LastInstalledExecutablePath.Should().Be(executablePath);
+            settings.Current.HookExecutablePath.Should().Be(executablePath);
+            viewModel.DetailMessage.Should().Be("GitGuard Hook 已安装。");
+        }
+        finally
+        {
+            File.Delete(executablePath);
+        }
+    }
+
+    [Fact]
+    public async Task InstallHooksCommand_PickerCancelled_ShowsMessageAndDoesNotInstall()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+            ResolveHookExecutableHandler = _ => Task.FromResult<string?>(null),
+        };
+        var picker = new FakeCliPathPicker { PickHandler = _ => Task.FromResult<string?>(null) };
+        var viewModel = new RepositoriesViewModel(
+            fake,
+            DesktopLanguage.Chinese,
+            cliPathPicker: picker);
+        await viewModel.EnsureLoadedAsync();
+
+        await viewModel.InstallHooksCommand.ExecuteAsync(null);
+
+        fake.InstallHooksCalls.Should().Be(0);
+        viewModel.DetailMessage.Should().Be("未选择 GitGuard CLI，Hook 未安装。");
+        viewModel.IsInstallingHooks.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InstallHooksCommand_NoCliAndNoPicker_ShowsNotFoundMessage()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+            ResolveHookExecutableHandler = _ => Task.FromResult<string?>(null),
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+
+        await viewModel.InstallHooksCommand.ExecuteAsync(null);
+
+        fake.InstallHooksCalls.Should().Be(0);
+        viewModel.DetailMessage.Should().Be("未找到 GitGuard CLI，请选择 gitguard 可执行文件后继续。");
+    }
+
+    [Fact]
+    public async Task InstallHooksCommand_UnknownHookPresent_RequiresForceConfirmation()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        const string executablePath = @"C:\tools\gitguard.exe";
+        int installCalls = 0;
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+            ResolveHookExecutableHandler = _ => Task.FromResult<string?>(executablePath),
+            InstallHooksHandler = (path, _, force) =>
+            {
+                installCalls++;
+                if (installCalls == 1)
+                {
+                    force.Should().BeFalse();
+                    return Task.FromException<RepositoryDetail>(
+                        new HookException(HookException.UNKNOWN_HOOK_PRESENT, "目标 Hook 需要强制接管。"));
+                }
+
+                force.Should().BeTrue();
+                return Task.FromResult(
+                    CreateDetail(path, preCommitKind: HookStatusKind.Managed, postCommitKind: HookStatusKind.Missing));
+            },
+        };
+        var settings = new FakeSettingsOperations();
+        var viewModel = new RepositoriesViewModel(
+            fake,
+            DesktopLanguage.Chinese,
+            settingsOperations: settings);
+        await viewModel.EnsureLoadedAsync();
+
+        await viewModel.InstallHooksCommand.ExecuteAsync(null);
+
+        viewModel.IsHookForceConfirmationVisible.Should().BeTrue();
+        viewModel.IsHookConfirmationVisible.Should().BeTrue();
+        viewModel.CanManageHooks.Should().BeFalse();
+        viewModel.DetailMessage.Should().Be("现有 Hook 无法安全接管，请确认强制接管或先处理遗留备份。");
+        settings.SaveCalls.Should().Be(0);
+
+        await viewModel.ConfirmHookForceInstallCommand.ExecuteAsync(null);
+
+        fake.InstallHooksCalls.Should().Be(2);
+        fake.LastInstallForce.Should().BeTrue();
+        viewModel.IsHookForceConfirmationVisible.Should().BeFalse();
+        viewModel.CanManageHooks.Should().BeTrue();
+        settings.SaveCalls.Should().Be(1);
+        viewModel.DetailMessage.Should().Be("GitGuard Hook 已安装。");
+    }
+
+    [Fact]
+    public async Task UninstallHooksCommand_RequiresConfirmationAndRefreshesDetail()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+            UninstallHooksHandler = path => Task.FromResult(
+                CreateDetail(path, preCommitKind: HookStatusKind.Missing, postCommitKind: HookStatusKind.Missing)),
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+        viewModel.HasManagedHooks.Should().BeTrue();
+
+        viewModel.RequestUninstallHooksCommand.Execute(null);
+
+        viewModel.IsUninstallConfirmationVisible.Should().BeTrue();
+        viewModel.CanUninstallHooks.Should().BeFalse();
+        fake.UninstallHooksCalls.Should().Be(0);
+
+        await viewModel.ConfirmUninstallHooksCommand.ExecuteAsync(null);
+
+        fake.UninstallHooksCalls.Should().Be(1);
+        viewModel.IsUninstallConfirmationVisible.Should().BeFalse();
+        viewModel.HasManagedHooks.Should().BeFalse();
+        viewModel.UninstallHookButtonText.Should().Be("卸载 Hook");
+        viewModel.DetailMessage.Should().Be("GitGuard Hook 已卸载。");
+    }
+
+    [Fact]
+    public async Task UninstallHooksCommand_Cancel_KeepsHooksInstalled()
+    {
+        var repository = CreateRepository("repo-a", "甲仓库");
+        var fake = new FakeRepositoryOperations
+        {
+            ListHandler = () => Task.FromResult<IReadOnlyList<RegisteredRepository>>(new[] { repository }),
+            LoadDetailHandler = path => Task.FromResult(CreateDetail(path)),
+        };
+        var viewModel = new RepositoriesViewModel(fake, DesktopLanguage.Chinese);
+        await viewModel.EnsureLoadedAsync();
+
+        viewModel.RequestUninstallHooksCommand.Execute(null);
+        viewModel.CancelUninstallHooksCommand.Execute(null);
+
+        viewModel.IsUninstallConfirmationVisible.Should().BeFalse();
+        fake.UninstallHooksCalls.Should().Be(0);
+        viewModel.HasManagedHooks.Should().BeTrue();
+    }
+
     private static ScanRun CreateRun(string repoPath, Guid runId)
     {
         var finding = Finding.Create(
@@ -458,14 +687,24 @@ public sealed class RepositoriesViewModelTests
     private static RepositoryDetail CreateDetail(
         string repoPath,
         AuditRunSummary? latestScan = null,
-        bool auditWriteFailed = false)
+        bool auditWriteFailed = false,
+        HookStatusKind preCommitKind = HookStatusKind.Managed,
+        HookStatusKind postCommitKind = HookStatusKind.Legacy)
     {
         string hooksDirectory = Path.Combine(repoPath, ".git", "hooks");
         var hooks = new[]
         {
-            new HookStatus(HookType.PreCommit, Path.Combine(hooksDirectory, "pre-commit"), HookStatusKind.Managed, "0.3.0"),
+            new HookStatus(
+                HookType.PreCommit,
+                Path.Combine(hooksDirectory, "pre-commit"),
+                preCommitKind,
+                preCommitKind == HookStatusKind.Managed ? "0.3.0" : null),
             new HookStatus(HookType.PrePush, Path.Combine(hooksDirectory, "pre-push"), HookStatusKind.Missing, null),
-            new HookStatus(HookType.PostCommit, Path.Combine(hooksDirectory, "post-commit"), HookStatusKind.Legacy, null),
+            new HookStatus(
+                HookType.PostCommit,
+                Path.Combine(hooksDirectory, "post-commit"),
+                postCommitKind,
+                postCommitKind == HookStatusKind.Managed ? "0.3.0" : null),
         };
         var status = new StatusReport(
             repoPath,
@@ -508,6 +747,15 @@ public sealed class RepositoriesViewModelTests
         internal Func<string, Task<RepositoryDetail>> ScanHandler { get; set; } =
             path => Task.FromResult(CreateDetail(path));
 
+        internal Func<string, Task<string?>> ResolveHookExecutableHandler { get; set; } =
+            _ => Task.FromResult<string?>(null);
+
+        internal Func<string, string, bool, Task<RepositoryDetail>> InstallHooksHandler { get; set; } =
+            (path, _, _) => Task.FromResult(CreateDetail(path));
+
+        internal Func<string, Task<RepositoryDetail>> UninstallHooksHandler { get; set; } =
+            path => Task.FromResult(CreateDetail(path));
+
         internal Func<string, int, int, Task<AuditRunPage>> QueryScanHistoryHandler { get; set; } =
             (_, _, _) => Task.FromResult(new AuditRunPage(Array.Empty<AuditRunSummary>(), 0));
 
@@ -532,6 +780,16 @@ public sealed class RepositoriesViewModelTests
         internal int LoadDetailCalls { get; private set; }
 
         internal int ScanCalls { get; private set; }
+
+        internal int ResolveHookExecutableCalls { get; private set; }
+
+        internal int InstallHooksCalls { get; private set; }
+
+        internal int UninstallHooksCalls { get; private set; }
+
+        internal string? LastInstalledExecutablePath { get; private set; }
+
+        internal bool? LastInstallForce { get; private set; }
 
         internal int QueryScanHistoryCalls { get; private set; }
 
@@ -571,6 +829,34 @@ public sealed class RepositoriesViewModelTests
         {
             ScanCalls++;
             return ScanHandler(repoPath);
+        }
+
+        public Task<string?> ResolveHookExecutableAsync(
+            string repoPath,
+            CancellationToken cancellationToken = default)
+        {
+            ResolveHookExecutableCalls++;
+            return ResolveHookExecutableHandler(repoPath);
+        }
+
+        public Task<RepositoryDetail> InstallHooksAsync(
+            string repoPath,
+            string executablePath,
+            bool force,
+            CancellationToken cancellationToken = default)
+        {
+            InstallHooksCalls++;
+            LastInstalledExecutablePath = executablePath;
+            LastInstallForce = force;
+            return InstallHooksHandler(repoPath, executablePath, force);
+        }
+
+        public Task<RepositoryDetail> UninstallHooksAsync(
+            string repoPath,
+            CancellationToken cancellationToken = default)
+        {
+            UninstallHooksCalls++;
+            return UninstallHooksHandler(repoPath);
         }
 
         public Task<AuditRunPage> QueryScanHistoryAsync(
@@ -613,6 +899,40 @@ public sealed class RepositoriesViewModelTests
         {
             RemoveAllowlistCalls++;
             return RemoveAllowlistHandler(id);
+        }
+    }
+
+    /// <summary>可编程桌面设置假对象：记录保存次数与最终快照。</summary>
+    private sealed class FakeSettingsOperations : ISettingsOperations
+    {
+        public DesktopSettings Current { get; private set; } = new DesktopSettings();
+
+        internal int SaveCalls { get; private set; }
+
+        public Task<DesktopGitleaksSettings> LoadGitleaksAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DesktopGitleaksSettings(false, null));
+
+        public void Save(DesktopSettings settings)
+        {
+            SaveCalls++;
+            Current = settings;
+        }
+    }
+
+    /// <summary>可编程 CLI 文件选择器假对象。</summary>
+    private sealed class FakeCliPathPicker : ICliPathPicker
+    {
+        internal Func<string, Task<string?>> PickHandler { get; set; } = _ => Task.FromResult<string?>(null);
+
+        internal int PickCalls { get; private set; }
+
+        internal string? LastTitle { get; private set; }
+
+        public Task<string?> PickExecutableAsync(string title, CancellationToken cancellationToken = default)
+        {
+            PickCalls++;
+            LastTitle = title;
+            return PickHandler(title);
         }
     }
 }

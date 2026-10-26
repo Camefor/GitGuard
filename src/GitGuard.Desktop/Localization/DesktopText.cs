@@ -180,6 +180,106 @@ internal static class DesktopText
     internal static string RepositoryHooksTitle(DesktopLanguage language) =>
         language == DesktopLanguage.English ? "Hook status" : "Hook 状态";
 
+    /// <summary>安装 Hook 按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryInstallHookButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Install Hook" : "安装 Hook";
+
+    /// <summary>重新安装 Hook 按钮（已存在托管 Hook）。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryReinstallHookButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Reinstall Hook" : "重新安装 Hook";
+
+    /// <summary>Hook 安装中按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryInstallingHookButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Installing…" : "安装中…";
+
+    /// <summary>卸载 Hook 按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryUninstallHookButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Uninstall Hook" : "卸载 Hook";
+
+    /// <summary>Hook 卸载中按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryUninstallingHookButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Uninstalling…" : "卸载中…";
+
+    /// <summary>二进制 / 符号链接 Hook 的强制接管提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RepositoryHookForceConfirmPrompt(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Some hook files are binary files or symbolic links. GitGuard will back them up as <hook>.local.bak and take them over. Continue?"
+            : "部分 Hook 是二进制文件或符号链接，GitGuard 会先备份为 <hook>.local.bak 再接管。是否继续？";
+
+    /// <summary>确认强制接管按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryHookForceConfirmButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Confirm takeover" : "确认接管";
+
+    /// <summary>卸载 Hook 确认提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string RepositoryHookUninstallConfirmPrompt(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "This removes GitGuard-managed hooks and restores any original hook backups. Unmanaged hooks are left untouched."
+            : "将删除 GitGuard 托管的 Hook，并还原原 Hook 备份；未托管 Hook 不会被修改。";
+
+    /// <summary>确认卸载 Hook 按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string RepositoryHookUninstallConfirmButton(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Confirm uninstall" : "确认卸载";
+
+    /// <summary>GitGuard CLI 文件选择框标题。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标题。</returns>
+    internal static string RepositoryHookCliPickerTitle(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Select GitGuard CLI executable" : "选择 GitGuard CLI 可执行文件";
+
+    /// <summary>未找到 GitGuard CLI 提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookCliNotFoundMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "GitGuard CLI was not found. Select the gitguard executable to continue."
+            : "未找到 GitGuard CLI，请选择 gitguard 可执行文件后继续。";
+
+    /// <summary>用户取消选择 GitGuard CLI 的提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookCliSelectionCancelledMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "No GitGuard CLI selected. Hooks were not installed."
+            : "未选择 GitGuard CLI，Hook 未安装。";
+
+    /// <summary>所选 GitGuard CLI 文件不存在的提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookCliPathInvalidMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "The selected GitGuard CLI file does not exist."
+            : "所选 GitGuard CLI 文件不存在。";
+
+    /// <summary>Hook 安装完成提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookInstalledMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "GitGuard hooks installed." : "GitGuard Hook 已安装。";
+
+    /// <summary>Hook 卸载完成提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookUninstalledMessage(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "GitGuard hooks uninstalled." : "GitGuard Hook 已卸载。";
+
     /// <summary>GitGuard 版本标签。</summary>
     /// <param name="language">界面语言。</param>
     /// <returns>本地化标签。</returns>
@@ -259,8 +359,8 @@ internal static class DesktopText
     /// <returns>本地化提示。</returns>
     internal static string HookAttentionHint(DesktopLanguage language) =>
         language == DesktopLanguage.English
-            ? "Unmanaged hook detected. Run `gitguard install` to take it over."
-            : "检测到未托管 Hook，请执行 `gitguard install` 接管。";
+            ? "Unmanaged hook detected. Use Install Hook to take it over."
+            : "检测到未托管 Hook，点击「安装 Hook」接管。";
 
     /// <summary>Hook 探测结果标签。</summary>
     /// <param name="kind">探测结果分类。</param>
@@ -840,6 +940,52 @@ internal static class DesktopText
                 "仓库登记已不存在。",
             _ => fallbackMessage,
         };
+
+    /// <summary>Hook 操作错误提示（按稳定错误码映射；未知错误回退原始消息）。</summary>
+    /// <param name="errorCode">错误码。</param>
+    /// <param name="fallbackMessage">原始消息。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookError(string errorCode, string fallbackMessage, DesktopLanguage language) =>
+        (errorCode, language) switch
+        {
+            (HookException.WRITE_PERMISSION_DENIED, DesktopLanguage.English) =>
+                "Cannot write to the hooks directory. Check repository file permissions.",
+            (HookException.UNKNOWN_HOOK_PRESENT, DesktopLanguage.English) =>
+                "An existing hook cannot be taken over safely. Confirm the takeover or resolve the leftover backup first.",
+            (HookException.INSTALL_IN_PROGRESS, DesktopLanguage.English) =>
+                "Another Hook operation is already running. Try again shortly.",
+            (HookException.WRITE_PERMISSION_DENIED, _) =>
+                "没有写入 Hook 目录的权限，请检查仓库文件权限。",
+            (HookException.UNKNOWN_HOOK_PRESENT, _) =>
+                "现有 Hook 无法安全接管，请确认强制接管或先处理遗留备份。",
+            (HookException.INSTALL_IN_PROGRESS, _) =>
+                "另一个 Hook 操作正在进行，请稍后重试。",
+            _ => fallbackMessage,
+        };
+
+    /// <summary>Hook 配置错误提示（全 Hook 禁用 / CLI 路径失效给出可操作提示）。</summary>
+    /// <param name="message">原始配置错误消息。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string HookConfigurationError(string message, DesktopLanguage language)
+    {
+        if (message == HookSelection.NO_HOOKS_ENABLED_MESSAGE)
+        {
+            return language == DesktopLanguage.English
+                ? "All hooks are disabled in the configuration. Adjust hooks.* settings before installing."
+                : "配置已禁用全部 Hook，无法安装。请调整 hooks.* 设置后重试。";
+        }
+
+        if (message.Contains("hooks.gitguard_executable_path", StringComparison.Ordinal))
+        {
+            return language == DesktopLanguage.English
+                ? "The configured GitGuard CLI path does not exist. Select a valid executable and try again."
+                : "配置的 GitGuard CLI 路径不存在，请重新选择可执行文件后重试。";
+        }
+
+        return message;
+    }
 
     /// <summary>规则库刷新按钮。</summary>
     /// <param name="language">界面语言。</param>

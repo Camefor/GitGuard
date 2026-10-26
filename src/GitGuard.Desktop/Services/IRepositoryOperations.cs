@@ -65,6 +65,33 @@ public interface IRepositoryOperations
     /// <returns>扫描后的仓库详情快照（<see cref="RepositoryDetail.LatestScan"/> 为本次运行）。</returns>
     Task<RepositoryDetail> ScanAsync(string repoPath, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 解析可用于安装 Hook 的 GitGuard CLI 可执行文件（GGD-0055）：配置路径 → PATH → 已知安装位置；
+    /// 桌面端不得回退自身 GUI 进程。
+    /// </summary>
+    /// <param name="repoPath">仓库工作区根目录绝对路径。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>可执行文件绝对路径；未找到时为 <see langword="null"/>（由 ViewModel 提示用户选择）。</returns>
+    Task<string?> ResolveHookExecutableAsync(string repoPath, CancellationToken cancellationToken = default);
+
+    /// <summary>安装 GitGuard Hook（按配置选择 Hook 子集）并返回安装后的详情快照。</summary>
+    /// <param name="repoPath">仓库工作区根目录绝对路径。</param>
+    /// <param name="executablePath">固化到分发脚本的 GitGuard CLI 绝对路径。</param>
+    /// <param name="force">是否允许接管二进制 / 符号链接 Hook。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>安装后的仓库详情快照。</returns>
+    Task<RepositoryDetail> InstallHooksAsync(
+        string repoPath,
+        string executablePath,
+        bool force,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>卸载 GitGuard Hook（全部三类）并返回卸载后的详情快照。</summary>
+    /// <param name="repoPath">仓库工作区根目录绝对路径。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>卸载后的仓库详情快照。</returns>
+    Task<RepositoryDetail> UninstallHooksAsync(string repoPath, CancellationToken cancellationToken = default);
+
     /// <summary>按仓库分页读取扫描历史摘要（开始时间倒序，不含 Finding 明细）。</summary>
     /// <param name="repoPath">仓库工作区根目录绝对路径。</param>
     /// <param name="limit">每页条数（1..1000）。</param>

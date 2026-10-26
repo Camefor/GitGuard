@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GitGuard.Desktop.ViewModels"
              xmlns:views="using:GitGuard.Desktop.Views"
@@ -284,6 +284,15 @@
                         Command="{Binding OpenHistoryCommand}"
                         IsEnabled="{Binding CanInteract}"
                         CornerRadius="8" />
+                <Button Content="{Binding InstallHookButtonText}"
+                        Command="{Binding InstallHooksCommand}"
+                        IsEnabled="{Binding CanManageHooks}"
+                        Classes="primary" />
+                <Button Content="{Binding UninstallHookButtonText}"
+                        Command="{Binding RequestUninstallHooksCommand}"
+                        IsEnabled="{Binding CanUninstallHooks}"
+                        IsVisible="{Binding HasManagedHooks}"
+                        CornerRadius="8" />
                 <Button Content="{Binding AllowlistButtonText}"
                         Command="{Binding OpenAllowlistCommand}"
                         IsEnabled="{Binding CanInteract}"
@@ -293,6 +302,48 @@
                         IsEnabled="{Binding CanInteract}"
                         CornerRadius="8" />
               </StackPanel>
+
+              <!-- GGD-0055：二进制 / 符号链接 Hook 的强制接管确认 -->
+              <Border IsVisible="{Binding IsHookForceConfirmationVisible}"
+                      Background="#FFF3CD"
+                      CornerRadius="8"
+                      Padding="14">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="{Binding HookForceConfirmPrompt}"
+                             FontSize="12"
+                             TextWrapping="Wrap"
+                             Foreground="#5C4500" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding ConfirmHookForceButtonText}"
+                            Command="{Binding ConfirmHookForceInstallCommand}"
+                            CornerRadius="8" />
+                    <Button Content="{Binding CancelHookButtonText}"
+                            Command="{Binding CancelHookForceCommand}"
+                            CornerRadius="8" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <!-- GGD-0055：卸载 Hook 二次确认 -->
+              <Border IsVisible="{Binding IsUninstallConfirmationVisible}"
+                      Background="#FFF3CD"
+                      CornerRadius="8"
+                      Padding="14">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="{Binding HookUninstallConfirmPrompt}"
+                             FontSize="12"
+                             TextWrapping="Wrap"
+                             Foreground="#5C4500" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding ConfirmUninstallHookButtonText}"
+                            Command="{Binding ConfirmUninstallHooksCommand}"
+                            CornerRadius="8" />
+                    <Button Content="{Binding CancelHookButtonText}"
+                            Command="{Binding CancelUninstallHooksCommand}"
+                            CornerRadius="8" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
 
               <Border IsVisible="{Binding IsRemoveConfirmationVisible}"
                       Background="#FFF3CD"

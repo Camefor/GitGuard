@@ -140,6 +140,23 @@ public sealed class RepositoryItemViewModelTests
         public Task<RepositoryDetail> ScanAsync(string repoPath, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("本测试不执行扫描。");
 
+        public Task<string?> ResolveHookExecutableAsync(
+            string repoPath,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不解析 GitGuard CLI。");
+
+        public Task<RepositoryDetail> InstallHooksAsync(
+            string repoPath,
+            string executablePath,
+            bool force,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不安装 Hook。");
+
+        public Task<RepositoryDetail> UninstallHooksAsync(
+            string repoPath,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不卸载 Hook。");
+
         public Task<AuditRunPage> QueryScanHistoryAsync(
             string repoPath,
             int limit,

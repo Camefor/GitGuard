@@ -23,4 +23,7 @@ public sealed class DesktopServices
 
     /// <summary>审计导出文件选择器。</summary>
     public IExportPathPicker? ExportPathPicker { get; init; }
+
+    /// <summary>GitGuard CLI 可执行文件选择器（GGD-0055 安装 Hook）。</summary>
+    public ICliPathPicker? CliPathPicker { get; init; }
 }

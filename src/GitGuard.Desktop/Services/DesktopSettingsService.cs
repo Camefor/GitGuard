@@ -133,6 +133,7 @@ public sealed class DesktopSettingsService : ISettingsOperations
             Language = language,
             ThemeMode = themeMode,
             Gitleaks = gitleaks,
+            HookExecutablePath = NormalizePath(document.HookExecutablePath),
         };
     }
 
@@ -144,6 +145,7 @@ public sealed class DesktopSettingsService : ISettingsOperations
         HasGitleaks = settings.Gitleaks is not null,
         UseGitleaks = settings.Gitleaks?.Enabled ?? false,
         GitleaksPath = NormalizePath(settings.Gitleaks?.Path),
+        HookExecutablePath = NormalizePath(settings.HookExecutablePath),
     };
 
     private static string? NormalizePath(string? path) =>
@@ -181,6 +183,9 @@ public sealed class DesktopSettingsService : ISettingsOperations
 
         /// <summary>Gitleaks 可执行文件路径；空表示 PATH 查找。</summary>
         public string? GitleaksPath { get; set; }
+
+        /// <summary>用户选定的 GitGuard CLI 可执行文件路径；空表示自动探测。</summary>
+        public string? HookExecutablePath { get; set; }
     }
 }
 

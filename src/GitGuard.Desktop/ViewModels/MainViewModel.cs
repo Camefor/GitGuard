@@ -139,7 +139,12 @@ public sealed class MainViewModel : ObservableObject
         section switch
         {
             DesktopSection.Repositories when _services.RepositoryOperations is not null =>
-                new RepositoriesViewModel(_services.RepositoryOperations, _appState.Language, _services.EditorLauncher),
+                new RepositoriesViewModel(
+                    _services.RepositoryOperations,
+                    _appState.Language,
+                    _services.EditorLauncher,
+                    _services.SettingsOperations,
+                    _services.CliPathPicker),
             DesktopSection.Rules when _services.RuleOperations is not null =>
                 new RulesViewModel(_services.RuleOperations, _appState.Language),
             DesktopSection.Logs when _services.AuditOperations is not null =>

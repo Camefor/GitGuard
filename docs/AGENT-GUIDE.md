@@ -130,15 +130,15 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| 当前任务 ID | `GGD-0053` |
+| 当前任务 ID | — |
 | 当前状态 | `DONE` |
-| 当前目标 | 无（等待用户指派下一任务） |
-| 最后完成动作 | `GGD-0053` 完成并推送：版本号冻结 1.0.0、新增 `docs/20-v1.0发行说明.md`、同步 README / 文档导航 / CLI 示例 / 部署流程 / RoadMap；Windows CLI AOT + zip + MSIX 发行冒烟通过 |
-| 下一步动作 | 用户验收 v1.0 正式发布条件：连续稳定运行 3 个月（至 2027-01-24）且无 P0 Bug；macOS / Linux 首次 Release runner 冒烟；或指派新任务 |
-| 涉及文件 | `Directory.Build.props`、`docs/20-v1.0发行说明.md`、`README.md`、`docs/README.md`、`docs/06-API接口设计.md`、`docs/14-部署文档.md`、`docs/17-开发RoadMap.md`、`CONTEXT.md`、`docs/AGENT-GUIDE.md` |
-| 验证结果 | Release 构建 0 警告 0 错误；`dotnet format --verify-no-changes` 通过；1750 用例（1741 通过 + 9 平台跳过 + 0 失败）；Windows AOT `gitguard 1.0.0`、zip / `SHA256SUMS` 校验通过、MSIX 发行冒烟 `ok = true`；macOS / Linux 待首次 Release runner |
+| 当前目标 | 无（v1.1 Hook 快捷管理已完成，等待用户指派下一任务） |
+| 最后完成动作 | `GGD-0055` 完成：Desktop 仓库页新增 Hook 安装 / 重新安装 / 卸载、CLI 自动解析与文件选择、强制接管 / 卸载二次确认、路径持久化与中英文案；v1.1 文档与发行说明同步 |
+| 下一步动作 | 用户按 `TC-FR-100-15` 实机验收 v1.1；如需 CLI 写入系统 PATH（原始需求 3），确认后登记新任务 |
+| 涉及文件 | Application `Hooks/*`、CLI `InstallCommand` / `UninstallCommand`、Desktop `RepositoriesViewModel` / `RepositoriesView.axaml` / `RepositoryOperations` / `DesktopSettings` / `DesktopText`、Desktop / Application 测试及 v1.1 文档 |
+| 验证结果 | Release 构建 0 警告 0 错误；`dotnet format` 通过；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败），其中 Desktop 138、Application 302、CLI 131 |
 | 阻塞/待确认 | 无 |
-| 最后更新 | 2026-10-25 |
+| 最后更新 | 2026-10-26 |
 
 <!-- agent-state:end -->
 
@@ -148,7 +148,7 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-> 暂无待办任务。v1.0 开发任务已全部完成（`GGD-0048` ~ `GGD-0053`），正式公开发布由用户验收：连续稳定运行 3 个月（2026-10-24 ~ 2027-01-24）且无 P0 Bug；macOS / Linux 首次 Release runner 冒烟；v0.1 / v0.2 真实项目试用验收。
+> 暂无待办任务。v1.1（`GGD-0054` / `GGD-0055`）已完成并通过全量测试；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
 
 ### 8.2 暂停/阻塞任务恢复详情
 
@@ -214,6 +214,9 @@
 | [x] | `GGD-0052` | v1.0 文档稳定化：规则清单 / README / 误报治理指南与 `BuiltinRules.yaml` 一致，Markdown 相对链接与阶段 / 版本状态审计 | 2026-10-25 | 规则库脚本复核 60 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 13；Critical 11 / High 24 / Medium 12 / Low 13）与文档声明一致；60 个规则 ID 在模块设计 Secret / Privacy / LocalPathUrl 与 19 指南附录 0 缺失；全库 Markdown 相对链接 79 条 0 失效；修复 `docs/README.md` 阶段基线 / 模块导航 / ADR-0004 链接、`CONTEXT.md` 当前阶段 / Gitleaks 状态 / 文档入口、`Hook.md` ADR-0004 状态、RoadMap「文档稳定」退出条件与任务表；`git diff --check` 通过；纯文档改动未运行构建 / 测试（风险匹配） |
 | [x] | `GGD-0053` | v1.0 发布基线：版本号冻结 1.0.0、新增 v1.0 发行说明、Windows 发行产物回归与文档同步 | 2026-10-25 | `dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；`dotnet test GitGuard.sln -c Release --no-build` 1750 用例（1741 通过 + 9 平台跳过 + 0 失败）；Windows AOT `gitguard 1.0.0` + JSON `gitguard.version.v1`；`gitguard.exe` SHA-256 `c5758335…77c4d`、`gitguard-1.0.0-win-x64.zip` SHA-256 `ddef10e3…46028`；MSIX 解包发行冒烟 1 条审计运行 / 1 个 Finding / `ok = true`；macOS / Linux 待首次 Release runner；文档同步 `docs/20-v1.0发行说明.md` / `README.md` / `docs/README.md` / `docs/06-API接口设计.md` / `docs/14-部署文档.md` / `docs/17-开发RoadMap.md` / `CONTEXT.md` / `docs/AGENT-GUIDE.md` |
 
+| [x] | `GGD-0054` | 提取 Application 层共享 Hook 管理服务与 CLI 可执行文件解析器，CLI `install` / `uninstall` 复用 | 2026-10-26 | `HookManagementService` / `HookExecutableResolver` / `HookSelection` 落地；CLI 参数、输出契约与退出码不变；Release 构建 0 警告 0 错误；Application 302/302、CLI 131/131 通过 |
+| [x] | `GGD-0055` | Desktop 仓库详情页 Hook 一键安装 / 卸载与 CLI 路径选择 | 2026-10-26 | 右侧操作区提供安装 / 重新安装 / 卸载及两类二次确认；CLI 自动解析 → 文件选择 → `hookExecutablePath` 持久化；Desktop 138/138；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败） |
+
 ## 10. 取消任务
 
 | ID | 任务 | 取消日期 | 取消原因 |
@@ -277,3 +280,4 @@
 - 2026-10-25 · `GGD-0051` · v1.0 规则库第四批：`BuiltinRules.yaml` 新增 5 条 Url 规则——GCP-SIGNED-URL（`X-Goog-Signature` / `X-Goog-Credential` 查询参数）、AZURE-SAS-URL（同一查询同时含 `sv=YYYY-MM-DD` 与 ≥16 字符 `sig=`，参数顺序不限）、DB-URL-CREDENTIALS（mysql / mariadb / postgres(ql) / mongodb(+srv) / redis(s) / amqp(s) / mssql / sqlserver 的 `://user:pass@`）、OAUTH-REFRESH-TOKEN（`?` / `&` / `#` 后 `refresh_token=` 且值 ≥16 字符）、FEISHU-WEBHOOK（`open.feishu.cn/open-apis/bot/v2/hook/<UUID>`）；新增 5 个夹具文件（每条 3 正 / 3 负 / 边界正反，共 40 个用例）；`BuiltinRuleLoaderTests` / `RuleCatalogTests` / `CliRulesCommandTests` 计数更新为 60 / Url 13 / rules_evaluated 61 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 退出码 0；`dotnet test GitGuard.sln -c Release --no-build` 1750 用例（1741 通过 + 9 平台跳过 + 0 失败，较 1710 新增 40）；Detection 单项目 660 通过；YAML 脚本复核 60 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 13），严重度 Critical 11 / High 24 / Medium 12 / Low 13 · 关键决策：① 选型优先与既有规则互斥的高置信格式：GCP / Azure 补齐云签名 URL，数据库 URL 与 ADO.NET 连接串规则互补，refresh_token 避开 TOKEN-IN-QUERY 的 access_token，飞书 Webhook 为路径令牌且无查询参数，避免同一行重复 Finding；② Azure 以 `sv` 日期版本 + `sig` 长度双门禁控制误报并兼容参数顺序；③ 5 条均为 High，默认策略 35 阻断 / 25 警告；④ 夹具继续使用模板占位符避免远端 secret scanning 误判 · 环境陷阱：Azure 正则从已消费的 `?` 之后用 lookahead 会漏掉首个参数，改用两条顺序分支；YAML 单引号内 `'` 需双写，SAS 字符类因此排除单引号；`X-Goog` 参数大小写敏感，规则保持区分大小写；新增 `.txt` 必须 UTF-8 BOM + CRLF，`BuiltinRules.yaml` 保持无 BOM + CRLF · 文档同步 8 份：模块设计 LocalPathUrl 0.1.6 / PRD 0.1.19 / SRS 0.1.30 / 16-测试方案 0.2.26 / 17-RoadMap 0.1.30 / 19-误报治理指南 0.1.6 / README / AGENT-GUIDE · 下一步：提交并自动推送；`GGD-0052` v1.0 文档稳定化
 - 2026-10-25 · `GGD-0052` · v1.0 文档稳定化：以脚本复核 `BuiltinRules.yaml` 60 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 13；Critical 11 / High 24 / Medium 12 / Low 13）与 PRD / SRS / 测试方案 / 误报治理指南 / README 声明一致；校验 60 个规则 ID 在模块设计 Secret / Privacy / LocalPathUrl 与 19 指南附录 A 全覆盖（0 缺失）；重写 Markdown 相对链接检查器（正确处理 `<...>`、平衡括号与表格转义），全库 79 条相对链接 0 失效；修复 `docs/README.md`（v0.1 规划基线 → v1.0 开发中、P1 / P2 / P3 状态、模块导航补 LocalPathUrl、RoadMap 四阶段、ADR-0004 链接）、`CONTEXT.md`（当前阶段 / Gitleaks 已集成 / LocalPathUrl 入口 / 团队管理员阶段标注）、`Hook.md`（ADR-0004 去「待新增」）、`17-开发RoadMap.md`（「文档稳定」退出条件勾选、GGD-0052 完成）；`git diff --check` 通过；纯文档改动未运行构建 / 测试（风险匹配）。说明：`docs/06` 中 `"version": "0.1.0"` 为当前程序集版本示例，留待 `GGD-0053` 升版同步 · 下一步：`GGD-0053` v1.0 发布基线
 - 2026-10-25 · `GGD-0053` · v1.0 发布基线：`Directory.Build.props` 版本冻结 `1.0.0`；新增 `docs/20-v1.0发行说明.md`（版本概览、60 条规则、自 v0.3 变更、安装升级、验证记录、已知限制、正式发布条件）；`README.md` / `docs/README.md` / `docs/06-API接口设计.md` / `docs/14-部署文档.md` / `docs/17-开发RoadMap.md` / `CONTEXT.md` 同步 1.0.0、发行说明入口与发布基线状态 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 退出码 0；`dotnet test GitGuard.sln -c Release --no-build` 1750 用例（1741 通过 + 9 平台跳过 + 0 失败）；Windows Native AOT `gitguard version` → `gitguard 1.0.0`、JSON `schema=gitguard.version.v1` / `gitguard_version=1.0.0`；发行 zip 含 `gitguard.exe` / `e_sqlite3.dll` / `SHA256SUMS`（exe SHA-256 `c5758335f960e3eeba0052281546f1fd6fe6b3c1cfa8683e71c8ebde18b77c4d`，zip SHA-256 `ddef10e32d51555dc141bb9736932da51109663670d1fab0dfd0417c7f446028`）；MSIX 解包 → `smoke-test.ps1` 通过（`Desktop smoke passed: 1 audit run(s), latest findings=1.`） · 关键决策：① 仅冻结版本号并产出本地发行基线，不创建 `v1.0.0` Tag / GitHub Release——RoadMap §2.4 要求正式发布前完成 3 个月稳定运行观察（至 2027-01-24）；② macOS / Linux 本机不可验证且无 `gh`，与 `GGD-0047` 先例一致记录为待首次 Release runner 原生冒烟，不伪造通过；③ 发行说明明确「发布候选」状态并列出未签名 / 未公证等已知限制；④ 文档示例版本号与程序集版本保持一致 · 环境陷阱：Windows Native AOT 链接需 `vswhere.exe` 在 PATH（追加 VS Installer 目录）；清理发布目录时 `Get-ChildItem -Include` 在无通配路径 / 非递归场景被忽略，改用扩展名 `Where-Object` 过滤；新增 `.md` 必须 UTF-8 BOM + CRLF · 文档同步 9 份：`docs/20-v1.0发行说明.md` / README / docs/README / 06-API接口设计 / 14-部署文档 / 17-开发RoadMap / CONTEXT / AGENT-GUIDE / Directory.Build.props · 下一步：用户验收 v1.0 正式发布条件（3 个月稳定运行、macOS / Linux Release runner 冒烟）或指派新任务
+- 2026-10-26 · `GGD-0054` / `GGD-0055` · 完成 v1.1 桌面端 Hook 快捷管理：Application 新增 `HookManagementService` / `HookExecutableResolver` / `HookSelection`，CLI `install` / `uninstall` 复用共享服务且参数、输出契约与退出码不变；Desktop `IRepositoryOperations` / `RepositoryOperations` 接入 CLI 解析与 Hook 安装 / 卸载，`RepositoriesView` 增加安装 / 重新安装 / 卸载按钮、强制接管与卸载确认条，`ICliPathPicker` + Avalonia StorageProvider 支持手动选择，`DesktopSettings.HookExecutablePath` 持久化，`DesktopText` 补齐中英文案与 `HookException` / `ConfigurationException` 映射；测试新增 Application `HookExecutableResolverTests` / `HookSelectionTests` / 配置覆盖用例与 Desktop 7 例，并补全既有假对象接口 · 验证：Release 构建 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败），Application 302、CLI 131、Desktop 138 · 关键决策：① Desktop 不内置 CLI，只持久化外部 CLI 路径；② 路径解析顺序为配置 → PATH → 已知安装位置，失败才允许手动选择；③ 二进制 / 符号链接要求强制接管二次确认，卸载始终覆盖三类 GitGuard 托管 Hook；④ 变更不写回项目 `.gitguard.yml` · 文档同步 12 份：`docs/21-v1.1发行说明.md` / README / docs/README / CONTEXT / 06-API / 11-前端UI设计 / 12-前端组件设计 / 14-部署文档 / 16-测试方案 / 17-开发RoadMap / Directory.Build.props / AGENT-GUIDE · 环境陷阱：静态只读模式数组须按 `_camelCase` 命名以满足 IDE1006；新增文本文件须 UTF-8 BOM + CRLF 才能通过 `dotnet format` · 下一步：用户按 `TC-FR-100-15` 实机验收 v1.1；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务

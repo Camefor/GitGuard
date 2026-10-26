@@ -8,6 +8,7 @@
 | v0.2 | 规则升级 + 全量扫描 + Gitleaks 适配 | 开发者 + 小团队 | FR-042 增强、FR-060 ~ FR-061、FR-080、FR-090 | 真实项目接入，首周误报率 ≤ 10% |
 | v0.3 | Avalonia 桌面端 | 偏好图形化的用户 | FR-100 | 桌面端覆盖所有 CLI 核心能力 |
 | v1.0 | 规则库沉淀 + 文档稳定 | 公开发布 | 内置规则扩充至 60 条、规则清单与误报治理文档稳定、v1.0 发行说明 | 规则库 ≥ 60 条；稳定运行 3 个月且无 P0 Bug；三平台发行冒烟通过（Windows 本地已通过，macOS / Linux 待首次 Release runner） |
+| v1.1 | 桌面端 Hook 快捷管理 | 桌面端用户 | 不内置 CLI；复用 Application 层 Hook 用例，在仓库详情页提供安装 / 重新安装 / 卸载 Hook 与 CLI 路径选择，CLI `install` / `uninstall` 同步复用共享服务 | 安装 / 卸载 / 强制接管 / 取消路径全部有 ViewModel 自动化测试；CLI 现有行为与退出码不变；Windows 实机验收通过 |
 
 ## 2. 阶段划分
 
@@ -86,6 +87,25 @@
   - [ ] 三平台发行冒烟通过（Windows CLI AOT / zip / MSIX 已在本地通过，`GGD-0053`；macOS / Linux 待首次 Release runner 验证）。
   - [x] 文档稳定：规则清单 / README / 误报治理指南与实现一致，无失效链接（`GGD-0052` 已完成）。
 
+### 2.5 阶段 5：桌面端 Hook 快捷管理（v1.1）
+
+- **周期**：2026-10-26 启动；目标 2–3 人日完成开发交付。
+- **目标**：不把完整 CLI 打包进桌面端；仓库详情页直接复用 Application 层 Hook 用例，为每个已登记仓库提供一键安装 / 重新安装 / 卸载 Hook，并解决 CLI 可执行文件定位与持久化。
+- **交付物**：
+  - Application 层共享 `HookManagementService` / `HookExecutableResolver` / `HookSelection`，CLI `install` / `uninstall` 复用（`GGD-0054` 已完成）。
+  - Desktop 仓库详情页 Hook 操作区：安装 / 重新安装、卸载、二进制 / 符号链接强制接管确认、卸载二次确认（`GGD-0055` 已完成）。
+  - CLI 路径解析顺序：`hooks.gitguard_executable_path` → PATH → 已知安装位置 → 文件选择器；选择结果写入桌面设置，不写回项目配置。
+  - ViewModel 自动化测试覆盖安装、路径选择取消 / 无效、强制接管、卸载确认、错误映射与语言刷新。
+- **依赖**：阶段 3 桌面端与阶段 4 文档基线完成；不依赖 CLI 打包。
+- **风险**：
+  - 桌面端 GUI 进程不能被误当作 CLI → `HookExecutableResolver` 禁止回退 `Environment.ProcessPath`，只接受显式配置 / PATH / 已知位置 / 用户选择。
+  - Hook 备份与强制接管语义必须与 CLI 一致 → 两端复用同一 `InstallHookUseCase` / `UninstallHookUseCase` 与共享服务。
+- **退出条件**：
+  - [x] Desktop / CLI 共用 Hook 管理服务，CLI 既有行为与退出码不变（`GGD-0054`）。
+  - [x] 仓库页支持一键安装 / 重新安装 / 卸载与两类二次确认（`GGD-0055`）。
+  - [x] ViewModel 自动化测试覆盖关键路径（Desktop 138 例通过）。
+  - [ ] Windows 实机验收安装 / 强制接管 / 卸载与重启后 CLI 路径保持（用户执行）。
+
 ## 3. 任务分解
 
 > 粒度：0.5 ~ 3 天完成。所有任务登记在 `AGENT-GUIDE.md` §8。
@@ -127,6 +147,8 @@
 | 4 | `GGD-0051` | 规则库扩充第四批：Url 8→13（GCP-SIGNED-URL / AZURE-SAS-URL / DB-URL-CREDENTIALS / OAUTH-REFRESH-TOKEN / FEISHU-WEBHOOK，已完成） | P2 | 1d |
 | 4 | `GGD-0052` | v1.0 文档稳定化：规则清单、README、误报治理指南、链接与版本一致性（已完成） | P2 | 2d |
 | 4 | `GGD-0053` | v1.0 发布基线：版本号 1.0.0、发行说明、三平台产物回归（已完成；Windows 本地冒烟通过，macOS / Linux 待 Release runner） | P1 | 2d |
+| 5 | `GGD-0054` | Application 层共享 Hook 管理服务与 CLI 可执行文件解析，CLI `install` / `uninstall` 复用（已完成） | P1 | 1.5d |
+| 5 | `GGD-0055` | Desktop 仓库详情页 Hook 一键安装 / 卸载与 CLI 路径选择（已完成） | P1 | 1.5d |
 
 ## 4. 里程碑
 
@@ -198,3 +220,4 @@ flowchart LR
 | 0.1.30 | 2026-10-25 | GGD-0051 完成：Url 规则 8→13（GCP-SIGNED-URL / AZURE-SAS-URL / DB-URL-CREDENTIALS / OAUTH-REFRESH-TOKEN / FEISHU-WEBHOOK），新增 5 个夹具文件 40 个用例，规则库 55→60，§2.4 退出条件「规则库 ≥ 60 条」达成，§3 任务表同步 |
 | 0.1.31 | 2026-10-25 | GGD-0052 完成：文档稳定化——规则清单与 `BuiltinRules.yaml` 一致（60 条，21 / 14 / 12 / 13）、相对链接审计通过；`docs/README.md` 阶段基线、模块导航与 ADR-0004 链接更新；CONTEXT 当前阶段 / Gitleaks 集成状态更正；§2.4 退出条件「文档稳定」达成，§3 任务表同步 |
 | 0.1.32 | 2026-10-25 | GGD-0053 完成：版本号冻结 1.0.0，新增 `docs/20-v1.0发行说明.md`；Windows CLI AOT / zip / MSIX 本地发行冒烟通过，macOS / Linux 留待首次 Release runner；§1 / §2.4 退出条件与 §3 任务表同步（全量 1750 用例） |
+| 0.1.33 | 2026-10-26 | v1.1 启动与完成（用户确认方案）：不内置 CLI，改为桌面端复用 Application 层 Hook 用例；§1 新增 v1.1 行、新增 §2.5 阶段 5，§3 登记 `GGD-0054` / `GGD-0055` 并标记完成；Release 构建 0 警告 0 错误，全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败） |

@@ -45,13 +45,7 @@ public sealed class RepositoryOperations : IRepositoryOperations
     /// <inheritdoc />
     public Task<RepositoryDetail> LoadDetailAsync(string repoPath, CancellationToken cancellationToken = default) =>
         Task.Run(
-            () =>
-            {
-                GitGuardSession scope = _session.CreateScopedSession(repoPath, CreateConfigOverrides());
-                StatusReport status = scope.CreateStatus().Execute();
-                AuditRunSummary? latestScan = scope.CreateLatestRepositoryScan().Execute(repoPath);
-                return new RepositoryDetail(status, latestScan);
-            },
+            () => LoadDetail(_session.CreateScopedSession(repoPath, CreateConfigOverrides()), repoPath),
             cancellationToken);
 
     /// <inheritdoc />
@@ -75,6 +69,43 @@ public sealed class RepositoryOperations : IRepositoryOperations
                     outcome.Run.ExitCode,
                     outcome.Run.Findings.Length);
                 return new RepositoryDetail(status, latestScan, outcome.AuditWriteFailed);
+            },
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<string?> ResolveHookExecutableAsync(string repoPath, CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () => _session
+                .CreateScopedSession(repoPath, CreateConfigOverrides())
+                .CreateHookManagementService()
+                .ResolveExecutablePath(),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<RepositoryDetail> InstallHooksAsync(
+        string repoPath,
+        string executablePath,
+        bool force,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () =>
+            {
+                GitGuardSession scope = _session.CreateScopedSession(repoPath, CreateConfigOverrides());
+                scope.CreateHookManagementService().Install(executablePath, force);
+                return LoadDetail(scope, repoPath);
+            },
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<RepositoryDetail> UninstallHooksAsync(
+        string repoPath,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () =>
+            {
+                GitGuardSession scope = _session.CreateScopedSession(repoPath, CreateConfigOverrides());
+                scope.CreateHookManagementService().Uninstall();
+                return LoadDetail(scope, repoPath);
             },
             cancellationToken);
 
@@ -116,13 +147,37 @@ public sealed class RepositoryOperations : IRepositoryOperations
     public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.Run(() => _session.CreateAllowlistRemove().Execute(id), cancellationToken);
 
-    /// <summary>读取当前桌面 Gitleaks 覆盖；未设置时返回 <see langword="null"/>（完全采用配置文件）。</summary>
-    private GitGuardConfigOverrides? CreateConfigOverrides() =>
-        _settingsOperations?.Current.Gitleaks is { } gitleaks
-            ? new GitGuardConfigOverrides
-            {
-                UseGitleaks = gitleaks.Enabled,
-                GitleaksPath = gitleaks.Path,
-            }
-            : null;
+    /// <summary>读取仓库详情：Git / Hook 状态与最近扫描摘要。</summary>
+    private static RepositoryDetail LoadDetail(GitGuardSession scope, string repoPath)
+    {
+        StatusReport status = scope.CreateStatus().Execute();
+        AuditRunSummary? latestScan = scope.CreateLatestRepositoryScan().Execute(repoPath);
+        return new RepositoryDetail(status, latestScan);
+    }
+
+    /// <summary>
+    /// 读取当前桌面覆盖：Gitleaks 设置与用户选定的 GitGuard CLI 路径；
+    /// 两者均未设置时返回 <see langword="null"/>（完全采用配置文件）。
+    /// </summary>
+    private GitGuardConfigOverrides? CreateConfigOverrides()
+    {
+        DesktopSettings settings = _settingsOperations?.Current ?? new DesktopSettings();
+        DesktopGitleaksSettings? gitleaks = settings.Gitleaks;
+
+        // 记住的 CLI 已被移动或删除时不再注入覆盖，回退到配置 / PATH / 已知位置探测，
+        // 避免一次过期路径让后续安装永久停在 ConfigurationException。
+        bool hasHookExecutablePath = !string.IsNullOrWhiteSpace(settings.HookExecutablePath)
+            && File.Exists(settings.HookExecutablePath);
+        if (gitleaks is null && !hasHookExecutablePath)
+        {
+            return null;
+        }
+
+        return new GitGuardConfigOverrides
+        {
+            UseGitleaks = gitleaks?.Enabled,
+            GitleaksPath = gitleaks?.Path,
+            HookExecutablePath = hasHookExecutablePath ? settings.HookExecutablePath : null,
+        };
+    }
 }

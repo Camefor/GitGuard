@@ -30,7 +30,7 @@ public sealed class DesktopSettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void Save_ThenReload_RoundTripsLanguageThemeAndGitleaksOverride()
+    public void Save_ThenReload_RoundTripsLanguageThemeGitleaksAndHookExecutable()
     {
         DesktopSettingsService service = CreateService();
 
@@ -40,6 +40,7 @@ public sealed class DesktopSettingsServiceTests : IDisposable
                 Language = DesktopLanguage.English,
                 ThemeMode = DesktopThemeMode.Dark,
                 Gitleaks = new DesktopGitleaksSettings(true, @"C:\tools\gitleaks.exe"),
+                HookExecutablePath = @"C:\tools\gitguard.exe",
             });
 
         DesktopSettingsService reloaded = CreateService();
@@ -48,6 +49,7 @@ public sealed class DesktopSettingsServiceTests : IDisposable
         reloaded.Current.Gitleaks.Should().NotBeNull();
         reloaded.Current.Gitleaks!.Enabled.Should().BeTrue();
         reloaded.Current.Gitleaks.Path.Should().Be(@"C:\tools\gitleaks.exe");
+        reloaded.Current.HookExecutablePath.Should().Be(@"C:\tools\gitguard.exe");
     }
 
     [Fact]

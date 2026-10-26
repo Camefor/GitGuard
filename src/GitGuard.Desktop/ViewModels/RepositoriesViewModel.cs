@@ -16,6 +16,8 @@ namespace GitGuard.Desktop.ViewModels;
 public sealed class RepositoriesViewModel : SectionViewModel
 {
     private readonly IRepositoryOperations _operations;
+    private readonly ISettingsOperations? _settingsOperations;
+    private readonly ICliPathPicker? _cliPathPicker;
     private DesktopLanguage _language;
     private RepositoryItemViewModel? _selectedRepository;
     private string _newRepositoryPath = string.Empty;
@@ -26,6 +28,13 @@ public sealed class RepositoriesViewModel : SectionViewModel
     private bool _isAllowlistVisible;
     private bool _isScanning;
     private bool _isRemoveConfirmationVisible;
+    private bool _isInstallingHooks;
+    private bool _isUninstallingHooks;
+    private bool _isHookForceConfirmationVisible;
+    private bool _isUninstallConfirmationVisible;
+    private bool _hasManagedHooks;
+    private bool _requiresHookForce;
+    private string? _pendingHookExecutablePath;
     private string? _listMessage;
     private string? _detailMessage;
     private bool _hasLatestScan;
@@ -46,16 +55,28 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// 外部编辑器启动器；<see langword="null"/> 时使用默认的 <see cref="ShellEditorLauncher"/>
     /// （ViewModel 单测可注入假对象，避免真实启动进程）。
     /// </param>
+    /// <param name="settingsOperations">
+    /// 桌面设置服务（GGD-0055）：安装 Hook 成功后记住用户选择的 GitGuard CLI 路径；
+    /// <see langword="null"/> 时不持久化（ViewModel 单测可省略）。
+    /// </param>
+    /// <param name="cliPathPicker">
+    /// GitGuard CLI 文件选择器（GGD-0055）：自动探测失败时提示用户选择；
+    /// <see langword="null"/> 时显示未找到提示。
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="operations"/> 为 <see langword="null"/>。</exception>
     public RepositoriesViewModel(
         IRepositoryOperations operations,
         DesktopLanguage language,
-        IEditorLauncher? editorLauncher = null)
+        IEditorLauncher? editorLauncher = null,
+        ISettingsOperations? settingsOperations = null,
+        ICliPathPicker? cliPathPicker = null)
         : base(DesktopSection.Repositories, language)
     {
         ArgumentNullException.ThrowIfNull(operations);
 
         _operations = operations;
+        _settingsOperations = settingsOperations;
+        _cliPathPicker = cliPathPicker;
         _language = language;
         Repositories = new ObservableCollection<RepositoryItemViewModel>();
         HookRows = new ObservableCollection<HookStatusRowViewModel>();
@@ -70,6 +91,12 @@ public sealed class RepositoriesViewModel : SectionViewModel
         ScanCommand = new AsyncRelayCommand(ScanAsync);
         OpenHistoryCommand = new AsyncRelayCommand(OpenHistoryAsync);
         OpenAllowlistCommand = new AsyncRelayCommand(OpenAllowlistAsync);
+        InstallHooksCommand = new AsyncRelayCommand(InstallHooksAsync);
+        ConfirmHookForceInstallCommand = new AsyncRelayCommand(ConfirmHookForceInstallAsync);
+        CancelHookForceCommand = new RelayCommand(CancelHookForce);
+        RequestUninstallHooksCommand = new RelayCommand(RequestUninstallHooks);
+        ConfirmUninstallHooksCommand = new AsyncRelayCommand(ConfirmUninstallHooksAsync);
+        CancelUninstallHooksCommand = new RelayCommand(CancelUninstallHooks);
         RequestRemoveCommand = new RelayCommand(RequestRemove);
         ConfirmRemoveCommand = new AsyncRelayCommand(ConfirmRemoveAsync);
         CancelRemoveCommand = new RelayCommand(CancelRemove);
@@ -102,6 +129,24 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>打开白名单管理命令。</summary>
     public IAsyncRelayCommand OpenAllowlistCommand { get; }
 
+    /// <summary>安装 / 重新安装 Hook 命令（GGD-0055）。</summary>
+    public IAsyncRelayCommand InstallHooksCommand { get; }
+
+    /// <summary>确认接管二进制 / 符号链接 Hook 命令。</summary>
+    public IAsyncRelayCommand ConfirmHookForceInstallCommand { get; }
+
+    /// <summary>取消强制接管命令。</summary>
+    public IRelayCommand CancelHookForceCommand { get; }
+
+    /// <summary>请求卸载 Hook（显示二次确认）命令。</summary>
+    public IRelayCommand RequestUninstallHooksCommand { get; }
+
+    /// <summary>确认卸载 Hook 命令。</summary>
+    public IAsyncRelayCommand ConfirmUninstallHooksCommand { get; }
+
+    /// <summary>取消卸载 Hook 命令。</summary>
+    public IRelayCommand CancelUninstallHooksCommand { get; }
+
     /// <summary>请求移除（显示二次确认）命令。</summary>
     public IRelayCommand RequestRemoveCommand { get; }
 
@@ -132,6 +177,8 @@ public sealed class RepositoriesViewModel : SectionViewModel
             CloseHistory();
             CloseAllowlist();
             IsRemoveConfirmationVisible = false;
+            IsHookForceConfirmationVisible = false;
+            IsUninstallConfirmationVisible = false;
             _ = LoadSelectedDetailAsync(value);
         }
     }
@@ -145,7 +192,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
             if (SetProperty(ref _isBusy, value))
             {
                 OnPropertyChanged(nameof(IsEmpty));
-                OnPropertyChanged(nameof(CanInteract));
+                NotifyInteractionState();
             }
         }
     }
@@ -158,7 +205,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         {
             if (SetProperty(ref _isDetailLoading, value))
             {
-                OnPropertyChanged(nameof(CanInteract));
+                NotifyInteractionState();
             }
         }
     }
@@ -172,7 +219,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
             if (SetProperty(ref _isDetailVisible, value))
             {
                 OnPropertyChanged(nameof(IsSelectPromptVisible));
-                OnPropertyChanged(nameof(CanInteract));
+                NotifyInteractionState();
             }
         }
     }
@@ -185,7 +232,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         {
             if (SetProperty(ref _isHistoryVisible, value))
             {
-                OnPropertyChanged(nameof(CanInteract));
+                NotifyInteractionState();
             }
         }
     }
@@ -198,7 +245,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         {
             if (SetProperty(ref _isAllowlistVisible, value))
             {
-                OnPropertyChanged(nameof(CanInteract));
+                NotifyInteractionState();
             }
         }
     }
@@ -221,6 +268,77 @@ public sealed class RepositoriesViewModel : SectionViewModel
     {
         get => _isRemoveConfirmationVisible;
         private set => SetProperty(ref _isRemoveConfirmationVisible, value);
+    }
+
+    /// <summary>是否正在安装 Hook。</summary>
+    public bool IsInstallingHooks
+    {
+        get => _isInstallingHooks;
+        private set
+        {
+            if (SetProperty(ref _isInstallingHooks, value))
+            {
+                OnPropertyChanged(nameof(InstallHookButtonText));
+                NotifyInteractionState();
+            }
+        }
+    }
+
+    /// <summary>是否正在卸载 Hook。</summary>
+    public bool IsUninstallingHooks
+    {
+        get => _isUninstallingHooks;
+        private set
+        {
+            if (SetProperty(ref _isUninstallingHooks, value))
+            {
+                OnPropertyChanged(nameof(UninstallHookButtonText));
+                NotifyInteractionState();
+            }
+        }
+    }
+
+    /// <summary>是否展示二进制 / 符号链接 Hook 的强制接管确认。</summary>
+    public bool IsHookForceConfirmationVisible
+    {
+        get => _isHookForceConfirmationVisible;
+        private set
+        {
+            if (SetProperty(ref _isHookForceConfirmationVisible, value))
+            {
+                NotifyHookConfirmationState();
+            }
+        }
+    }
+
+    /// <summary>是否展示卸载 Hook 二次确认。</summary>
+    public bool IsUninstallConfirmationVisible
+    {
+        get => _isUninstallConfirmationVisible;
+        private set
+        {
+            if (SetProperty(ref _isUninstallConfirmationVisible, value))
+            {
+                NotifyHookConfirmationState();
+            }
+        }
+    }
+
+    /// <summary>是否存在 Hook 确认条（强制接管或卸载）。</summary>
+    public bool IsHookConfirmationVisible => IsHookForceConfirmationVisible || IsUninstallConfirmationVisible;
+
+    /// <summary>是否至少有一个由 GitGuard 托管的 Hook。</summary>
+    public bool HasManagedHooks
+    {
+        get => _hasManagedHooks;
+        private set
+        {
+            if (SetProperty(ref _hasManagedHooks, value))
+            {
+                OnPropertyChanged(nameof(InstallHookButtonText));
+                NotifyInteractionState();
+            }
+        }
     }
 
     /// <summary>列表级消息（登记 / 刷新错误）。</summary>
@@ -258,6 +376,13 @@ public sealed class RepositoriesViewModel : SectionViewModel
     /// <summary>详情操作（扫描 / 移除 / 扫描历史 / 白名单）当前是否可用。</summary>
     public bool CanInteract =>
         IsDetailVisible && !IsBusy && !IsDetailLoading && !IsHistoryVisible && !IsAllowlistVisible;
+
+    /// <summary>Hook 安装 / 卸载操作当前是否可用（确认条与进行中操作期间暂停其他 Hook 操作）。</summary>
+    public bool CanManageHooks =>
+        CanInteract && !IsHookConfirmationVisible && !IsInstallingHooks && !IsUninstallingHooks;
+
+    /// <summary>卸载 Hook 是否可用（必须存在托管 Hook）。</summary>
+    public bool CanUninstallHooks => CanManageHooks && HasManagedHooks;
 
     /// <summary>列表级消息是否可见。</summary>
     public bool HasListMessage => !string.IsNullOrWhiteSpace(ListMessage);
@@ -366,6 +491,33 @@ public sealed class RepositoriesViewModel : SectionViewModel
 
     /// <summary>白名单按钮文案。</summary>
     public string AllowlistButtonText => DesktopText.AllowlistButton(_language);
+
+    /// <summary>安装 / 重新安装 Hook 按钮文案（按托管状态与进行态切换）。</summary>
+    public string InstallHookButtonText => IsInstallingHooks
+        ? DesktopText.RepositoryInstallingHookButton(_language)
+        : HasManagedHooks
+            ? DesktopText.RepositoryReinstallHookButton(_language)
+            : DesktopText.RepositoryInstallHookButton(_language);
+
+    /// <summary>卸载 Hook 按钮文案（卸载中显示进行态）。</summary>
+    public string UninstallHookButtonText => IsUninstallingHooks
+        ? DesktopText.RepositoryUninstallingHookButton(_language)
+        : DesktopText.RepositoryUninstallHookButton(_language);
+
+    /// <summary>强制接管 Hook 的确认提示。</summary>
+    public string HookForceConfirmPrompt => DesktopText.RepositoryHookForceConfirmPrompt(_language);
+
+    /// <summary>确认强制接管按钮文案。</summary>
+    public string ConfirmHookForceButtonText => DesktopText.RepositoryHookForceConfirmButton(_language);
+
+    /// <summary>卸载 Hook 确认提示。</summary>
+    public string HookUninstallConfirmPrompt => DesktopText.RepositoryHookUninstallConfirmPrompt(_language);
+
+    /// <summary>确认卸载 Hook 按钮文案。</summary>
+    public string ConfirmUninstallHookButtonText => DesktopText.RepositoryHookUninstallConfirmButton(_language);
+
+    /// <summary>取消 Hook 确认按钮文案。</summary>
+    public string CancelHookButtonText => DesktopText.RepositoryCancelButton(_language);
 
     /// <summary>移除登记按钮文案。</summary>
     public string RemoveButtonText => DesktopText.RepositoryRemoveButton(_language);
@@ -589,6 +741,8 @@ public sealed class RepositoriesViewModel : SectionViewModel
         }
 
         DetailMessage = null;
+        IsHookForceConfirmationVisible = false;
+        IsUninstallConfirmationVisible = false;
         IsRemoveConfirmationVisible = true;
     }
 
@@ -617,6 +771,213 @@ public sealed class RepositoriesViewModel : SectionViewModel
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private async Task InstallHooksAsync()
+    {
+        RepositoryItemViewModel? item = SelectedRepository;
+        if (item is null || !CanManageHooks)
+        {
+            return;
+        }
+
+        IsInstallingHooks = true;
+        DetailMessage = null;
+        try
+        {
+            string? executablePath = await _operations.ResolveHookExecutableAsync(item.RepoPath).ConfigureAwait(true);
+            if (!ReferenceEquals(SelectedRepository, item))
+            {
+                return;
+            }
+
+            // 自动探测失败时由用户选择 CLI；未注入选择器（单测 / 预览）只展示提示
+            if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                if (_cliPathPicker is null)
+                {
+                    DetailMessage = DesktopText.HookCliNotFoundMessage(_language);
+                    return;
+                }
+
+                DetailMessage = DesktopText.HookCliNotFoundMessage(_language);
+                executablePath = await _cliPathPicker
+                    .PickExecutableAsync(DesktopText.RepositoryHookCliPickerTitle(_language))
+                    .ConfigureAwait(true);
+                if (!ReferenceEquals(SelectedRepository, item))
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(executablePath))
+                {
+                    DetailMessage = DesktopText.HookCliSelectionCancelledMessage(_language);
+                    return;
+                }
+
+                if (!File.Exists(executablePath))
+                {
+                    DetailMessage = DesktopText.HookCliPathInvalidMessage(_language);
+                    return;
+                }
+            }
+
+            await ExecuteInstallHooksAsync(item, executablePath, force: false).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(SelectedRepository, item))
+            {
+                DetailMessage = FormatError(ex);
+            }
+        }
+        finally
+        {
+            IsInstallingHooks = false;
+        }
+    }
+
+    private async Task ConfirmHookForceInstallAsync()
+    {
+        RepositoryItemViewModel? item = SelectedRepository;
+        if (item is null || !_requiresHookForce || string.IsNullOrWhiteSpace(_pendingHookExecutablePath))
+        {
+            return;
+        }
+
+        string executablePath = _pendingHookExecutablePath;
+        IsHookForceConfirmationVisible = false;
+        IsInstallingHooks = true;
+        DetailMessage = null;
+        try
+        {
+            await ExecuteInstallHooksAsync(item, executablePath, force: true).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsInstallingHooks = false;
+        }
+    }
+
+    private void CancelHookForce()
+    {
+        IsHookForceConfirmationVisible = false;
+        _requiresHookForce = false;
+        _pendingHookExecutablePath = null;
+        DetailMessage = null;
+    }
+
+    private void RequestUninstallHooks()
+    {
+        if (!CanUninstallHooks)
+        {
+            return;
+        }
+
+        DetailMessage = null;
+        IsUninstallConfirmationVisible = true;
+    }
+
+    private void CancelUninstallHooks() => IsUninstallConfirmationVisible = false;
+
+    private async Task ConfirmUninstallHooksAsync()
+    {
+        RepositoryItemViewModel? item = SelectedRepository;
+        if (item is null || !IsUninstallConfirmationVisible)
+        {
+            return;
+        }
+
+        IsUninstallConfirmationVisible = false;
+        IsUninstallingHooks = true;
+        DetailMessage = null;
+        try
+        {
+            RepositoryDetail detail = await _operations.UninstallHooksAsync(item.RepoPath).ConfigureAwait(true);
+            if (!ReferenceEquals(SelectedRepository, item))
+            {
+                return;
+            }
+
+            ApplyDetail(detail);
+            DetailMessage = DesktopText.HookUninstalledMessage(_language);
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(SelectedRepository, item))
+            {
+                DetailMessage = FormatError(ex);
+            }
+        }
+        finally
+        {
+            IsUninstallingHooks = false;
+        }
+    }
+
+    /// <summary>执行安装并处理二进制 / 符号链接 Hook 的强制接管确认。</summary>
+    private async Task ExecuteInstallHooksAsync(
+        RepositoryItemViewModel item,
+        string executablePath,
+        bool force)
+    {
+        try
+        {
+            RepositoryDetail detail = await _operations
+                .InstallHooksAsync(item.RepoPath, executablePath, force)
+                .ConfigureAwait(true);
+
+            // 安装已生效：即使用户已切换仓库也应记住可用 CLI 路径
+            RememberHookExecutablePath(executablePath);
+            if (!ReferenceEquals(SelectedRepository, item))
+            {
+                return;
+            }
+
+            ApplyDetail(detail);
+            _requiresHookForce = false;
+            _pendingHookExecutablePath = null;
+            IsHookForceConfirmationVisible = false;
+            DetailMessage = DesktopText.HookInstalledMessage(_language);
+        }
+        catch (HookException ex) when (ex.ErrorCode == HookException.UNKNOWN_HOOK_PRESENT && !force)
+        {
+            if (!ReferenceEquals(SelectedRepository, item))
+            {
+                return;
+            }
+
+            // 首次安装遇到不可安全接管的 Hook：保留已解析路径，等待用户二次确认后强制接管
+            _requiresHookForce = true;
+            _pendingHookExecutablePath = executablePath;
+            DetailMessage = FormatError(ex);
+            IsHookForceConfirmationVisible = true;
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(SelectedRepository, item))
+            {
+                DetailMessage = FormatError(ex);
+            }
+        }
+    }
+
+    /// <summary>记住本次成功使用的 CLI 路径；写盘失败不改变 Hook 安装结果。</summary>
+    private void RememberHookExecutablePath(string executablePath)
+    {
+        if (_settingsOperations is not { } settingsOperations)
+        {
+            return;
+        }
+
+        try
+        {
+            settingsOperations.Save(settingsOperations.Current with { HookExecutablePath = executablePath });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            // 设置持久化失败由设置页提供显式反馈，此处静默保留会话内路径
         }
     }
 
@@ -670,6 +1031,7 @@ public sealed class RepositoriesViewModel : SectionViewModel
         }
 
         HasHookAttention = detail.Status.NeedsAttention;
+        HasManagedHooks = detail.Status.Hooks.Any(static hook => hook.Kind == HookStatusKind.Managed);
         GitGuardVersionText = detail.Status.GitGuardVersion;
         GitVersionText = detail.Status.GitVersion;
         HooksDirectoryText = detail.Status.HooksDirectory;
@@ -702,6 +1064,11 @@ public sealed class RepositoriesViewModel : SectionViewModel
         LatestScanText = string.Empty;
         HasLatestScan = false;
         HasHookAttention = false;
+        HasManagedHooks = false;
+        _requiresHookForce = false;
+        _pendingHookExecutablePath = null;
+        IsHookForceConfirmationVisible = false;
+        IsUninstallConfirmationVisible = false;
         DetailMessage = null;
     }
 
@@ -724,6 +1091,13 @@ public sealed class RepositoriesViewModel : SectionViewModel
         OnPropertyChanged(nameof(ScanButtonText));
         OnPropertyChanged(nameof(ScanHistoryButtonText));
         OnPropertyChanged(nameof(AllowlistButtonText));
+        OnPropertyChanged(nameof(InstallHookButtonText));
+        OnPropertyChanged(nameof(UninstallHookButtonText));
+        OnPropertyChanged(nameof(HookForceConfirmPrompt));
+        OnPropertyChanged(nameof(ConfirmHookForceButtonText));
+        OnPropertyChanged(nameof(HookUninstallConfirmPrompt));
+        OnPropertyChanged(nameof(ConfirmUninstallHookButtonText));
+        OnPropertyChanged(nameof(CancelHookButtonText));
         OnPropertyChanged(nameof(RemoveButtonText));
         OnPropertyChanged(nameof(RemoveConfirmPrompt));
         OnPropertyChanged(nameof(ConfirmRemoveButtonText));
@@ -731,8 +1105,27 @@ public sealed class RepositoriesViewModel : SectionViewModel
         OnPropertyChanged(nameof(HookAttentionText));
     }
 
-    private string FormatError(Exception exception) =>
-        exception is RepositoryException repositoryException
-            ? DesktopText.RepositoryError(repositoryException.ErrorCode, repositoryException.Message, _language)
-            : exception.Message;
+    private void NotifyInteractionState()
+    {
+        OnPropertyChanged(nameof(CanInteract));
+        OnPropertyChanged(nameof(CanManageHooks));
+        OnPropertyChanged(nameof(CanUninstallHooks));
+    }
+
+    private void NotifyHookConfirmationState()
+    {
+        OnPropertyChanged(nameof(IsHookConfirmationVisible));
+        NotifyInteractionState();
+    }
+
+    private string FormatError(Exception exception) => exception switch
+    {
+        RepositoryException repositoryException =>
+            DesktopText.RepositoryError(repositoryException.ErrorCode, repositoryException.Message, _language),
+        HookException hookException =>
+            DesktopText.HookError(hookException.ErrorCode, hookException.Message, _language),
+        ConfigurationException configurationException =>
+            DesktopText.HookConfigurationError(configurationException.Message, _language),
+        _ => exception.Message,
+    };
 }

@@ -42,6 +42,7 @@ public sealed partial class App : Avalonia.Application
                         AuditOperations = new AuditOperations(session),
                         SettingsOperations = settingsService,
                         ExportPathPicker = new StorageProviderExportPathPicker(() => desktop.MainWindow),
+                        CliPathPicker = new StorageProviderCliPathPicker(() => desktop.MainWindow),
                     }),
             };
         }
