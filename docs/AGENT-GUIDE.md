@@ -112,9 +112,10 @@
 2. 完成则移入已办清单，取消则移入取消任务；未完成则保留为 `IN_PROGRESS`、`PAUSED` 或 `BLOCKED` 并写清恢复点。
 3. 追加一条「会话记录」，写明结果、验证和下一步。
 4. 同步本次影响的需求、设计、API、数据库、测试或部署文档。
-5. 检查 Git 差异，确认没有覆盖用户改动，也没有混入无关文件。
-6. 对本次改动过的文本文件执行 UTF-8 with BOM 与 CRLF 检查；JSON、YAML 等现代配置文件按其惯例处理。
-7. 运行与风险匹配的构建、测试或文档链接检查，并记录未能执行的验证。
+5. **重大功能更新必须同步更新 `README.md`**：新增或变更检测能力、扫描模式、CLI 命令 / 选项 / 退出码、桌面端页面或核心交互、配置项、发行方式时，在同一任务内更新 README 的「项目介绍」「功能清单」「CLI 使用方法」「Desktop 使用方法」，并核对示例命令、版本号与产物名称。
+6. 检查 Git 差异，确认没有覆盖用户改动，也没有混入无关文件。
+7. 对本次改动过的文本文件执行 UTF-8 with BOM 与 CRLF 检查；JSON、YAML 等现代配置文件按其惯例处理。
+8. 运行与风险匹配的构建、测试或文档链接检查，并记录未能执行的验证。
 
 纯问答、明确的只读审查或用户明确禁止写入时，不为记录会话而擅自修改仓库；最终回复中应说明本次未更新台账。其他项目任务必须更新本文档。
 
@@ -132,11 +133,11 @@
 | --- | --- |
 | 当前任务 ID | — |
 | 当前状态 | `DONE` |
-| 当前目标 | 无（`GGD-0057` 完成，等待用户 Light / Dark / 跟随系统主题与默认 / 最小窗口实机验收） |
-| 最后完成动作 | `GGD-0057` 完成：Light / Dark 补齐警告 / 危险 / 成功 / 徽标语义画刷并统一视图颜色引用，修复深色主题警告条白字不可读；仓库详情操作区改为底部固定 `WrapPanel`，默认窗口 1280×720，新增 4 例主题 / 布局回归测试 |
-| 下一步动作 | 用户实机确认 Light / Dark / 跟随系统三种主题下确认条、错误提示与按钮文字清晰，默认 1280×720 与最小 1024×720 下仓库详情六个操作按钮完整可见；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务 |
-| 涉及文件 | `App.axaml`、`MainWindow.axaml`、`Views/*.axaml`、Desktop `ThemeResourcesTests` / `RepositoriesViewLayoutTests`、11 / 12 / 16 / 17 / 21 文档、README、AGENT-GUIDE |
-| 验证结果 | Release 构建 0 警告 0 错误；`dotnet format` 通过；全量 1778 用例（1769 通过 + 9 平台跳过 + 0 失败），其中 Desktop 142、CLI 131、Application 302、Infrastructure 210（204 通过 + 6 平台跳过）；Light / Dark 默认与 Light 最小窗口截图核验通过 |
+| 当前目标 | 无（等待用户审阅新版 README） |
+| 最后完成动作 | `GGD-0058` 完成：README 重写为「项目介绍 / 功能清单 / 安装 / CLI 使用方法 / Desktop 使用方法 / 配置 / 已知限制 / 开发与测试 / 文档入口」，删除版本流水账、FR 完成度与 CI / 打包细节；`docs/AGENT-GUIDE.md` §6 与 `docs/README.md` §5 固化「重大功能更新同步 README」规则 |
+| 下一步动作 | 用户审阅 README 结构与 Desktop 使用步骤；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务 |
+| 涉及文件 | `README.md`、`docs/AGENT-GUIDE.md`、`docs/README.md` |
+| 验证结果 | README 12 个本地文档链接均存在；`git diff --check` 通过；三份改动 `.md` 均为 UTF-8 with BOM + CRLF；`gitguard scan --staged` 结果 Warned（3 文件，1 项白名单忽略，退出码 0）；纯文档改动未运行构建 / 测试（风险匹配） |
 | 阻塞/待确认 | 无 |
 | 最后更新 | 2026-10-26 |
 
@@ -220,6 +221,7 @@
 | [x] | `GGD-0055` | Desktop 仓库详情页 Hook 一键安装 / 卸载与 CLI 路径选择 | 2026-10-26 | 右侧操作区提供安装 / 重新安装 / 卸载及两类二次确认；CLI 自动解析 → 文件选择 → `hookExecutablePath` 持久化；Desktop 138/138；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败） |
 | [x] | `GGD-0056` | 修复 GitGuard Desktop 操作期间 git 子进程闪现控制台窗口 | 2026-10-26 | `GitAccess` / `GitVersionProbe` 统一经 `GitProcessStartInfoFactory` 以 `UseShellExecute=false` + `CreateNoWindow=true` 启动 git；新增 3 例回归测试；Release 构建 0 警告 0 错误、`dotnet format` 通过，全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），Infrastructure 210（204 通过 + 6 平台跳过） |
 | [x] | `GGD-0057` | 修复桌面端主题对比度与仓库详情操作区布局 | 2026-10-26 | `App.axaml` 补齐 Light / Dark 警告 / 危险 / 成功 / 徽标语义画刷与按钮样式类，16 组关键前景 / 背景对比度 ≥ 4.5:1；视图移除全部硬编码颜色；`RepositoriesView` 操作区固定底部并由 `WrapPanel` 换行；`MainWindow` 默认 1280×720；新增 `ThemeResourcesTests` 3 例 + `RepositoriesViewLayoutTests` 1 例；Release 构建 0 警告 0 错误、`dotnet format` 通过，全量 1778 用例（1769 通过 + 9 平台跳过 + 0 失败），Desktop 142 |
+| [x] | `GGD-0058` | README 瘦身与使用文档重构 | 2026-10-26 | 重写 README 为项目介绍、功能清单、安装、CLI 使用方法、Desktop 使用方法、配置、已知限制、开发与测试、文档入口；删除版本流水账 / FR 完成度 / CI 与打包细节；在 `AGENT-GUIDE` §6 与 `docs/README` §5 固化重大功能同步 README 规则；README 12 个本地链接全部存在，`git diff --check` 通过，三份 `.md` 均 UTF-8 BOM + CRLF，`gitguard scan --staged` 退出码 0（1 项白名单忽略） |
 
 ## 10. 取消任务
 
@@ -287,3 +289,4 @@
 - 2026-10-26 · `GGD-0054` / `GGD-0055` · 完成 v1.1 桌面端 Hook 快捷管理：Application 新增 `HookManagementService` / `HookExecutableResolver` / `HookSelection`，CLI `install` / `uninstall` 复用共享服务且参数、输出契约与退出码不变；Desktop `IRepositoryOperations` / `RepositoryOperations` 接入 CLI 解析与 Hook 安装 / 卸载，`RepositoriesView` 增加安装 / 重新安装 / 卸载按钮、强制接管与卸载确认条，`ICliPathPicker` + Avalonia StorageProvider 支持手动选择，`DesktopSettings.HookExecutablePath` 持久化，`DesktopText` 补齐中英文案与 `HookException` / `ConfigurationException` 映射；测试新增 Application `HookExecutableResolverTests` / `HookSelectionTests` / 配置覆盖用例与 Desktop 7 例，并补全既有假对象接口 · 验证：Release 构建 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败），Application 302、CLI 131、Desktop 138 · 关键决策：① Desktop 不内置 CLI，只持久化外部 CLI 路径；② 路径解析顺序为配置 → PATH → 已知安装位置，失败才允许手动选择；③ 二进制 / 符号链接要求强制接管二次确认，卸载始终覆盖三类 GitGuard 托管 Hook；④ 变更不写回项目 `.gitguard.yml` · 文档同步 12 份：`docs/21-v1.1发行说明.md` / README / docs/README / CONTEXT / 06-API / 11-前端UI设计 / 12-前端组件设计 / 14-部署文档 / 16-测试方案 / 17-开发RoadMap / Directory.Build.props / AGENT-GUIDE · 环境陷阱：静态只读模式数组须按 `_camelCase` 命名以满足 IDE1006；新增文本文件须 UTF-8 BOM + CRLF 才能通过 `dotnet format` · 下一步：用户按 `TC-FR-100-15` 实机验收 v1.1；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务
 - 2026-10-26 · `GGD-0056` · 修复 GitGuard Desktop 操作期间 git 子进程闪现控制台窗口：用户反馈 Windows 桌面端在仓库列表 / 详情 / 扫描 / Hook 操作时反复出现一闪而过的控制台窗口；定位为 Desktop 以 WinExe 启动（无控制台），而 Infrastructure `GitAccess` 与 `GitVersionProbe` 的 `ProcessStartInfo` 仅设置 `UseShellExecute=false`、未设置 `CreateNoWindow`，每次 git 调用都会由系统新建控制台窗口；新增 `GitProcessStartInfoFactory` 统一设置 `CreateNoWindow=true` 并供两处复用，Infrastructure 项目增加 `InternalsVisibleTo` 供回归测试直接断言启动配置；Gitleaks 子进程已有 `CreateNoWindow`，ShellEditorLauncher 为显式打开编辑器的交互进程保持原样 · 测试新增 `GitProcessStartInfoFactoryTests` 3 例（隐藏窗口配置 + 空 / 空白可执行文件守卫），`TC-FR-100-16` 登记自动化与实机核验口径 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；`dotnet test GitGuard.sln -c Release --no-build` 全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），Infrastructure 210 用例（204 通过 + 6 平台跳过） · 文档同步：16-测试方案 0.2.28 / 17-开发RoadMap 0.1.34 / 21-v1.1发行说明 §2.4 与验证记录 / README 测试基线 / AGENT-GUIDE · 下一步：用户实机确认无窗口闪现；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
 - 2026-10-26 · `GGD-0057` · 完成桌面端主题对比度与仓库详情操作区布局修复：用户反馈深色主题下确认条按钮文字几乎不可见、默认窗口右侧操作按钮被裁切；根因为警告条使用固定浅黄背景但按钮沿用 FluentTheme 深色白字前景，以及六个操作按钮单行 `StackPanel` 在 1120px 默认宽度下溢出；`App.axaml` 新增 Light / Dark 警告表面 / 悬停 / 边框 / 文字、危险按钮 / 悬停 / 文字 / 表面、成功文字 / 徽标与中性徽标共 14 个语义画刷及 `warningPanel` / `warning` / `danger` / `dangerOutline` / `warningSecondary` 样式类，视图硬编码颜色清零并统一 `DynamicResource`；`RepositoriesView` 详情改为 `Grid RowDefinitions="*,Auto"`，内容滚动、六按钮 `WrapPanel` 固定底部，三类确认条改用语义样式；`MainWindow` 默认 1280×720 居中、最小 1024×720 · 测试新增 `ThemeResourcesTests`（Light / Dark 键集一致、16 组 WCAG AA 对比度、视图无硬编码前景 / 背景 / 边框）3 例与 `RepositoriesViewLayoutTests`（底部固定 + WrapPanel + 六按钮）1 例，`TC-FR-100-17` 登记自动化与实机核验口径 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；`dotnet test GitGuard.sln -c Release --no-build` 全量 1778 用例（1769 通过 + 9 平台跳过 + 0 失败），Desktop 142；Light / Dark 默认窗口与 Light 最小窗口截图人工核验通过 · 文档同步：11-前端UI设计 0.1.8 / 12-前端组件设计 0.1.9 / 16-测试方案 0.2.29 / 17-开发RoadMap 0.1.35 / 21-v1.1发行说明 §2.5 与验证记录 / README / AGENT-GUIDE · 下一步：用户实机确认三种主题与两种窗口尺寸；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
+- 2026-10-26 · `GGD-0058` · README 瘦身与使用文档重构：根目录 README 由版本流水账 / FR 完成度 / CI 与打包细节重写为「项目介绍 → 功能清单 → 安装 → CLI 使用方法（9 步）→ Desktop 使用方法（10 步）→ 配置 → 已知限制 → 开发与测试 → 文档入口 → README 维护约定」，补充 Desktop 仓库登记 / Hook 一键管理 / 立即扫描 / 扫描历史 / 白名单 / 规则库 / 日志导出 / 设置的操作步骤，CLI 命令与选项按 `--help` 实际输出核对；`docs/AGENT-GUIDE.md` §6 新增「重大功能更新必须同步更新 README」收尾规则并重排编号，`docs/README.md` §5 同步该维护约定并追加 0.1.5 变更记录 · 验证：README 12 个本地文档链接全部存在；`git diff --check` 通过；README / AGENT-GUIDE / docs/README 均 UTF-8 with BOM + CRLF；`gitguard scan --staged` 结果 Warned（3 文件 / 1 项白名单忽略 / 退出码 0）；纯文档改动未运行构建与测试（风险匹配） · 下一步：用户审阅新版 README；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
