@@ -2,6 +2,8 @@ name: Release
 
 # 发行流程（14-部署文档 §3）：tag v* 或手动触发 → Native AOT 多 RID 构建 → 三平台桌面安装包 →
 # 发行形态冒烟（CLI 写入审计 + 桌面端 --smoke-test 读取并导出）→ 校验和 + 产物上传。
+# Tag 触发且全部构建成功后，publish-release 作业创建 GitHub Release 并上传全部发行资产；
+# 手动触发仅产出 Actions 构件，不创建 Release。
 # RID 矩阵：Windows x64 / Linux x64 / macOS arm64（原生）+ macOS x64（在 arm64 runner 上交叉编译，无法本机冒烟）。
 
 on:
@@ -316,3 +318,93 @@ jobs:
           path: artifacts/desktop/*.AppImage
           if-no-files-found: error
           retention-days: 30
+
+  # GGD-0059：Tag 发行时把全部构建构件汇总为 GitHub Release 资产。
+  # 任一平台构建或冒烟失败都不会发布，避免出现资产不全的 Release。
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, aot, desktop-windows, desktop-macos, desktop-linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: gitguard-*
+          merge-multiple: true
+
+      - name: Verify expected assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.version.outputs.value }}"
+          expected=(
+            "gitguard-${version}-win-x64.zip"
+            "gitguard-${version}-linux-x64.zip"
+            "gitguard-${version}-osx-arm64.zip"
+            "gitguard-${version}-osx-x64.zip"
+            "gitguard-${version}-win-x64.msix"
+            "gitguard-${version}-osx-arm64.dmg"
+            "gitguard-${version}-osx-x64.dmg"
+            "gitguard-${version}-linux-x64.AppImage"
+          )
+          for asset in "${expected[@]}"; do
+            if [[ ! -f "dist/$asset" ]]; then
+              echo "::error::Missing release asset: $asset"
+              exit 1
+            fi
+          done
+          ls -lh dist
+
+      - name: Generate release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum ./* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.version.outputs.value }}"
+          tag="v${version}"
+          cat > release-notes.md <<EOF
+          ## GitGuard v${version}
+
+          本地 Git 敏感信息防泄漏工具：在 \`git commit\` / \`git push\` 前检测 Token、密钥、密码、手机号、本地路径与内网 URL。
+
+          ### 下载
+
+          | 组件 | 文件 |
+          | --- | --- |
+          | CLI Windows x64 | \`gitguard-${version}-win-x64.zip\` |
+          | CLI Linux x64 | \`gitguard-${version}-linux-x64.zip\` |
+          | CLI macOS arm64 | \`gitguard-${version}-osx-arm64.zip\` |
+          | CLI macOS x64 | \`gitguard-${version}-osx-x64.zip\` |
+          | Desktop Windows x64 | \`gitguard-${version}-win-x64.msix\` |
+          | Desktop macOS arm64 | \`gitguard-${version}-osx-arm64.dmg\` |
+          | Desktop macOS x64 | \`gitguard-${version}-osx-x64.dmg\` |
+          | Desktop Linux x64 | \`gitguard-${version}-linux-x64.AppImage\` |
+
+          ### 安装与校验
+
+          - CLI 解压后将目录加入 \`PATH\`；完整用法见 [README](https://github.com/Camefor/GitGuard/blob/${tag}/README.md)。
+          - 每个 CLI 压缩包内含独立 \`SHA256SUMS\`；本页 \`SHA256SUMS\` 覆盖全部发行资产。
+          - Windows MSIX 未签名，需要开发者模式或信任自签证书；macOS DMG 为 ad-hoc 签名，首次启动需在「系统设置 → 隐私与安全性」中手动放行。
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; uploading assets..."
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* \
+              --title "GitGuard v${version}" \
+              --notes-file release-notes.md \
+              --verify-tag
+          fi

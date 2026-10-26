@@ -131,14 +131,14 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| 当前任务 ID | — |
-| 当前状态 | `DONE` |
-| 当前目标 | 无（等待用户审阅新版 README） |
+| 当前任务 ID | `GGD-0059` |
+| 当前状态 | `IN_PROGRESS` |
+| 当前目标 | 打通 GitHub Releases 发布通道，构建并发布 `v1.1.0`：4 个 CLI Native AOT 包 + 4 个桌面端安装包 + 总校验和 |
 | 最后完成动作 | `GGD-0058` 完成：README 重写为「项目介绍 / 功能清单 / 安装 / CLI 使用方法 / Desktop 使用方法 / 配置 / 已知限制 / 开发与测试 / 文档入口」，删除版本流水账、FR 完成度与 CI / 打包细节；`docs/AGENT-GUIDE.md` §6 与 `docs/README.md` §5 固化「重大功能更新同步 README」规则 |
-| 下一步动作 | 用户审阅 README 结构与 Desktop 使用步骤；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务 |
-| 涉及文件 | `README.md`、`docs/AGENT-GUIDE.md`、`docs/README.md` |
-| 验证结果 | README 12 个本地文档链接均存在；`git diff --check` 通过；三份改动 `.md` 均为 UTF-8 with BOM + CRLF；`gitguard scan --staged` 结果 Warned（3 文件，1 项白名单忽略，退出码 0）；纯文档改动未运行构建 / 测试（风险匹配） |
-| 阻塞/待确认 | 无 |
+| 下一步动作 | 修改 `.github/workflows/release.yml` 增加 Release 发布作业；提交推送后创建 `v1.1.0` Tag；监控 Actions 并验证 Release 资产 |
+| 涉及文件 | `.github/workflows/release.yml`、`docs/14-部署文档.md`、`docs/21-v1.1发行说明.md`、`README.md`、`docs/AGENT-GUIDE.md` |
+| 验证结果 | 进行中 |
+| 阻塞/待确认 | 无（仓库无签名证书 secrets，MSIX 为未签名、macOS DMG 为 ad-hoc 签名，与 README 现有说明一致） |
 | 最后更新 | 2026-10-26 |
 
 <!-- agent-state:end -->
@@ -149,7 +149,7 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | 暂无待办任务 | — |
+| [ ] | `GGD-0059` | P1 | `IN_PROGRESS` | 打通 GitHub Releases 发布通道并发布 `v1.1.0` | 用户要求「构建并发布上传」；验收：Release 页面可下载 4 个 CLI zip（`win-x64` / `linux-x64` / `osx-arm64` / `osx-x64`）、4 个桌面端安装包（Windows MSIX、macOS arm64 / x64 DMG、Linux AppImage）与总 `SHA256SUMS`；三平台冒烟通过；README / 部署文档 / v1.1 发行说明同步 |
 
 > v1.1（`GGD-0054` / `GGD-0055`）与 `GGD-0056` / `GGD-0057` 已完成并通过全量测试；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
 

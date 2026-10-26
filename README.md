@@ -61,7 +61,7 @@ GitGuard 解决的是「敏感信息被误提交、误推送」的问题。安�
 | CLI | `gitguard-<version>-<rid>.zip`（内含 `gitguard` / `gitguard.exe` 与 `SHA256SUMS`） |
 | Desktop | Windows x64 `gitguard-<version>-win-x64.msix`；macOS `gitguard-<version>-osx-arm64.dmg` / `osx-x64.dmg`；Linux x64 `gitguard-<version>-linux-x64.AppImage` |
 
-若对应版本尚未发布，请使用下方的源码构建方式。解压 CLI 后将所在目录加入 `PATH`。桌面端安装包默认未签名 / 未公证：Windows MSIX 需要开发者模式或信任自签证书，macOS DMG 首次启动需手动放行；正式分发前请按 [部署文档](docs/14-部署文档.md) 配置签名与公证。
+若对应版本尚未发布，请使用下方的源码构建方式。解压 CLI 后将所在目录加入 `PATH`。Release 页面同时提供覆盖全部发行资产的 `SHA256SUMS`，下载后可执行 `sha256sum -c SHA256SUMS`（Windows 可用 `Get-FileHash -Algorithm SHA256`）校验完整性。桌面端安装包默认未签名 / 未公证：Windows MSIX 需要开发者模式或信任自签证书，macOS DMG 首次启动需手动放行；正式分发前请按 [部署文档](docs/14-部署文档.md) 配置签名与公证。
 
 ### 方式 B：从源码构建
 
