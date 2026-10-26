@@ -48,7 +48,7 @@ GitGuard 解决的是「敏感信息被误提交、误推送」的问题。安�
 | 规则查询 | `rules list` / `rules view` 查看内置与自定义规则，正则默认隐藏 |
 | CLI 体验 | 中英文输出、文本 / JSON 双格式、文件日志、Native AOT 单文件发布 |
 | 桌面端 | 多仓库管理、Hook 一键管理、立即扫描、扫描历史与发现项、白名单、规则库、跨仓库日志导出、语言 / 主题设置 |
-| 跨平台 | Windows / macOS / Linux；CLI 提供 win-x64 / linux-x64 / osx-arm64 / osx-x64 产物，桌面端提供 MSIX / DMG / AppImage |
+| 跨平台 | Windows / macOS / Linux；CLI 提供 win-x64 / linux-x64 / osx-arm64 / osx-x64 产物，桌面端发行包提供 macOS DMG / Linux AppImage（Windows MSIX 仅保留本地构建，不随 Release 发布） |
 
 ## 安装
 
@@ -59,9 +59,9 @@ GitGuard 解决的是「敏感信息被误提交、误推送」的问题。安�
 | 组件 | 产物 |
 | --- | --- |
 | CLI | `gitguard-<version>-<rid>.zip`（内含 `gitguard` / `gitguard.exe` 与 `SHA256SUMS`） |
-| Desktop | Windows x64 `gitguard-<version>-win-x64.msix`；macOS `gitguard-<version>-osx-arm64.dmg` / `osx-x64.dmg`；Linux x64 `gitguard-<version>-linux-x64.AppImage` |
+| Desktop | macOS `gitguard-<version>-osx-arm64.dmg` / `osx-x64.dmg`；Linux x64 `gitguard-<version>-linux-x64.AppImage` |
 
-若对应版本尚未发布，请使用下方的源码构建方式。解压 CLI 后将所在目录加入 `PATH`。Release 页面同时提供覆盖全部发行资产的 `SHA256SUMS`，下载后可执行 `sha256sum -c SHA256SUMS`（Windows 可用 `Get-FileHash -Algorithm SHA256`）校验完整性。桌面端安装包默认未签名 / 未公证：Windows MSIX 需要开发者模式或信任自签证书，macOS DMG 首次启动需手动放行；正式分发前请按 [部署文档](docs/14-部署文档.md) 配置签名与公证。
+若对应版本尚未发布，请使用下方的源码构建方式。解压 CLI 后将所在目录加入 `PATH`。Release 页面同时提供覆盖全部发行资产的 `SHA256SUMS`，下载后可执行 `sha256sum -c SHA256SUMS`（Windows 可用 `Get-FileHash -Algorithm SHA256`）校验完整性。Windows 桌面端暂不提供预编译安装包：MSIX 未签名会被系统拦截，可从源码构建后直接运行；macOS DMG 为 ad-hoc 签名，首次启动需手动放行；正式分发前请按 [部署文档](docs/14-部署文档.md) 配置签名与公证。
 
 ### 方式 B：从源码构建
 
@@ -399,7 +399,7 @@ exclude:
 - 基线指纹使用每用户本地盐，基线文件不能跨机器 / 用户复用。
 - 桌面端不内置 CLI，Hook 安装需要可用的 GitGuard CLI。
 - 桌面端 Gitleaks 覆盖只影响桌面端，不改变 CLI 与 `config.yml`。
-- 安装包默认未签名 / 未公证；Windows MSIX 需开发者模式或信任自签证书，macOS DMG 首次启动需手动放行。
+- 桌面端安装包默认未签名 / 未公证；macOS DMG 首次启动需手动放行。Windows MSIX 仅用于本地构建与 CI 冒烟，不随 Release 发布。
 - Hook 兼容性已在 Windows 上针对 Husky v9 / lefthook v2 / pre-commit 4.x 验证；其他平台或更老版本请以实际仓库验证为准。
 
 ## 开发与测试
@@ -410,7 +410,7 @@ dotnet test GitGuard.sln
 dotnet format GitGuard.sln --verify-no-changes --no-restore
 ```
 
-CI 覆盖 Release 构建、格式检查、七类测试作业、Git 2.9.3 / 2.40.1 / 最新稳定版 E2E 兼容矩阵与 Windows MSIX 发行冒烟。架构、数据库与测试细节见 [文档索引](docs/README.md)。
+CI 覆盖 Release 构建、格式检查、七类测试作业、Git 2.9.3 / 2.40.1 / 最新稳定版 E2E 兼容矩阵与 Windows MSIX 构建冒烟。架构、数据库与测试细节见 [文档索引](docs/README.md)。
 
 ## 文档入口
 

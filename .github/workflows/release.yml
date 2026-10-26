@@ -341,12 +341,13 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ needs.version.outputs.value }}"
+          # Windows MSIX 仅用于 CI 构建冒烟，不随 Release 发布
+          rm -f "dist/gitguard-${version}-win-x64.msix"
           expected=(
             "gitguard-${version}-win-x64.zip"
             "gitguard-${version}-linux-x64.zip"
             "gitguard-${version}-osx-arm64.zip"
             "gitguard-${version}-osx-x64.zip"
-            "gitguard-${version}-win-x64.msix"
             "gitguard-${version}-osx-arm64.dmg"
             "gitguard-${version}-osx-x64.dmg"
             "gitguard-${version}-linux-x64.AppImage"
@@ -389,7 +390,6 @@ jobs:
           | CLI Linux x64 | \`gitguard-${version}-linux-x64.zip\` |
           | CLI macOS arm64 | \`gitguard-${version}-osx-arm64.zip\` |
           | CLI macOS x64 | \`gitguard-${version}-osx-x64.zip\` |
-          | Desktop Windows x64 | \`gitguard-${version}-win-x64.msix\` |
           | Desktop macOS arm64 | \`gitguard-${version}-osx-arm64.dmg\` |
           | Desktop macOS x64 | \`gitguard-${version}-osx-x64.dmg\` |
           | Desktop Linux x64 | \`gitguard-${version}-linux-x64.AppImage\` |
@@ -398,7 +398,7 @@ jobs:
 
           - CLI 解压后将目录加入 \`PATH\`；完整用法见 [README](https://github.com/Camefor/GitGuard/blob/${tag}/README.md)。
           - 每个 CLI 压缩包内含独立 \`SHA256SUMS\`；本页 \`SHA256SUMS\` 覆盖全部发行资产。
-          - Windows MSIX 未签名，需要开发者模式或信任自签证书；macOS DMG 为 ad-hoc 签名，首次启动需在「系统设置 → 隐私与安全性」中手动放行。
+          - Windows 桌面端 MSIX 仅用于 CI 构建冒烟，不随 Release 发布；Windows 用户可使用 CLI 或从源码构建桌面端。macOS DMG 为 ad-hoc 签名，首次启动需在「系统设置 → 隐私与安全性」中手动放行。
           EOF
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists; uploading assets..."

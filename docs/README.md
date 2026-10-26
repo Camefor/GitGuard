@@ -39,10 +39,10 @@
 
 ## 3. 当前产品基线
 
-- 产品版本：`1.1.0`（`GGD-0054` / `GGD-0055`：桌面端 Hook 快捷安装 / 卸载与共享 Hook 管理服务；`v1.1.0` 已发布至 [GitHub Releases](https://github.com/Camefor/GitGuard/releases/tag/v1.1.0)，含 4 个 CLI zip、Windows MSIX、macOS arm64 / x64 DMG、Linux AppImage 与总 `SHA256SUMS`；1.0.0 基线的 3 个月稳定运行观察仍待完成）
+- 产品版本：`1.1.0`（`GGD-0054` / `GGD-0055`：桌面端 Hook 快捷安装 / 卸载与共享 Hook 管理服务；`v1.1.0` 已发布至 [GitHub Releases](https://github.com/Camefor/GitGuard/releases/tag/v1.1.0)，含 4 个 CLI zip、macOS arm64 / x64 DMG、Linux AppImage 与总 `SHA256SUMS`；Windows MSIX 仅保留 CI 冒烟，不发布；1.0.0 基线的 3 个月稳定运行观察仍待完成）
 - **MVP (P1)**：已完成——CLI + Git Hook 分发器 + 四类检测器（Secret / Privacy / LocalPath / Url）+ SQLite 审计 + `.gitguard.yml` 配置
 - **第二阶段 (P2)**：开发完成——规则分级、项目白名单、仓库全历史扫描、Gitleaks 适配器集成、误报治理指南；真实项目试用验收待用户执行
-- **第三阶段 (P3)**：功能开发完成——Avalonia 桌面管理工具、多仓库统一管理、三平台安装包（三平台安装包已由 v1.1.0 Release 流水线完成发行冒烟）
+- **第三阶段 (P3)**：功能开发完成——Avalonia 桌面管理工具、多仓库统一管理、macOS / Linux 发行安装包（Windows MSIX 仅保留 CI 构建冒烟，不随 Release 发布）
 - **v1.0**：内置规则库 60 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 13）已达成；`1.0.0` 发布基线已完成（Windows CLI / MSIX 发行冒烟通过，macOS / Linux 已由 v1.1.0 Release 流水线完成首次 runner 冒烟；正式公开发布待 3 个月稳定运行观察）
 - **v1.1**：桌面端不内置 CLI，仓库详情页复用 Application 层 `HookManagementService` 提供一键安装 / 重新安装 / 卸载 Hook、CLI 路径选择与强制接管确认；CLI `install` / `uninstall` 同步复用共享服务（`GGD-0054` / `GGD-0055`）；`v1.1.0` 发行包已发布到 GitHub Releases（`GGD-0059`）
 - 技术基线：详见 [`03-系统架构设计(SAD).md`](<./03-系统架构设计(SAD).md>) §2 技术选型
@@ -76,3 +76,4 @@
 | 0.1.4 | 2026-10-26 | GGD-0054 / GGD-0055：§2 导航新增 21 号 v1.1 发行说明、RoadMap 更新为五阶段；§3 产品版本更新为 1.1.0 并补充桌面端 Hook 快捷管理 |
 | 0.1.5 | 2026-10-26 | GGD-0058：§5 文档维护约定新增「重大功能变更同步更新根目录 README.md」规则 |
 | 0.1.6 | 2026-10-26 | GGD-0059：GitHub Releases 发布通道落地；§3 产品基线补充 `v1.1.0` 发行地址、资产清单与三平台冒烟结果 |
+| 0.1.7 | 2026-10-26 | GGD-0060：Windows MSIX 退出 Release 发布，`v1.1.0` 资产与文案同步为 4 个 CLI zip + macOS DMG ×2 + Linux AppImage + `SHA256SUMS` |
