@@ -4,7 +4,7 @@
 
 > 面向开发者的本地 Git 敏感信息防泄漏工具：在 `git commit` 与 `git push` 前通过 Hook 拦截 Token、密钥、密码、手机号、本地路径、内网 URL 等敏感信息。扫描与审计全部在本机完成，不上传代码或敏感原文。
 
-当前版本：**1.1.0**
+当前版本：**1.1.0**（[下载发行包](https://github.com/Camefor/GitGuard/releases/tag/v1.1.0)）
 
 ## 项目介绍
 

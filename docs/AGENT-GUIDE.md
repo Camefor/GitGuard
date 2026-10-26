@@ -132,13 +132,13 @@
 | 字段 | 当前值 |
 | --- | --- |
 | 当前任务 ID | `GGD-0059` |
-| 当前状态 | `IN_PROGRESS` |
-| 当前目标 | 打通 GitHub Releases 发布通道，构建并发布 `v1.1.0`：4 个 CLI Native AOT 包 + 4 个桌面端安装包 + 总校验和 |
-| 最后完成动作 | `GGD-0058` 完成：README 重写为「项目介绍 / 功能清单 / 安装 / CLI 使用方法 / Desktop 使用方法 / 配置 / 已知限制 / 开发与测试 / 文档入口」，删除版本流水账、FR 完成度与 CI / 打包细节；`docs/AGENT-GUIDE.md` §6 与 `docs/README.md` §5 固化「重大功能更新同步 README」规则 |
-| 下一步动作 | 修改 `.github/workflows/release.yml` 增加 Release 发布作业；提交推送后创建 `v1.1.0` Tag；监控 Actions 并验证 Release 资产 |
-| 涉及文件 | `.github/workflows/release.yml`、`docs/14-部署文档.md`、`docs/21-v1.1发行说明.md`、`README.md`、`docs/AGENT-GUIDE.md` |
-| 验证结果 | 进行中 |
-| 阻塞/待确认 | 无（仓库无签名证书 secrets，MSIX 为未签名、macOS DMG 为 ad-hoc 签名，与 README 现有说明一致） |
+| 当前状态 | `DONE` |
+| 当前目标 | 无（等待用户指派下一任务） |
+| 最后完成动作 | `GGD-0059` 完成：`.github/workflows/release.yml` 新增 tag 触发的 `publish-release` 作业（全部构建成功后用 `gh release create` / `upload --clobber` 发布 4 个 CLI zip、4 个桌面安装包与总 `SHA256SUMS`）；`v1.1.0` 已发布至 GitHub Releases（Run #40276679120），9 个资产全部可下载且总校验和通过；README / 14-部署文档 / 21-v1.1发行说明 / docs/README 已同步发行信息 |
+| 下一步动作 | 无待办任务；等待用户指派（原始需求 3「GitGuard.Cli 写入系统 PATH」待用户确认后登记） |
+| 涉及文件 | `.github/workflows/release.yml`、`build/desktop/package-appimage.ps1`、`build/desktop/smoke-test.ps1`、`README.md`、`docs/14-部署文档.md`、`docs/21-v1.1发行说明.md`、`docs/README.md`、`docs/AGENT-GUIDE.md` |
+| 验证结果 | Release 页面 `draft=false` / `prerelease=false`，9 个资产全部 `uploaded`；GitHub Actions Release #40276679120 中 4 个 RID Native AOT、Windows MSIX、macOS arm64 / x64 DMG、Linux AppImage 全部构建与冒烟通过；8 个二进制资产下载后 `sha256sum -c SHA256SUMS` 全部 OK；`gitguard version` → `gitguard 1.1.0`；MSIX 标识版本 `1.1.0.0` |
+| 阻塞/待确认 | 无（仓库无签名证书 secrets：MSIX 未签名、macOS DMG 为 ad-hoc 签名，已在发行说明中标注） |
 | 最后更新 | 2026-10-26 |
 
 <!-- agent-state:end -->
@@ -149,9 +149,9 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | `GGD-0059` | P1 | `IN_PROGRESS` | 打通 GitHub Releases 发布通道并发布 `v1.1.0` | 用户要求「构建并发布上传」；验收：Release 页面可下载 4 个 CLI zip（`win-x64` / `linux-x64` / `osx-arm64` / `osx-x64`）、4 个桌面端安装包（Windows MSIX、macOS arm64 / x64 DMG、Linux AppImage）与总 `SHA256SUMS`；三平台冒烟通过；README / 部署文档 / v1.1 发行说明同步 |
+> 暂无待办任务。`GGD-0059` 已完成，`v1.1.0` 已发布至 GitHub Releases。
 
-> v1.1（`GGD-0054` / `GGD-0055`）与 `GGD-0056` / `GGD-0057` 已完成并通过全量测试；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
+> `GGD-0054` ~ `GGD-0059` 均已完成并通过全量测试；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
 
 ### 8.2 暂停/阻塞任务恢复详情
 
@@ -222,6 +222,7 @@
 | [x] | `GGD-0056` | 修复 GitGuard Desktop 操作期间 git 子进程闪现控制台窗口 | 2026-10-26 | `GitAccess` / `GitVersionProbe` 统一经 `GitProcessStartInfoFactory` 以 `UseShellExecute=false` + `CreateNoWindow=true` 启动 git；新增 3 例回归测试；Release 构建 0 警告 0 错误、`dotnet format` 通过，全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），Infrastructure 210（204 通过 + 6 平台跳过） |
 | [x] | `GGD-0057` | 修复桌面端主题对比度与仓库详情操作区布局 | 2026-10-26 | `App.axaml` 补齐 Light / Dark 警告 / 危险 / 成功 / 徽标语义画刷与按钮样式类，16 组关键前景 / 背景对比度 ≥ 4.5:1；视图移除全部硬编码颜色；`RepositoriesView` 操作区固定底部并由 `WrapPanel` 换行；`MainWindow` 默认 1280×720；新增 `ThemeResourcesTests` 3 例 + `RepositoriesViewLayoutTests` 1 例；Release 构建 0 警告 0 错误、`dotnet format` 通过，全量 1778 用例（1769 通过 + 9 平台跳过 + 0 失败），Desktop 142 |
 | [x] | `GGD-0058` | README 瘦身与使用文档重构 | 2026-10-26 | 重写 README 为项目介绍、功能清单、安装、CLI 使用方法、Desktop 使用方法、配置、已知限制、开发与测试、文档入口；删除版本流水账 / FR 完成度 / CI 与打包细节；在 `AGENT-GUIDE` §6 与 `docs/README` §5 固化重大功能同步 README 规则；README 12 个本地链接全部存在，`git diff --check` 通过，三份 `.md` 均 UTF-8 BOM + CRLF，`gitguard scan --staged` 退出码 0（1 项白名单忽略） |
+| [x] | `GGD-0059` | GitHub Releases 发布通道与 `v1.1.0` 发行：tag 触发的 `publish-release` 作业、8 个发行资产 + 总 `SHA256SUMS`、README / 部署文档 / 发行说明同步 | 2026-10-26 | Release 页面 `draft=false` / `prerelease=false`，9 个资产全部 `uploaded`；GitHub Actions Release #40276679120 中 4 个 RID Native AOT、Windows MSIX、macOS arm64 / x64 DMG、Linux AppImage 全部构建与冒烟通过；8 个二进制资产下载后 `sha256sum -c SHA256SUMS` 全部 OK；`gitguard version` → `gitguard 1.1.0`；MSIX 标识版本 `1.1.0.0`；文档同步 14-部署文档 0.2.0 / 21-v1.1发行说明 / docs/README 0.1.6 / README / AGENT-GUIDE |
 
 ## 10. 取消任务
 
@@ -290,3 +291,4 @@
 - 2026-10-26 · `GGD-0056` · 修复 GitGuard Desktop 操作期间 git 子进程闪现控制台窗口：用户反馈 Windows 桌面端在仓库列表 / 详情 / 扫描 / Hook 操作时反复出现一闪而过的控制台窗口；定位为 Desktop 以 WinExe 启动（无控制台），而 Infrastructure `GitAccess` 与 `GitVersionProbe` 的 `ProcessStartInfo` 仅设置 `UseShellExecute=false`、未设置 `CreateNoWindow`，每次 git 调用都会由系统新建控制台窗口；新增 `GitProcessStartInfoFactory` 统一设置 `CreateNoWindow=true` 并供两处复用，Infrastructure 项目增加 `InternalsVisibleTo` 供回归测试直接断言启动配置；Gitleaks 子进程已有 `CreateNoWindow`，ShellEditorLauncher 为显式打开编辑器的交互进程保持原样 · 测试新增 `GitProcessStartInfoFactoryTests` 3 例（隐藏窗口配置 + 空 / 空白可执行文件守卫），`TC-FR-100-16` 登记自动化与实机核验口径 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；`dotnet test GitGuard.sln -c Release --no-build` 全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），Infrastructure 210 用例（204 通过 + 6 平台跳过） · 文档同步：16-测试方案 0.2.28 / 17-开发RoadMap 0.1.34 / 21-v1.1发行说明 §2.4 与验证记录 / README 测试基线 / AGENT-GUIDE · 下一步：用户实机确认无窗口闪现；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
 - 2026-10-26 · `GGD-0057` · 完成桌面端主题对比度与仓库详情操作区布局修复：用户反馈深色主题下确认条按钮文字几乎不可见、默认窗口右侧操作按钮被裁切；根因为警告条使用固定浅黄背景但按钮沿用 FluentTheme 深色白字前景，以及六个操作按钮单行 `StackPanel` 在 1120px 默认宽度下溢出；`App.axaml` 新增 Light / Dark 警告表面 / 悬停 / 边框 / 文字、危险按钮 / 悬停 / 文字 / 表面、成功文字 / 徽标与中性徽标共 14 个语义画刷及 `warningPanel` / `warning` / `danger` / `dangerOutline` / `warningSecondary` 样式类，视图硬编码颜色清零并统一 `DynamicResource`；`RepositoriesView` 详情改为 `Grid RowDefinitions="*,Auto"`，内容滚动、六按钮 `WrapPanel` 固定底部，三类确认条改用语义样式；`MainWindow` 默认 1280×720 居中、最小 1024×720 · 测试新增 `ThemeResourcesTests`（Light / Dark 键集一致、16 组 WCAG AA 对比度、视图无硬编码前景 / 背景 / 边框）3 例与 `RepositoriesViewLayoutTests`（底部固定 + WrapPanel + 六按钮）1 例，`TC-FR-100-17` 登记自动化与实机核验口径 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；`dotnet test GitGuard.sln -c Release --no-build` 全量 1778 用例（1769 通过 + 9 平台跳过 + 0 失败），Desktop 142；Light / Dark 默认窗口与 Light 最小窗口截图人工核验通过 · 文档同步：11-前端UI设计 0.1.8 / 12-前端组件设计 0.1.9 / 16-测试方案 0.2.29 / 17-开发RoadMap 0.1.35 / 21-v1.1发行说明 §2.5 与验证记录 / README / AGENT-GUIDE · 下一步：用户实机确认三种主题与两种窗口尺寸；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
 - 2026-10-26 · `GGD-0058` · README 瘦身与使用文档重构：根目录 README 由版本流水账 / FR 完成度 / CI 与打包细节重写为「项目介绍 → 功能清单 → 安装 → CLI 使用方法（9 步）→ Desktop 使用方法（10 步）→ 配置 → 已知限制 → 开发与测试 → 文档入口 → README 维护约定」，补充 Desktop 仓库登记 / Hook 一键管理 / 立即扫描 / 扫描历史 / 白名单 / 规则库 / 日志导出 / 设置的操作步骤，CLI 命令与选项按 `--help` 实际输出核对；`docs/AGENT-GUIDE.md` §6 新增「重大功能更新必须同步更新 README」收尾规则并重排编号，`docs/README.md` §5 同步该维护约定并追加 0.1.5 变更记录 · 验证：README 12 个本地文档链接全部存在；`git diff --check` 通过；README / AGENT-GUIDE / docs/README 均 UTF-8 with BOM + CRLF；`gitguard scan --staged` 结果 Warned（3 文件 / 1 项白名单忽略 / 退出码 0）；纯文档改动未运行构建与测试（风险匹配） · 下一步：用户审阅新版 README；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
+- 2026-10-26 · `GGD-0059` · 打通 GitHub Releases 发布通道并发布 `v1.1.0`：`.github/workflows/release.yml` 新增 tag 触发的 `publish-release` 作业（`needs` 全部构建作业、`contents: write`、下载 `gitguard-*` 构件、校验 8 个预期资产、生成总 `SHA256SUMS`、`gh release create` 或 `gh release upload --clobber`）；修复 `build/desktop/package-appimage.ps1` 失效的 appimagetool 下载地址（改为 `AppImage/appimagetool` continuous release）；修复 `build/desktop/smoke-test.ps1` Linux 分支未创建隔离 HOME 导致 Native AOT CLI 无法解析主目录而失败；发布过程依次修复 `gh` 缺少 `GH_REPO` 上下文、AppImage 404、Linux HOME 缺失三个问题后，`v1.1.0` 于 Run #40276679120 全绿并发布 · 验证：Release 页面 `draft=false` / `prerelease=false`、9 个资产全部 `uploaded`（4 个 CLI zip + Windows MSIX + 2 个 macOS DMG + Linux AppImage + `SHA256SUMS`）；8 个二进制资产全部下载后 `sha256sum -c SHA256SUMS` 通过；`gitguard-1.1.0-win-x64.zip` 内 `gitguard.exe version` 输出 `gitguard 1.1.0`；MSIX 标识 `Version="1.1.0.0"` / `Publisher="CN=GitGuard"`；文档同步 14-部署文档 0.2.0 / 21-v1.1发行说明 / docs/README 0.1.6 / README / AGENT-GUIDE · 关键决策：① 仅 `v*` Tag 触发发布，`workflow_dispatch` 只产出 Actions 构件，避免手动构建误发版；② `publish-release` 等待 5 个构建作业全部成功才执行，任一平台失败即不发布；③ 已存在同名 Release 时 `gh release upload --clobber` 幂等重传，便于 Tag 重建后重跑；④ 无签名 secrets，MSIX 保持未签名、macOS DMG 保持 ad-hoc 签名并在发行说明中明确告警 · 环境陷阱：无 checkout 的 job 中 `gh` 需显式 `GH_REPO`（仅 `GH_TOKEN` / `GITHUB_REPOSITORY` 不够）；AppImageKit release 13 的 appimagetool 资产已 404，需改用 `AppImage/appimagetool` continuous；`UserDataPaths` 即便显式指定数据目录仍会解析 HOME，Linux 冒烟需先创建隔离 HOME · 下一步：无待办任务，等待用户指派
