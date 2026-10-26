@@ -135,6 +135,9 @@ try {
         $env:XDG_DATA_HOME = Join-Path $workRoot "xdgdata"
         $env:APPIMAGE_EXTRACT_AND_RUN = "1"
         $dataDirectory = Join-Path $env:XDG_DATA_HOME "gitguard"
+        # UserDataPaths 在未显式传入 userConfigDirectory 时仍需解析 HOME；先创建隔离 HOME，
+        # 避免 Native AOT CLI 在 HOME 指向不存在目录时无法解析用户配置目录。
+        New-Item -ItemType Directory -Force -Path $env:HOME | Out-Null
     }
 
     if (-not $isWindowsHost) {
