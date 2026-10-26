@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   发布 GitGuard.Desktop（linux-x64 自包含），组装 AppDir 并调用 appimagetool 生成无需 root 的
-  AppImage。appimagetool 默认从 AppImageKit release 13 下载并缓存在 build/desktop/.tools。
+  AppImage。appimagetool 从 AppImage/appimagetool continuous release 下载并缓存在 build/desktop/.tools。
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +31,7 @@ $appImageTool = Join-Path $toolsDirectory "appimagetool-x86_64.AppImage"
 
 if (-not (Test-Path $appImageTool)) {
     New-Item -ItemType Directory -Force -Path $toolsDirectory | Out-Null
-    $url = "https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage"
+    $url = "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
     Write-Host "Downloading appimagetool: $url"
     Invoke-WebRequest -Uri $url -OutFile $appImageTool
     chmod +x $appImageTool
