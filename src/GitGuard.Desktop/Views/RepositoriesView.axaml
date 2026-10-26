@@ -28,7 +28,7 @@
       <Setter Property="Background" Value="{DynamicResource GitGuardSidebarHoverBrush}" />
     </Style>
     <Style Selector="TextBlock.error">
-      <Setter Property="Foreground" Value="#C62828" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerTextBrush}" />
     </Style>
   </UserControl.Styles>
 
@@ -111,13 +111,15 @@
                                  FontSize="13"
                                  FontWeight="SemiBold" />
                       <Border IsVisible="{Binding IsMissing}"
-                              Background="#FFF3CD"
+                              Background="{DynamicResource GitGuardWarningSurfaceBrush}"
+                              BorderBrush="{DynamicResource GitGuardWarningBorderBrush}"
+                              BorderThickness="1"
                               CornerRadius="4"
                               Padding="6,1"
                               VerticalAlignment="Center">
                         <TextBlock Text="{Binding MissingText}"
                                    FontSize="10"
-                                   Foreground="#8A6D3B" />
+                                   Foreground="{DynamicResource GitGuardWarningTextBrush}" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="{Binding RepoPath}"
@@ -149,133 +151,141 @@
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="24">
-          <ScrollViewer>
-            <StackPanel Spacing="16">
+          <Grid RowDefinitions="*,Auto">
+            <ScrollViewer Grid.Row="0"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="16">
 
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <StackPanel Grid.Column="0" Spacing="3">
-                  <TextBlock Text="{Binding SelectedRepository.DisplayName}"
-                             FontSize="20"
-                             FontWeight="SemiBold"
-                             Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                  <TextBlock Text="{Binding SelectedRepository.RepoPath}"
-                             FontSize="11"
-                             Classes="secondary"
-                             TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding SelectedRepository.MissingText}"
-                             IsVisible="{Binding SelectedRepository.IsMissing}"
-                             Classes="error"
-                             FontSize="11" />
-                </StackPanel>
-                <ProgressBar Grid.Column="1"
-                             IsIndeterminate="True"
-                             Width="96"
-                             IsVisible="{Binding IsDetailLoading}" />
-              </Grid>
-
-              <TextBlock Text="{Binding DetailMessage}"
-                         IsVisible="{Binding HasDetailMessage}"
-                         FontSize="12"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-
-              <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                <StackPanel Grid.Column="0" Spacing="2">
-                  <TextBlock Text="{Binding GitGuardVersionLabel}"
-                             FontSize="11"
-                             Classes="secondary" />
-                  <TextBlock Text="{Binding GitGuardVersionText}"
-                             FontSize="13"
-                             Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="2">
-                  <TextBlock Text="{Binding GitVersionLabel}"
-                             FontSize="11"
-                             Classes="secondary" />
-                  <TextBlock Text="{Binding GitVersionText}"
-                             FontSize="13"
-                             TextWrapping="Wrap"
-                             Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                </StackPanel>
-              </Grid>
-
-              <StackPanel Spacing="2">
-                <TextBlock Text="{Binding HooksDirectoryLabel}"
-                           FontSize="11"
-                           Classes="secondary" />
-                <TextBlock Text="{Binding HooksDirectoryText}"
-                           FontSize="11"
-                           Classes="secondary"
-                           TextWrapping="Wrap" />
-              </StackPanel>
-
-              <Border Background="{DynamicResource GitGuardContentBrush}"
-                      BorderBrush="{DynamicResource GitGuardBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="8"
-                      Padding="16">
-                <StackPanel Spacing="8">
-                  <TextBlock Text="{Binding HooksTitle}"
-                             FontSize="13"
-                             FontWeight="SemiBold"
-                             Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                  <ItemsControl ItemsSource="{Binding HookRows}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:HookStatusRowViewModel">
-                        <Grid ColumnDefinitions="120,150,*" Margin="0,3">
-                          <TextBlock Grid.Column="0"
-                                     Text="{Binding HookName}"
-                                     FontFamily="Consolas"
-                                     FontSize="12"
-                                     Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                          <TextBlock Grid.Column="1"
-                                     Text="{Binding StatusText}"
-                                     FontSize="12"
-                                     Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                          <TextBlock Grid.Column="2"
-                                     Text="{Binding VersionText}"
-                                     FontSize="11"
-                                     Classes="secondary" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <TextBlock Text="{Binding HookAttentionText}"
-                             IsVisible="{Binding HasHookAttention}"
-                             FontSize="11"
-                             TextWrapping="Wrap"
-                             Foreground="#B26A00" />
-                </StackPanel>
-              </Border>
-
-              <Border Background="{DynamicResource GitGuardContentBrush}"
-                      BorderBrush="{DynamicResource GitGuardBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="8"
-                      Padding="16">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="{Binding LatestScanLabel}"
-                             FontSize="13"
-                             FontWeight="SemiBold"
-                             Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                  <TextBlock Text="{Binding NoScanText}"
-                             IsVisible="{Binding !HasLatestScan}"
-                             Classes="secondary"
-                             FontSize="12" />
-                  <StackPanel IsVisible="{Binding HasLatestScan}" Spacing="2">
-                    <TextBlock Text="{Binding LatestScanResultText}"
-                               FontSize="13"
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                  <StackPanel Grid.Column="0" Spacing="3">
+                    <TextBlock Text="{Binding SelectedRepository.DisplayName}"
+                               FontSize="20"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
-                    <TextBlock Text="{Binding LatestScanText}"
+                    <TextBlock Text="{Binding SelectedRepository.RepoPath}"
                                FontSize="11"
                                Classes="secondary"
                                TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding SelectedRepository.MissingText}"
+                               IsVisible="{Binding SelectedRepository.IsMissing}"
+                               Classes="error"
+                               FontSize="11" />
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                  <ProgressBar Grid.Column="1"
+                               IsIndeterminate="True"
+                               Width="96"
+                               IsVisible="{Binding IsDetailLoading}" />
+                </Grid>
 
-              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="{Binding DetailMessage}"
+                           IsVisible="{Binding HasDetailMessage}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                  <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="{Binding GitGuardVersionLabel}"
+                               FontSize="11"
+                               Classes="secondary" />
+                    <TextBlock Text="{Binding GitGuardVersionText}"
+                               FontSize="13"
+                               Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="{Binding GitVersionLabel}"
+                               FontSize="11"
+                               Classes="secondary" />
+                    <TextBlock Text="{Binding GitVersionText}"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                  </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding HooksDirectoryLabel}"
+                             FontSize="11"
+                             Classes="secondary" />
+                  <TextBlock Text="{Binding HooksDirectoryText}"
+                             FontSize="11"
+                             Classes="secondary"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Border Background="{DynamicResource GitGuardContentBrush}"
+                        BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding HooksTitle}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding HookRows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HookStatusRowViewModel">
+                          <Grid ColumnDefinitions="120,150,*" Margin="0,3">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding HookName}"
+                                       FontFamily="Consolas"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding StatusText}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding VersionText}"
+                                       FontSize="11"
+                                       Classes="secondary" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding HookAttentionText}"
+                               IsVisible="{Binding HasHookAttention}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource GitGuardWarningTextBrush}" />
+                  </StackPanel>
+                </Border>
+
+                <Border Background="{DynamicResource GitGuardContentBrush}"
+                        BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding LatestScanLabel}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                    <TextBlock Text="{Binding NoScanText}"
+                               IsVisible="{Binding !HasLatestScan}"
+                               Classes="secondary"
+                               FontSize="12" />
+                    <StackPanel IsVisible="{Binding HasLatestScan}" Spacing="2">
+                      <TextBlock Text="{Binding LatestScanResultText}"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource GitGuardPrimaryTextBrush}" />
+                      <TextBlock Text="{Binding LatestScanText}"
+                                 FontSize="11"
+                                 Classes="secondary"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- GGD-0057：操作区固定在详情底部，WrapPanel 在窄窗口自动换行，避免按钮被裁切 -->
+            <StackPanel Grid.Row="1" Margin="0,16,0,0" Spacing="10">
+              <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
                 <Button Content="{Binding ScanButtonText}"
                         Command="{Binding ScanCommand}"
                         IsEnabled="{Binding CanInteract}"
@@ -292,7 +302,7 @@
                         Command="{Binding RequestUninstallHooksCommand}"
                         IsEnabled="{Binding CanUninstallHooks}"
                         IsVisible="{Binding HasManagedHooks}"
-                        CornerRadius="8" />
+                        Classes="dangerOutline" />
                 <Button Content="{Binding AllowlistButtonText}"
                         Command="{Binding OpenAllowlistCommand}"
                         IsEnabled="{Binding CanInteract}"
@@ -300,74 +310,68 @@
                 <Button Content="{Binding RemoveButtonText}"
                         Command="{Binding RequestRemoveCommand}"
                         IsEnabled="{Binding CanInteract}"
-                        CornerRadius="8" />
-              </StackPanel>
+                        Classes="dangerOutline" />
+              </WrapPanel>
 
               <!-- GGD-0055：二进制 / 符号链接 Hook 的强制接管确认 -->
               <Border IsVisible="{Binding IsHookForceConfirmationVisible}"
-                      Background="#FFF3CD"
-                      CornerRadius="8"
+                      Classes="warningPanel"
                       Padding="14">
                 <StackPanel Spacing="10">
                   <TextBlock Text="{Binding HookForceConfirmPrompt}"
-                             FontSize="12"
-                             TextWrapping="Wrap"
-                             Foreground="#5C4500" />
+                             Classes="warning"
+                             FontSize="12" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{Binding ConfirmHookForceButtonText}"
                             Command="{Binding ConfirmHookForceInstallCommand}"
-                            CornerRadius="8" />
+                            Classes="primary" />
                     <Button Content="{Binding CancelHookButtonText}"
                             Command="{Binding CancelHookForceCommand}"
-                            CornerRadius="8" />
+                            Classes="warningSecondary" />
                   </StackPanel>
                 </StackPanel>
               </Border>
 
               <!-- GGD-0055：卸载 Hook 二次确认 -->
               <Border IsVisible="{Binding IsUninstallConfirmationVisible}"
-                      Background="#FFF3CD"
-                      CornerRadius="8"
+                      Classes="warningPanel"
                       Padding="14">
                 <StackPanel Spacing="10">
                   <TextBlock Text="{Binding HookUninstallConfirmPrompt}"
-                             FontSize="12"
-                             TextWrapping="Wrap"
-                             Foreground="#5C4500" />
+                             Classes="warning"
+                             FontSize="12" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{Binding ConfirmUninstallHookButtonText}"
                             Command="{Binding ConfirmUninstallHooksCommand}"
-                            CornerRadius="8" />
+                            Classes="danger" />
                     <Button Content="{Binding CancelHookButtonText}"
                             Command="{Binding CancelUninstallHooksCommand}"
-                            CornerRadius="8" />
+                            Classes="warningSecondary" />
                   </StackPanel>
                 </StackPanel>
               </Border>
 
               <Border IsVisible="{Binding IsRemoveConfirmationVisible}"
-                      Background="#FFF3CD"
-                      CornerRadius="8"
+                      Classes="warningPanel"
                       Padding="14">
                 <StackPanel Spacing="10">
                   <TextBlock Text="{Binding RemoveConfirmPrompt}"
-                             FontSize="12"
-                             TextWrapping="Wrap"
-                             Foreground="#5C4500" />
+                             Classes="warning"
+                             FontSize="12" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{Binding ConfirmRemoveButtonText}"
                             Command="{Binding ConfirmRemoveCommand}"
                             IsEnabled="{Binding !IsBusy}"
-                            CornerRadius="8" />
+                            Classes="danger" />
                     <Button Content="{Binding CancelRemoveButtonText}"
                             Command="{Binding CancelRemoveCommand}"
-                            CornerRadius="8" />
+                            Classes="warningSecondary" />
                   </StackPanel>
                 </StackPanel>
               </Border>
 
             </StackPanel>
-          </ScrollViewer>
+          </Grid>
         </Border>
 
         <Border IsVisible="{Binding IsSelectPromptVisible}"

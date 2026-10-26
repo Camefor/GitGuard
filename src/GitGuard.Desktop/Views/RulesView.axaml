@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GitGuard.Desktop.ViewModels"
              x:Class="GitGuard.Desktop.Views.RulesView"
@@ -20,7 +20,7 @@
       <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />
     </Style>
     <Style Selector="TextBlock.error">
-      <Setter Property="Foreground" Value="#C62828" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerTextBrush}" />
     </Style>
     <Style Selector="TextBlock.itemId">
       <Setter Property="FontFamily" Value="Consolas" />
@@ -148,13 +148,11 @@
           <!-- Gitleaks 分类说明：动态规则不进入静态目录 -->
           <Border Grid.Row="1"
                   IsVisible="{Binding IsGitleaksInfoVisible}"
-                  Background="#FFF3CD"
-                  CornerRadius="8"
+                  Classes="warningPanel"
                   Padding="12">
             <TextBlock Text="{Binding GitleaksInfoText}"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Foreground="#5C4500" />
+                       Classes="warning"
+                       FontSize="11" />
           </Border>
 
           <Grid Grid.Row="2">
@@ -191,23 +189,23 @@
                     </StackPanel>
                     <Border Grid.Column="1"
                             IsVisible="{Binding Enabled}"
-                            Background="#E8F5E9"
+                            Background="{DynamicResource GitGuardSuccessBadgeSurfaceBrush}"
                             CornerRadius="4"
                             Padding="6,1"
                             VerticalAlignment="Top">
                       <TextBlock Text="{Binding EnabledText}"
                                  FontSize="10"
-                                 Foreground="#2E7D32" />
+                                 Foreground="{DynamicResource GitGuardSuccessBadgeTextBrush}" />
                     </Border>
                     <Border Grid.Column="1"
                             IsVisible="{Binding !Enabled}"
-                            Background="#EEEEEE"
+                            Background="{DynamicResource GitGuardMutedBadgeSurfaceBrush}"
                             CornerRadius="4"
                             Padding="6,1"
                             VerticalAlignment="Top">
                       <TextBlock Text="{Binding EnabledText}"
                                  FontSize="10"
-                                 Foreground="#616161" />
+                                 Foreground="{DynamicResource GitGuardMutedBadgeTextBrush}" />
                     </Border>
                   </Grid>
                 </DataTemplate>

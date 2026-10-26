@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GitGuard.Desktop.ViewModels"
              x:Class="GitGuard.Desktop.Views.ScanHistoryView"
@@ -24,7 +24,7 @@
       <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
     </Style>
     <Style Selector="TextBlock.error">
-      <Setter Property="Foreground" Value="#C62828" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerTextBrush}" />
     </Style>
     <Style Selector="TextBlock.timelineTitle">
       <Setter Property="Foreground" Value="{DynamicResource GitGuardPrimaryTextBrush}" />

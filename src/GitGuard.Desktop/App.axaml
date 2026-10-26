@@ -1,4 +1,4 @@
-<Application xmlns="https://github.com/avaloniaui"
+﻿<Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="GitGuard.Desktop.App"
              RequestedThemeVariant="Default">
@@ -7,6 +7,55 @@
     <FluentTheme />
     <Style Selector="TextBlock.secondary">
       <Setter Property="Foreground" Value="{DynamicResource GitGuardSecondaryTextBrush}" />
+    </Style>
+
+    <!-- GGD-0057：警告 / 危险 / 成功文字与操作按钮统一使用主题语义画刷，避免深色主题下白字落在浅黄警告条上 -->
+    <Style Selector="Border.warningPanel">
+      <Setter Property="Background" Value="{DynamicResource GitGuardWarningSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GitGuardWarningBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="TextBlock.warning">
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardWarningTextBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="{DynamicResource GitGuardDangerBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerButtonTextBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="Button.danger:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardDangerHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerButtonTextBrush}" />
+    </Style>
+    <Style Selector="Button.dangerOutline">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GitGuardDangerTextBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="Button.dangerOutline:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardDangerSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardDangerTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GitGuardDangerTextBrush}" />
+    </Style>
+    <Style Selector="Button.warningSecondary">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardWarningTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GitGuardWarningBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="Button.warningSecondary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource GitGuardWarningSurfaceHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource GitGuardWarningTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource GitGuardWarningBorderBrush}" />
     </Style>
   </Application.Styles>
 
@@ -24,6 +73,20 @@
           <SolidColorBrush x:Key="GitGuardSecondaryTextBrush" Color="#5F6B60" />
           <SolidColorBrush x:Key="GitGuardSidebarTextBrush" Color="#F1F8F2" />
           <SolidColorBrush x:Key="GitGuardSidebarMutedBrush" Color="#B7D8B9" />
+          <SolidColorBrush x:Key="GitGuardWarningSurfaceBrush" Color="#FFF3CD" />
+          <SolidColorBrush x:Key="GitGuardWarningSurfaceHoverBrush" Color="#FFE8A3" />
+          <SolidColorBrush x:Key="GitGuardWarningBorderBrush" Color="#D9B44A" />
+          <SolidColorBrush x:Key="GitGuardWarningTextBrush" Color="#5C4500" />
+          <SolidColorBrush x:Key="GitGuardDangerBrush" Color="#B3261E" />
+          <SolidColorBrush x:Key="GitGuardDangerHoverBrush" Color="#8C1D18" />
+          <SolidColorBrush x:Key="GitGuardDangerButtonTextBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="GitGuardDangerTextBrush" Color="#B3261E" />
+          <SolidColorBrush x:Key="GitGuardDangerSurfaceBrush" Color="#FDECEA" />
+          <SolidColorBrush x:Key="GitGuardSuccessTextBrush" Color="#1B5E20" />
+          <SolidColorBrush x:Key="GitGuardSuccessBadgeSurfaceBrush" Color="#E8F5E9" />
+          <SolidColorBrush x:Key="GitGuardSuccessBadgeTextBrush" Color="#1B5E20" />
+          <SolidColorBrush x:Key="GitGuardMutedBadgeSurfaceBrush" Color="#EEEEEE" />
+          <SolidColorBrush x:Key="GitGuardMutedBadgeTextBrush" Color="#616161" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="GitGuardSidebarBrush" Color="#102614" />
@@ -36,6 +99,20 @@
           <SolidColorBrush x:Key="GitGuardSecondaryTextBrush" Color="#A3B2A5" />
           <SolidColorBrush x:Key="GitGuardSidebarTextBrush" Color="#E8F1E9" />
           <SolidColorBrush x:Key="GitGuardSidebarMutedBrush" Color="#9CC3A0" />
+          <SolidColorBrush x:Key="GitGuardWarningSurfaceBrush" Color="#3A2E12" />
+          <SolidColorBrush x:Key="GitGuardWarningSurfaceHoverBrush" Color="#4B3B16" />
+          <SolidColorBrush x:Key="GitGuardWarningBorderBrush" Color="#8A6D24" />
+          <SolidColorBrush x:Key="GitGuardWarningTextBrush" Color="#FFE8A3" />
+          <SolidColorBrush x:Key="GitGuardDangerBrush" Color="#B3261E" />
+          <SolidColorBrush x:Key="GitGuardDangerHoverBrush" Color="#C62828" />
+          <SolidColorBrush x:Key="GitGuardDangerButtonTextBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="GitGuardDangerTextBrush" Color="#FFB4AB" />
+          <SolidColorBrush x:Key="GitGuardDangerSurfaceBrush" Color="#4A1F1E" />
+          <SolidColorBrush x:Key="GitGuardSuccessTextBrush" Color="#8BDC96" />
+          <SolidColorBrush x:Key="GitGuardSuccessBadgeSurfaceBrush" Color="#1F3B24" />
+          <SolidColorBrush x:Key="GitGuardSuccessBadgeTextBrush" Color="#A5E0AE" />
+          <SolidColorBrush x:Key="GitGuardMutedBadgeSurfaceBrush" Color="#2A332B" />
+          <SolidColorBrush x:Key="GitGuardMutedBadgeTextBrush" Color="#C1CCC2" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>

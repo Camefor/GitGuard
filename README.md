@@ -6,7 +6,7 @@
 
 ## 当前状态（v0.1 已完成，v0.2 开发完成，v0.3 功能开发完成，v1.0 发布基线就绪，v1.1 功能开发完成，2026-10-26）
 
-**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、内置规则库、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。v1.0 已启动，内置规则库扩充至 60 条（第一批 Secret 规则 `GGD-0048`、第二批 Privacy 规则 `GGD-0049`、第三批 LocalPath 规则 `GGD-0050`、第四批 Url 规则 `GGD-0051` 已落地），v1.0 规则库目标已达成。v1.0 发布基线（`GGD-0053`）已完成：版本号冻结为 1.0.0，Windows CLI / MSIX 发行冒烟已在本机通过，详见 [docs/20-v1.0发行说明.md](docs/20-v1.0发行说明.md)；macOS / Linux 原生冒烟与 3 个月稳定运行观察仍待完成。v1.1（`GGD-0054` / `GGD-0055`）已完成：不内置 CLI，桌面端仓库详情页直接复用 Application 层 Hook 用例，提供一键安装 / 重新安装 / 卸载、CLI 路径选择与强制接管确认；CLI `install` / `uninstall` 同步复用共享服务，版本号更新为 1.1.0。
+**可以试用。** 「安装 Hook → 提交拦截 → 推送拦截 → 绕过留痕」的核心链路已经完成，并有真实 `git commit` / `git push` 的端到端测试覆盖。v0.2 的 `scan --all`、基线文件、内置规则库、自定义正则规则、可选 Gitleaks 引擎、`audit view` 与 URL 公共主机名白名单已落地；真实项目试用验收待执行。v0.3 桌面端已启动，Avalonia 11.3 LTS 工程骨架、四区导航壳与「仓库」业务页（多仓库登记 / 列表 / 详情、Hook 状态、最近扫描摘要、立即扫描、移除二次确认、中英切换、系统主题跟随）可用；扫描历史与发现项详情（分页时间线、脱敏片段 / 指纹、外部编辑器跳转）、全局白名单管理（分页、规则 / 路径 / 指纹新增、删除二次确认）、规则库（内置 / 自定义 / Gitleaks 分类、搜索节流、正则默认隐藏）与跨仓库日志 / 全局设置（分页筛选、JSON / CSV 导出、语言 / 主题 / Gitleaks 覆盖持久化）均已落地。v0.3 规划页面全部完成，Windows MSIX / macOS DMG / Linux AppImage 三平台安装包与发行冒烟已落地（`GGD-0047`）。v1.0 已启动，内置规则库扩充至 60 条（第一批 Secret 规则 `GGD-0048`、第二批 Privacy 规则 `GGD-0049`、第三批 LocalPath 规则 `GGD-0050`、第四批 Url 规则 `GGD-0051` 已落地），v1.0 规则库目标已达成。v1.0 发布基线（`GGD-0053`）已完成：版本号冻结为 1.0.0，Windows CLI / MSIX 发行冒烟已在本机通过，详见 [docs/20-v1.0发行说明.md](docs/20-v1.0发行说明.md)；macOS / Linux 原生冒烟与 3 个月稳定运行观察仍待完成。v1.1（`GGD-0054` / `GGD-0055`）已完成：不内置 CLI，桌面端仓库详情页直接复用 Application 层 Hook 用例，提供一键安装 / 重新安装 / 卸载、CLI 路径选择与强制接管确认；CLI `install` / `uninstall` 同步复用共享服务，版本号更新为 1.1.0。桌面端可用性修复（`GGD-0056` / `GGD-0057`）同步完成：隐藏 git 子进程控制台窗口，Light / Dark 主题文字与按钮对比度达到 WCAG AA，仓库详情操作区固定底部并可换行，默认窗口调整为 1280×720。
 
 功能完成度（按 PRD §4 的 21 条 FR 统计）：
 
@@ -407,7 +407,7 @@ dotnet build GitGuard.sln -c Release
 dotnet test GitGuard.sln
 ```
 
-- 全量测试：1774 用例（1765 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
+- 全量测试：1778 用例（1769 通过 + 9 个平台 / 工具链相关跳过，0 失败）；真实 Hook 框架兼容用例需设置 `GITGUARD_HOOK_COMPAT=1`（CI `hook-compat` 作业，当前仅 Windows）
 - CI 门禁：`dotnet build` + `dotnet format --verify-no-changes` + 七类测试作业（Core / Detection / Infrastructure / Application / CLI / Desktop / E2E）；Git 2.9.3 / 2.40.1 / 最新稳定版的 E2E 兼容矩阵（`git-compat` 作业）；Windows MSIX 打包 + 发行冒烟（`desktop-package-smoke` 作业）；每次运行归档 TRX 与 Cobertura 覆盖率构件（保留 30 天，失败时同样上传）
 - 基准（Windows 11 / Native AOT）：暂存区扫描 P95 311 ms（目标 ≤ 500 ms）；推送扫描 P95 670 ms（目标 ≤ 2 s）；检测吞吐 P50 26 MB/s（目标 ≥ 20 MB/s）
 - 基准方法与本机数据见 [benchmarks/README.md](benchmarks/README.md)
