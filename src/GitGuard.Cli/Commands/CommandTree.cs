@@ -6,7 +6,7 @@ namespace GitGuard.Cli.Commands;
 /// <summary>
 /// 命令树装配（<c>模块设计/Cli.md</c> §10）：命令集为
 /// <c>scan</c> / <c>install</c> / <c>uninstall</c> / <c>status</c> / <c>version</c> / <c>audit</c> /
-/// <c>allowlist</c> / <c>rules</c>，另有隐藏的内部命令 <c>hook post-commit</c>（FR-050，不展示于帮助）；
+/// <c>allowlist</c> / <c>rules</c> / <c>path</c>，另有隐藏的内部命令 <c>hook post-commit</c>（FR-050，不展示于帮助）；
 /// 全局选项挂根命令并递归下发。
 /// 每次运行构建全新命令树，命令实例不跨调用共享（并行测试安全）。
 /// </summary>
@@ -32,6 +32,7 @@ internal static class CommandTree
         root.Subcommands.Add(AuditCommand.Create(runtime));
         root.Subcommands.Add(AllowlistCommand.Create(runtime));
         root.Subcommands.Add(RulesCommand.Create(runtime));
+        root.Subcommands.Add(PathCommand.Create(runtime));
         globalOptions.AddTo(root);
         return root;
     }

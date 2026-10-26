@@ -100,6 +100,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | `FR-010` | `gitguard install` 安装 Hook | P0 | 3.1 | 安装后 `pre-commit` / `pre-push` 均被注入；原 Hook 保留并被链式调用 | 已实现（GGD-0008） |
 | `FR-011` | `gitguard uninstall` 卸载 Hook | P0 | 3.1 | 仅移除 GitGuard 注册项；原 Hook 恢复可运行 | 已实现（GGD-0008） |
 | `FR-012` | `gitguard status` 查询安装状态 | P0 | 3.1 | 输出 Git 版本、Hook 路径、GitGuard 版本、Hook 分类 | 已实现（状态分类见 3.1） |
+| `FR-013` | `gitguard path` 用户级 PATH 管理（原始需求 3） | P1 | 全部 | 安装后新终端可直接运行 `gitguard`；卸载可逆且不破坏既有 PATH 条目；状态区分已登记 / 当前进程生效 / profile 配置 | 已实现（`GGD-0061`：Windows `HKCU\Environment\Path` / Unix `~/.local/bin` 符号链接 + 可选 profile 标记块，`path install/uninstall/status` 与三种 JSON Schema） |
 | `FR-020` | 暂存区扫描（`gitguard scan --staged`） | P0 | 3.2 | 严格使用 `git diff --cached`；不包含未暂存内容 | 已实现（GGD-0007） |
 | `FR-021` | 四类检测器 Secret/Privacy/LocalPath/Url | P0 | 3.2 | 命中率符合 §6 验收用例集 | 已实现：60 条内置规则（Secret 21 / Privacy 14 / LocalPath 12 / Url 13；GGD-0033 / GGD-0048 / GGD-0049 / GGD-0050 / GGD-0051 规则扩充） |
 | `FR-022` | 策略引擎映射严重度到动作 | P0 | 3.2 | 可通过 `.gitguard.yml` 覆写默认映射 | 已实现（含 `critical` 不可降级为 `allow` 的硬下限） |
@@ -143,6 +144,7 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 - [x] SQLite 中无任何 Token / 密码 / 完整敏感行原文（DR-02；TC-DR-02-01）。
 - [x] Husky / lefthook / pre-commit 真实框架兼容矩阵（NFR-A-001；`GGD-0021`；TC-COMPAT-01~04，CI `hook-compat`）。
 - [x] NFR-P-001~004 性能基准已落地（`GGD-0020`，工具与结果见 `benchmarks/README.md`）：P-002 / P-004 达标；P-001 / P-003 在本机受进程创建基线影响未达标，待正常宿主复测 / `GGD-0023`。
+- [x] `gitguard path install / uninstall / status` 用户级 PATH 管理（原始需求 3；`GGD-0061`）：Windows 用户环境变量 / Unix 符号链接 + 可选 profile 标记块；自动化测试覆盖注册表临时子键与临时 HOME，不触碰真实用户 PATH；实机新终端解析与卸载可逆性由用户验收（见 14-部署文档 §10.1）。
 
 ## 7. 产品路线与版本计划
 
@@ -183,3 +185,4 @@ GitGuard 是面向开发者的本地 Git 敏感信息防泄漏工具。在 `git 
 | 0.1.17 | 2026-10-24 | GGD-0049：§4 FR-021 实现状态更新为 50 条内置规则（Secret 21 / Privacy 14 / LocalPath 7 / Url 8），Privacy 新增 IBAN / 美国电话 / 英国 NINO / 中国车牌 / 出生日期 |
 | 0.1.18 | 2026-10-24 | GGD-0050：§4 FR-021 实现状态更新为 55 条内置规则（Secret 21 / Privacy 14 / LocalPath 12 / Url 8），LocalPath 新增 macOS 挂载卷 / root 主目录 / Web 部署目录 / Cygwin 盘符 / Windows 行内盘符路径 |
 | 0.1.19 | 2026-10-25 | GGD-0051：§4 FR-021 实现状态更新为 60 条内置规则（Secret 21 / Privacy 14 / LocalPath 12 / Url 13），Url 新增 Google Cloud 签名 URL / Azure SAS / 数据库 URL 内嵌凭据 / OAuth 刷新令牌 / 飞书 Webhook |
+| 0.1.20 | 2026-10-26 | GGD-0061：§4 新增 FR-013 用户级 PATH 管理（原始需求 3）并标记已实现；§6 增加 PATH 安装 / 卸载 / 状态验收项 |

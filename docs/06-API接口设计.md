@@ -441,6 +441,63 @@ CSV 契约：
 - `pattern` 仅在显式 `--show-pattern` 时出现，值为 .NET 正则原文；默认省略以避免被误用。
 - 规则顺序为内置规则顺序 + `rules.custom` 声明顺序；未知规则输出 `gitguard.error.v1` 并返回退出码 40。
 
+### 4.12 PATH 管理输出（JSON）
+
+`gitguard path install --format json` 输出 `gitguard.path.install.v1`（stdout 单行紧凑）：
+
+```json
+{
+  "schema": "gitguard.path.install.v1",
+  "platform": "linux",
+  "target_directory": "/home/user/.local/bin",
+  "executable": "/opt/gitguard/gitguard",
+  "already_present": false,
+  "path_updated": true,
+  "profile_path": "/home/user/.zshrc",
+  "profile_updated": true,
+  "backup_path": null,
+  "effective": false
+}
+```
+
+`gitguard path uninstall --format json` 输出 `gitguard.path.uninstall.v1`：
+
+```json
+{
+  "schema": "gitguard.path.uninstall.v1",
+  "platform": "linux",
+  "target_directory": "/home/user/.local/bin",
+  "path_updated": false,
+  "link_removed": true,
+  "profile_block_removed": true,
+  "not_installed": false
+}
+```
+
+`gitguard path status --format json` 输出 `gitguard.path.status.v1`：
+
+```json
+{
+  "schema": "gitguard.path.status.v1",
+  "platform": "windows",
+  "target_directory": "C:\\Tools\\GitGuard",
+  "executable": "C:\\Tools\\GitGuard\\gitguard.exe",
+  "installed": true,
+  "path_entry_present": true,
+  "effective": false,
+  "profile_path": null,
+  "profile_configured": false
+}
+```
+
+- `platform` ∈ `windows` / `linux` / `macos`；`target_directory` 为实际托管的 PATH 目录（Windows 为可执行文件所在目录，Unix 为 `~/.local/bin`）。
+- `already_present` 表示目标目录已在 PATH 中（Windows）或符号链接已指向当前可执行文件（Unix）；此时 `path_updated` 为 `false`。
+- `path_updated` 仅表示本次命令是否写入 PATH（Windows 注册表 / Unix 状态中有 profile 更新时由 `profile_updated` 单独表达；Unix 的 `path_updated` 表示符号链接是否新建或接管）。
+- `effective` 表示目标目录是否已出现在**当前进程**的 PATH 中；新终端生效需重启终端或重新登录，不代表安装失败。
+- `backup_path` 仅在 Unix `--force` 接管冲突符号链接时非空（`<link>.local.bak`）。
+- Unix 状态查询的 `path_entry_present` 表示 shell profile 中是否存在托管标记块；`installed` 表示 `~/.local/bin/gitguard` 符号链接是否指向托管可执行文件。Windows 的 `profile_path` 恒为 `null`、`profile_configured` 恒为 `false`。
+- 状态文件 `<data>/path-install.json` 使用内部 Schema `gitguard.path.state.v1`，仅用于精确卸载；损坏或缺失时按「未安装」处理，不影响命令执行。
+
 ## 5. 命令清单
 
 > MVP 阶段固化以下命令集；新增命令需同步更新本文件、`模块设计/Cli.md`、`AGENT-GUIDE` 任务台账。
@@ -548,13 +605,40 @@ gitguard install --format json
 - **退出码**：0 成功；7 类别 / 参数非法；40 规则不存在（输出 `gitguard.error.v1`）。
 - **关联 FR**：`FR-080`（`GGD-0034`）。
 
-### 5.8 `gitguard version` — 版本
+### 5.8 `gitguard path` — 用户级 PATH 管理
+
+- **用途**：把 GitGuard CLI 加入**当前用户**的 PATH，使用户可在新终端直接运行 `gitguard`；不修改系统级 PATH，也不需要管理员 / `sudo` 权限。命令不要求当前目录是 Git 仓库，也不读写审计库。
+- **子命令**：
+  - `install [--force] [--update-profile]`
+    - Windows：把可执行文件所在目录追加到 `HKCU\Environment\Path`（`REG_EXPAND_SZ`，保留既有 `%VAR%` 引用，大小写不敏感去重，写入后广播 `WM_SETTINGCHANGE`）；超过 30000 字符 → 退出码 62。`--force` / `--update-profile` 在 Windows 上无效果。
+    - Unix：在 `~/.local/bin` 创建指向当前可执行文件的 `gitguard` 符号链接。目标已存在且非本工具托管时默认拒绝（退出码 60）；`--force` 将冲突条目备份为 `gitguard.local.bak` 后接管。`--update-profile` 依据 `$SHELL` 向 `~/.bashrc` / `~/.zshrc` / `~/.profile` / fish 配置写入带 `# >>> gitguard >>>` / `# <<< gitguard <<<` 标记的可逆 PATH 块；未识别的 Shell → 退出码 61。
+    - 只接受可执行文件名为 `gitguard` / `gitguard.exe` 的进程；`dotnet run`、测试宿主等非发布形态 → 退出码 61，且不触碰用户 PATH（避免误写入 dotnet 安装目录）。
+    - 安装成功后写入 `<data>/path-install.json`（内部 Schema `gitguard.path.state.v1`），仅用于精确卸载。
+  - `uninstall`
+    - 只移除 GitGuard 托管痕迹：Windows 删除状态文件中记录的 PATH 条目；Unix 删除指向托管可执行文件的符号链接与 profile 标记块。其他 PATH 条目保持不变。
+    - 未发现托管痕迹（无状态文件且无托管条目）→ 退出码 5，不修改任何内容。
+  - `status`
+    - 只读查询安装状态：`installed`（登记或链接存在）、`path_entry_present`（持久化条目 / profile 块）、`effective`（当前进程 PATH 是否可见）、`profile_path` / `profile_configured`（Unix）。
+- **选项**：`--force` 仅 `install` 可用；`--update-profile` 仅 `install` 可用（Unix 有效）。
+- **输出**：文本报告 → stderr；`--format json` → stdout（Schema 见 §4.12）。中英文案随 `--language` / `GITGUARD_LANG` 切换。
+- **退出码**：0 成功；3 写入注册表 / 目录 / 符号链接 / profile 权限不足；5 未发现 GitGuard PATH 安装痕迹（仅 `uninstall`）；7 参数非法；60 目标条目冲突（需 `--force` 或手工清理）；61 平台不支持、Shell 无法识别或当前进程不是 gitguard 可执行文件；62 追加后 PATH 超过平台长度上限。
+- **幂等**：`install` 是（已在 PATH / 链接已正确指向时不重复写入）；`uninstall` 对已移除状态返回 5；`status` 只读。
+- **关联需求**：原始需求 3「GitGuard.Cli 增加写入系统 Path 路径功能」（`GGD-0061`）。
+- **示例**：
+
+```bash
+gitguard path install --update-profile --format json
+gitguard path status
+gitguard path uninstall
+```
+
+### 5.9 `gitguard version` — 版本
 
 - **输入**：无（非 Git 仓库中同样可用）。
 - **输出**：GitGuard 版本、规则库版本、Git 版本、运行时信息（人类可读 → stderr） / JSON（`--format json` → stdout，Schema 见 §4.6）。
 - **退出码**：0（含 git 探测失败：原因经 `git_failure` 字段输出）。
 
-### 5.9 `gitguard hook post-commit` — 绕过检测（隐藏）
+### 5.10 `gitguard hook post-commit` — 绕过检测（隐藏）
 
 - **用途**：由 GitGuard 安装的 `post-commit` 分发脚本调用；比对实际提交与 `pre-commit` 记录的待提交预测，判定 `--no-verify` / `GITGUARD_SKIP=1` 绕过并写入审计。
 - **可见性**：`hook` 命令组与 `post-commit` 子命令均为隐藏（不出现在 `--help`），供分发脚本内部使用。
@@ -563,7 +647,7 @@ gitguard install --format json
 - **退出码**：始终 0（Git 忽略 `post-commit` 退出码）；审计写入失败 → 14；Git 读取失败 → 10。
 - **关联 FR**：`FR-050`。
 
-### 5.10 全局选项（所有子命令共用）
+### 5.11 全局选项（所有子命令共用）
 
 递归挂载于根命令，可出现在子命令前后任意位置：
 
@@ -575,7 +659,7 @@ gitguard install --format json
 | `--trace` | 日志级别降到 Trace（逐行匹配细节）；必须与 `--verbose` 同用，否则退出码 7 |
 | `--log-file <path>` | 启用文件日志并写入指定路径（JSON-lines，按 `logging.file` 的 `max_bytes` / `max_files` 滚动）；`~` 展开为用户主目录 |
 
-### 5.11 `gitguard --help`
+### 5.12 `gitguard --help`
 
 - 全局 `--help` 由 System.CommandLine 自动生成。所有子命令都应支持 `--help` 独立说明。
 
@@ -603,9 +687,12 @@ gitguard install --format json
 | 30 | 查询 | run_id 不存在 | 用 `audit list` 列出有效 run_id |
 | 31 | 查询 | 审计导出失败，或基线文件写入失败（`BASELINE_WRITE_FAILED`） | 检查输出路径与权限 |
 | 40 | 查询 | 规则不存在 | 用 `rules list` 列出规则 |
+| 60 | 环境 | PATH 条目冲突：目标已有非 GitGuard 托管的同名文件 / 符号链接 | 确认来源后加 `--force` 备份接管，或手工清理 |
+| 61 | 环境 | PATH 管理不支持：当前平台 / Shell 无法自动写入，或当前进程不是 gitguard 可执行文件（如 `dotnet run`） | 使用发布后的 `gitguard` 可执行文件；检查 `$SHELL` |
+| 62 | 环境 | 追加后用户 PATH 超过平台长度上限（Windows 30000 字符） | 先清理不再使用的 PATH 条目 |
 | 99 | 未知 | 代码缺陷导致未分类异常 | 请提交 Issue 并附 `--verbose` 日志 |
 
-> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 已由 `audit view` 实际使用（`GGD-0036`，`AUDIT_RUN_NOT_FOUND`）；退出码 40 已由 `rules view` 实际使用（`GGD-0034`，`RULE_NOT_FOUND`）。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。
+> 退出码 20 / 21 已由 `allowlist add` / `allowlist remove` 实际使用（`GGD-0030`）；退出码 30 已由 `audit view` 实际使用（`GGD-0036`，`AUDIT_RUN_NOT_FOUND`）；退出码 40 已由 `rules view` 实际使用（`GGD-0034`，`RULE_NOT_FOUND`）。退出码 31 已由 `audit export` 与基线写入失败实际使用（`AUDIT_EXPORT_FAILED`）；退出码 13 自 `GGD-0032` 起同时覆盖基线文件读取 / 解析失败。退出码 60 / 61 / 62 由 `gitguard path` 使用（`GGD-0061`，`PATH_ENTRY_CONFLICT` / `PATH_UNSUPPORTED` / `PATH_TOO_LONG`）；退出码 5 同时用于 `path uninstall` 的「未发现 PATH 托管痕迹」。
 
 ## 7. 限流与配额
 
@@ -640,3 +727,4 @@ N/A（本地 CLI 无 HTTP）。
 | 0.1.11 | 2026-10-23 | GGD-0038：§5.1 `install` 缺省按 `hooks.*` 注册子集（显式 `--hook` 优先）、`gitguard_executable_path` 覆盖脚本路径、全禁用 / 路径不存在 → 13；§5.4 新增隐藏选项 `--hook-mode` 与 `scan.pre_commit` / `scan.pre_push` 跳过语义（不产生 ScanRun，pre-commit 仍写非绕过标记） |
 | 0.1.12 | 2026-10-25 | GGD-0053：§4.5 / §4.6 JSON 示例版本号同步为 1.0.0（契约字段不变） |
 | 0.1.13 | 2026-10-26 | GGD-0054 / GGD-0055：§4.5 / §4.6 JSON 示例版本号同步为 1.1.0（CLI 契约字段与退出码不变） |
+| 0.1.14 | 2026-10-26 | GGD-0061：新增 §4.12 PATH 管理 JSON Schema（`gitguard.path.install.v1` / `gitguard.path.uninstall.v1` / `gitguard.path.status.v1`）与内部状态文件 `gitguard.path.state.v1`；新增 §5.8 `gitguard path install` / `uninstall` / `status`（Windows 用户环境变量 / Unix `~/.local/bin` 符号链接 + 可选 profile 标记块、用户级不触碰系统 PATH、`--force` / `--update-profile`），原 §5.8~§5.11 顺延为 §5.9~§5.12；§6 新增退出码 60 / 61 / 62 并扩展退出码 3 / 5 的 PATH 场景 |

@@ -40,6 +40,11 @@ public static class ExitCodeMapper
             HookException hook when hook.ErrorCode == HookException.UNKNOWN_HOOK_PRESENT => ExitCodes.UNKNOWN_HOOK_PRESENT,
             HookException hook when hook.ErrorCode == HookException.INSTALL_IN_PROGRESS => ExitCodes.INSTALL_IN_PROGRESS,
             HookException => ExitCodes.UNKNOWN_ERROR,
+            PathException path when path.ErrorCode == PathException.WRITE_PERMISSION_DENIED => ExitCodes.WRITE_PERMISSION_DENIED,
+            PathException path when path.ErrorCode == PathException.ENTRY_CONFLICT => ExitCodes.PATH_ENTRY_CONFLICT,
+            PathException path when path.ErrorCode == PathException.UNSUPPORTED => ExitCodes.PATH_UNSUPPORTED,
+            PathException path when path.ErrorCode == PathException.TOO_LONG => ExitCodes.PATH_TOO_LONG,
+            PathException => ExitCodes.UNKNOWN_ERROR,
             AllowlistException allowlist when allowlist.ErrorCode == AllowlistException.ALLOWLIST_VALIDATION_FAILED
                 => ExitCodes.ALLOWLIST_VALIDATION_FAILED,
             AllowlistException => ExitCodes.ALLOWLIST_NOT_FOUND,
@@ -67,6 +72,7 @@ public static class ExitCodeMapper
         {
             GitException git => git.ErrorCode,
             HookException hook => hook.ErrorCode,
+            PathException path => path.ErrorCode,
             AllowlistException allowlist => allowlist.ErrorCode,
             BaselineException baseline => baseline.ErrorCode,
             ConfigurationException configuration => configuration.ErrorCode,

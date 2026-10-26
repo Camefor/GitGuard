@@ -41,6 +41,7 @@ GitGuard 解决的是「敏感信息被误提交、误推送」的问题。安�
 | 外部引擎 | 可选接入 Gitleaks 8.x，命中映射为 `GLK/SECRET/*` 并与内置规则按指纹去重；缺失时告警降级 |
 | 扫描模式 | 暂存区扫描、推送范围扫描、HEAD 全量扫描、历史提交扫描与断点续扫 |
 | Hook 拦截 | 安装 `pre-commit` / `pre-push` / `post-commit`；包裹已有 Hook；支持强制接管二进制 / 符号链接 Hook |
+| PATH 管理 | `gitguard path install / uninstall / status`：Windows 用户环境变量 / Unix `~/.local/bin` 符号链接 + 可选 profile 标记块；精确卸载，不触碰系统级 PATH |
 | 策略与降噪 | 严重度阻断 / 警告 / 放行策略、URL 公共主机名白名单、Markdown 围栏抑制、路径与文件名排除 |
 | 基线 | `gitguard.baseline.v1` 基线文件，按指纹抑制历史噪声，支持默认消费与续扫 |
 | 白名单 | 按规则 ID、文件路径 glob、指纹增删查；配置条目与 SQLite 条目同时生效 |
@@ -61,7 +62,7 @@ GitGuard 解决的是「敏感信息被误提交、误推送」的问题。安�
 | CLI | `gitguard-<version>-<rid>.zip`（内含 `gitguard` / `gitguard.exe` 与 `SHA256SUMS`） |
 | Desktop | macOS `gitguard-<version>-osx-arm64.dmg` / `osx-x64.dmg`；Linux x64 `gitguard-<version>-linux-x64.AppImage` |
 
-若对应版本尚未发布，请使用下方的源码构建方式。解压 CLI 后将所在目录加入 `PATH`。Release 页面同时提供覆盖全部发行资产的 `SHA256SUMS`，下载后可执行 `sha256sum -c SHA256SUMS`（Windows 可用 `Get-FileHash -Algorithm SHA256`）校验完整性。Windows 桌面端暂不提供预编译安装包：MSIX 未签名会被系统拦截，可从源码构建后直接运行；macOS DMG 为 ad-hoc 签名，首次启动需手动放行；正式分发前请按 [部署文档](docs/14-部署文档.md) 配置签名与公证。
+若对应版本尚未发布，请使用下方的源码构建方式。解压 CLI 后，可执行一次 `gitguard path install` 将 GitGuard 加入当前用户 PATH（Windows 写入用户环境变量；Unix 创建 `~/.local/bin/gitguard` 符号链接，若该目录不在 PATH 中可加 `--update-profile`），新开终端即可直接运行 `gitguard`。Release 页面同时提供覆盖全部发行资产的 `SHA256SUMS`，下载后可执行 `sha256sum -c SHA256SUMS`（Windows 可用 `Get-FileHash -Algorithm SHA256`）校验完整性。Windows 桌面端暂不提供预编译安装包：MSIX 未签名会被系统拦截，可从源码构建后直接运行；macOS DMG 为 ad-hoc 签名，首次启动需手动放行；正式分发前请按 [部署文档](docs/14-部署文档.md) 配置签名与公证。
 
 ### 方式 B：从源码构建
 
@@ -79,7 +80,19 @@ dotnet build GitGuard.sln -c Release
 - CLI：`src/GitGuard.Cli/bin/Release/net10.0/gitguard.exe`（Windows）或 `gitguard`（Linux / macOS）
 - Desktop：`src/GitGuard.Desktop/bin/Release/net10.0/GitGuard.Desktop.exe`（Windows）或对应平台可执行文件
 
-构建产物**不会自动加入 `PATH`**。可按需临时加入：
+构建产物**不会自动加入 `PATH`**。可执行一次以下命令写入当前用户 PATH（之后新开终端即可直接使用 `gitguard`；移动产物后需重新执行）：
+
+```powershell
+# Windows
+& "D:\path\to\GitGuard\src\GitGuard.Cli\bin\Release\net10.0\gitguard.exe" path install
+```
+
+```bash
+# Linux / macOS
+/path/to/GitGuard/src/GitGuard.Cli/bin/Release/net10.0/gitguard path install --update-profile
+```
+
+也可以只在当前会话临时加入：
 
 ```powershell
 # Windows PowerShell
@@ -236,7 +249,22 @@ gitguard install      # 重新安装即可刷新 Hook 中固化的可执行文�
 gitguard uninstall    # 移除 GitGuard Hook 并还原被包裹的原 Hook
 ```
 
-### 9. 全局选项与输出约定
+### 9. PATH 管理
+
+```bash
+gitguard path install                    # Windows：追加可执行文件目录；Unix：创建 ~/.local/bin/gitguard 符号链接
+gitguard path install --update-profile   # Unix：同时写入 Shell profile 标记块（bash / zsh / sh / fish）
+gitguard path status                     # 查看 installed / path_entry_present / effective / profile 配置
+gitguard path uninstall                  # 仅移除 GitGuard 托管条目，其他 PATH 条目保持不变
+```
+
+- 只修改**当前用户**的 PATH，不需要管理员 / `sudo`，不触碰系统级 PATH。
+- Windows 写入 `HKCU\Environment\Path` 并广播环境变更；已打开的终端需重开或重新登录才能生效。PATH 超过 30000 字符时退出码 62。
+- Unix 默认只创建符号链接，不修改 shell 配置；目标已存在非托管条目时默认退出码 60，确认来源后可用 `--force` 备份为 `gitguard.local.bak` 并接管。
+- `path` 命令要求当前进程是发布后的 `gitguard` / `gitguard.exe`；通过 `dotnet run` 执行会返回退出码 61，避免误把 dotnet 目录写入 PATH。
+- 安装状态记录在用户数据目录的 `path-install.json`，仅用于精确卸载；损坏时按「未安装」处理。`--format json` 输出 `gitguard.path.install.v1` / `uninstall.v1` / `status.v1`。
+
+### 10. 全局选项与输出约定
 
 | 选项 | 用途 |
 | --- | --- |
@@ -246,7 +274,7 @@ gitguard uninstall    # 移除 GitGuard Hook 并还原被包裹的原 Hook
 | `--log-file <path>` | 写入 JSON-lines 文件日志 |
 | `--no-color` | 禁用彩色输出 |
 
-常用退出码：`0` 成功、`1` 命中阻断、`7` 用法错误、`10` Git 执行失败、`13` 配置错误、`50` 安装锁冲突。完整契约见 [CLI 命令契约](docs/06-API接口设计.md)。
+常用退出码：`0` 成功、`1` 命中阻断、`5` 未发现托管痕迹、`7` 用法错误、`10` Git 执行失败、`13` 配置错误、`50` 安装锁冲突、`60` PATH 条目冲突、`61` PATH 管理不支持、`62` PATH 超长。完整契约见 [CLI 命令契约](docs/06-API接口设计.md)。
 
 ## Desktop 使用方法
 
@@ -388,6 +416,7 @@ exclude:
 | --- | --- |
 | 审计库 | Windows `%LOCALAPPDATA%\GitGuard\audit.db`；macOS `~/Library/Application Support/GitGuard/audit.db`；Linux `~/.local/share/gitguard/audit.db` |
 | 指纹盐 | 数据目录下 `cache/fingerprint.salt` |
+| PATH 安装状态 | 数据目录下 `path-install.json`（供 `gitguard path uninstall` 精确卸载） |
 | 用户配置 | `~/.config/gitguard/config.yml` |
 | 桌面端设置 | 数据目录下 `desktop-settings.json` |
 
@@ -397,6 +426,7 @@ exclude:
 
 - `scan --staged` 严格只扫描暂存区，不读取未暂存内容。
 - 基线指纹使用每用户本地盐，基线文件不能跨机器 / 用户复用。
+- `gitguard path install` 只管理当前用户 PATH；Windows 需新开终端生效，Unix 默认不修改 shell profile（用 `--update-profile`），移动 GitGuard 可执行文件后需重新安装。
 - 桌面端不内置 CLI，Hook 安装需要可用的 GitGuard CLI。
 - 桌面端 Gitleaks 覆盖只影响桌面端，不改变 CLI 与 `config.yml`。
 - 桌面端安装包默认未签名 / 未公证；macOS DMG 首次启动需手动放行。Windows MSIX 仅用于本地构建与 CI 冒烟，不随 Release 发布。

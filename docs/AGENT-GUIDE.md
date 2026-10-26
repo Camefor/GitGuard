@@ -131,13 +131,13 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| 当前任务 ID | `GGD-0060` |
-| 当前状态 | `DONE` |
-| 当前目标 | 无（等待用户指派下一任务） |
-| 最后完成动作 | `GGD-0060` 完成：从 `v1.1.0` Release 移除未签名 Windows MSIX，后续 Release 不再发布 MSIX（保留 CI 构建冒烟） |
-| 下一步动作 | 无 |
-| 涉及文件 | `.github/workflows/release.yml`、`README.md`、`docs/14-部署文档.md`、`docs/21-v1.1发行说明.md`、`docs/README.md`、`docs/AGENT-GUIDE.md` |
-| 验证结果 | Release 现为 8 个资产（4 个 CLI zip + macOS DMG ×2 + Linux AppImage + `SHA256SUMS`），7 项校验和与 GitHub 资产 digest 全部一致，正文无 MSIX；工作流 YAML 解析通过 |
+| 当前任务 ID | —（最近完成 `GGD-0061`） |
+| 当前状态 | `DONE`（空闲） |
+| 当前目标 | 无进行中任务，等待用户指派 |
+| 最后完成动作 | `GGD-0061` 完成：新增 CLI 用户级 PATH 管理 `gitguard path install / uninstall / status`（Windows 用户环境变量 / Unix 符号链接与 shell profile 标记块） |
+| 下一步动作 | 等待用户指派；PATH 安装后新终端解析与真实环境回滚为用户验收项 |
+| 涉及文件 | `src/GitGuard.Core`、`src/GitGuard.Infrastructure/FileSystem`、`src/GitGuard.Application`、`src/GitGuard.Cli`、`tests/*`、`README.md`、`docs/01`、`docs/02`、`docs/06`、`docs/10`、`docs/14`、`docs/16`、`docs/17` |
+| 验证结果 | Release 构建 0 警告 0 错误；`dotnet format --verify-no-changes` 通过；全量 1846 用例（1829 通过 + 17 平台跳过 + 0 失败） |
 | 阻塞/待确认 | 无 |
 | 最后更新 | 2026-10-26 |
 
@@ -149,9 +149,9 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-> 暂无待办任务。`GGD-0060` 已完成，`v1.1.0` Release 已清理 Windows MSIX。
+| — | — | — | — | 暂无待办任务 | — |
 
-> `GGD-0054` ~ `GGD-0060` 均已完成并通过验证；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
+> `GGD-0061` 已完成并移入 §9；PATH 安装后新终端解析与真实用户环境回滚保留为用户验收项（见 §9 备注）。
 
 ### 8.2 暂停/阻塞任务恢复详情
 
@@ -223,6 +223,7 @@
 | [x] | `GGD-0057` | 修复桌面端主题对比度与仓库详情操作区布局 | 2026-10-26 | `App.axaml` 补齐 Light / Dark 警告 / 危险 / 成功 / 徽标语义画刷与按钮样式类，16 组关键前景 / 背景对比度 ≥ 4.5:1；视图移除全部硬编码颜色；`RepositoriesView` 操作区固定底部并由 `WrapPanel` 换行；`MainWindow` 默认 1280×720；新增 `ThemeResourcesTests` 3 例 + `RepositoriesViewLayoutTests` 1 例；Release 构建 0 警告 0 错误、`dotnet format` 通过，全量 1778 用例（1769 通过 + 9 平台跳过 + 0 失败），Desktop 142 |
 | [x] | `GGD-0058` | README 瘦身与使用文档重构 | 2026-10-26 | 重写 README 为项目介绍、功能清单、安装、CLI 使用方法、Desktop 使用方法、配置、已知限制、开发与测试、文档入口；删除版本流水账 / FR 完成度 / CI 与打包细节；在 `AGENT-GUIDE` §6 与 `docs/README` §5 固化重大功能同步 README 规则；README 12 个本地链接全部存在，`git diff --check` 通过，三份 `.md` 均 UTF-8 BOM + CRLF，`gitguard scan --staged` 退出码 0（1 项白名单忽略） |
 | [x] | `GGD-0059` | GitHub Releases 发布通道与 `v1.1.0` 发行：tag 触发的 `publish-release` 作业、8 个发行资产 + 总 `SHA256SUMS`、README / 部署文档 / 发行说明同步 | 2026-10-26 | Release 页面 `draft=false` / `prerelease=false`，初始 9 个资产全部 `uploaded`（Windows MSIX 后由 `GGD-0060` 移除，现为 8 个）；GitHub Actions Release #40276679120 中 4 个 RID Native AOT、Windows MSIX、macOS arm64 / x64 DMG、Linux AppImage 全部构建与冒烟通过；8 个二进制资产下载后 `sha256sum -c SHA256SUMS` 全部 OK；`gitguard version` → `gitguard 1.1.0`；MSIX 标识版本 `1.1.0.0`；文档同步 14-部署文档 0.2.0 / 21-v1.1发行说明 / docs/README 0.1.6 / README / AGENT-GUIDE |
+| [x] | `GGD-0061` | CLI 用户级 PATH 管理：`gitguard path install` / `uninstall` / `status`（Windows 用户环境变量、Unix `~/.local/bin` 符号链接 + 可选 shell profile 标记块） | 2026-10-26 | Release 构建 0 警告 0 错误；`dotnet format --verify-no-changes` 通过；全量 1846 用例（1829 通过 + 17 平台跳过 + 0 失败；新增 68 例：Core 8 / Infrastructure 44 / Application 4 / CLI 12）；新终端解析与真实环境回滚为用户验收项 |
 | [x] | `GGD-0060` | 从 `v1.1.0` Release 移除未签名 Windows MSIX，并停止后续 Release 发布 MSIX（保留 CI 构建冒烟） | 2026-10-26 | 删除 Release 中的 MSIX 与旧 `SHA256SUMS` 资产后重传 7 项校验和，现为 8 个资产（4 个 CLI zip + macOS DMG ×2 + Linux AppImage + `SHA256SUMS`），逐项与 GitHub 资产 digest 一致；Release 正文移除 MSIX 下载行与安装提示；`publish-release` 在生成校验和与发布前剔除 MSIX 并校验 7 个预期资产，发行说明模板同步；README / 14-部署文档 / 21-v1.1发行说明 / docs/README 同步；工作流 YAML 解析通过 |
 
 ## 10. 取消任务
@@ -294,3 +295,4 @@
 - 2026-10-26 · `GGD-0058` · README 瘦身与使用文档重构：根目录 README 由版本流水账 / FR 完成度 / CI 与打包细节重写为「项目介绍 → 功能清单 → 安装 → CLI 使用方法（9 步）→ Desktop 使用方法（10 步）→ 配置 → 已知限制 → 开发与测试 → 文档入口 → README 维护约定」，补充 Desktop 仓库登记 / Hook 一键管理 / 立即扫描 / 扫描历史 / 白名单 / 规则库 / 日志导出 / 设置的操作步骤，CLI 命令与选项按 `--help` 实际输出核对；`docs/AGENT-GUIDE.md` §6 新增「重大功能更新必须同步更新 README」收尾规则并重排编号，`docs/README.md` §5 同步该维护约定并追加 0.1.5 变更记录 · 验证：README 12 个本地文档链接全部存在；`git diff --check` 通过；README / AGENT-GUIDE / docs/README 均 UTF-8 with BOM + CRLF；`gitguard scan --staged` 结果 Warned（3 文件 / 1 项白名单忽略 / 退出码 0）；纯文档改动未运行构建与测试（风险匹配） · 下一步：用户审阅新版 README；原始需求 3（CLI 写入系统 PATH）待用户确认后登记
 - 2026-10-26 · `GGD-0059` · 打通 GitHub Releases 发布通道并发布 `v1.1.0`：`.github/workflows/release.yml` 新增 tag 触发的 `publish-release` 作业（`needs` 全部构建作业、`contents: write`、下载 `gitguard-*` 构件、校验 8 个预期资产、生成总 `SHA256SUMS`、`gh release create` 或 `gh release upload --clobber`）；修复 `build/desktop/package-appimage.ps1` 失效的 appimagetool 下载地址（改为 `AppImage/appimagetool` continuous release）；修复 `build/desktop/smoke-test.ps1` Linux 分支未创建隔离 HOME 导致 Native AOT CLI 无法解析主目录而失败；发布过程依次修复 `gh` 缺少 `GH_REPO` 上下文、AppImage 404、Linux HOME 缺失三个问题后，`v1.1.0` 于 Run #40276679120 全绿并发布 · 验证：Release 页面 `draft=false` / `prerelease=false`、初始 9 个资产全部 `uploaded`（4 个 CLI zip + Windows MSIX + 2 个 macOS DMG + Linux AppImage + `SHA256SUMS`，MSIX 后由 `GGD-0060` 移除）；8 个二进制资产全部下载后 `sha256sum -c SHA256SUMS` 通过；`gitguard-1.1.0-win-x64.zip` 内 `gitguard.exe version` 输出 `gitguard 1.1.0`；MSIX 标识 `Version="1.1.0.0"` / `Publisher="CN=GitGuard"`；文档同步 14-部署文档 0.2.0 / 21-v1.1发行说明 / docs/README 0.1.6 / README / AGENT-GUIDE · 关键决策：① 仅 `v*` Tag 触发发布，`workflow_dispatch` 只产出 Actions 构件，避免手动构建误发版；② `publish-release` 等待 5 个构建作业全部成功才执行，任一平台失败即不发布；③ 已存在同名 Release 时 `gh release upload --clobber` 幂等重传，便于 Tag 重建后重跑；④ 无签名 secrets，MSIX 保持未签名、macOS DMG 保持 ad-hoc 签名并在发行说明中明确告警 · 环境陷阱：无 checkout 的 job 中 `gh` 需显式 `GH_REPO`（仅 `GH_TOKEN` / `GITHUB_REPOSITORY` 不够）；AppImageKit release 13 的 appimagetool 资产已 404，需改用 `AppImage/appimagetool` continuous；`UserDataPaths` 即便显式指定数据目录仍会解析 HOME，Linux 冒烟需先创建隔离 HOME · 下一步：无待办任务，等待用户指派
 - 2026-10-26 · `GGD-0060` · 按用户要求放弃 Windows MSIX 并清理 `v1.1.0` Release：通过 GitHub REST API（本机无 `gh`，token 取自 `git credential fill`，经仓库已配置的本地 HTTP(S) 代理）删除 MSIX 资产 `677178158` 与旧 `SHA256SUMS` 资产 `677178122`，重传仅覆盖 7 个发行包的校验和（678 字节），并 PATCH Release 正文移除 MSIX 下载行与安装提示；`.github/workflows/release.yml` 在 `publish-release` 的「Verify expected assets」中发布前 `rm -f dist/*.msix`、预期资产收敛为 4 个 CLI zip + 2 个 macOS DMG + 1 个 Linux AppImage，同步删除发行说明模板中的 MSIX 行与提示；README 跨平台 / 安装表 / 已知限制 / CI 说明、14-部署文档、21-v1.1发行说明、docs/README 同步为「MSIX 仅本地构建与 CI 冒烟，不随 Release 发布」 · 验证：Release 现为 8 个资产（4 个 CLI zip + macOS DMG ×2 + Linux AppImage + `SHA256SUMS`），7 项校验和与 GitHub API 返回的资产 digest 全部一致，正文无 `Desktop Windows x64` 行且无字面量 `\n`；工作流经 PyYAML 解析通过；纯发行 / 文档改动，未重复运行全量测试（风险匹配） · 关键决策：① 不折腾未签名 MSIX 的证书信任链，直接退出 Release，但保留 CI 构建与解包冒烟以防打包链回归；② Windows 桌面端不再提供预编译安装包，用户可使用 CLI 或从源码构建桌面端；③ 已发布 Release 采用删除资产 + 重算 `SHA256SUMS` 而非撤版重发，保持 Tag 与既有资产稳定 · 环境陷阱：无 `gh` 时使用 GitHub REST API；Git Bash `/tmp` 与 Windows Python 路径不互通，临时文件改放仓库目录并清理；中文经控制台显示可能呈乱码，但 API 原文为合法 UTF-8 · 下一步：无待办任务，等待用户指派
+- 2026-10-26 · `GGD-0061` · 完成原始需求 3（CLI 写入系统 PATH）：Core 新增 `PathException`（四错误码）、`IPathManager` 与安装 / 卸载 / 状态报告模型；Infrastructure 新增 `PathEnvironmentVariable`（去重 / 追加 / 精确移除 / 30000 上限）、Windows `HKCU\Environment\Path` 读写（`REG_EXPAND_SZ`、保留 `%VAR%`、大小写不敏感去重、广播 `WM_SETTINGCHANGE`、禁止 `setx`）、Unix `~/.local/bin` 符号链接与 `--force` 备份 + bash / zsh / sh / fish profile 标记块、`path-install.json` 原子状态文件与 `PathManagerFactory`；Application 新增 `PathManagementService` 并接入 `GitGuardSession`；CLI 注册 `path install`（`--force` / `--update-profile`）/ `uninstall` / `status`，三种 `gitguard.path.*.v1` JSON Schema、中英文案与退出码 3 / 5 / 60 / 61 / 62，非 `gitguard` 进程拒绝写入 · 验证：Release 构建 0 警告 0 错误；`dotnet format --verify-no-changes` 退出码 0；全量 1846 用例（1829 通过 + 17 平台跳过 + 0 失败，新增 68 例：Core 8 / Infrastructure 44 / Application 4 / CLI 12；全部通过临时注册表键 / 临时 HOME / 假管理器隔离，未触碰真实 PATH）；改动文本文件 UTF-8 BOM + CRLF 校验通过 · 文档同步：PRD FR-013 / SRS §2.3.1 / 06-API §4.12 + §5.8 / 10-异常处理 / 14-部署文档 / 16-测试方案 `TC-PATH-01~05` / 17-RoadMap §2.6 + 0.1.36 / README · 下一步：提交 `feat(cli): 实现 gitguard path 用户级 PATH 管理 (GGD-0061)` 并推送 origin/master；新终端解析与真实环境回滚为用户验收项

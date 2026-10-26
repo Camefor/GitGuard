@@ -7,6 +7,7 @@ using GitGuard.Application.Audit;
 using GitGuard.Application.Bypass;
 using GitGuard.Application.Configuration;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Paths;
 using GitGuard.Application.Repositories;
 using GitGuard.Application.Rules;
 using GitGuard.Application.Scanning;
@@ -38,6 +39,8 @@ public sealed class GitGuardSession
     private readonly ISecretRandom _secretRandom;
     private readonly UserDataPaths _paths;
     private readonly GitAccessFactory _gitAccessFactory;
+    private readonly IPathManager? _injectedPathManager;
+    private readonly Lazy<IPathManager> _pathManager;
 
     private readonly Lazy<GitGuardConfig> _config;
     private readonly Lazy<IGitAccess> _gitAccess;
@@ -60,11 +63,13 @@ public sealed class GitGuardSession
     /// <param name="options">外部注入点（工作目录 / git 可执行文件 / 数据目录 / 版本）；<see langword="null"/> 取默认值。</param>
     /// <param name="clock">时钟抽象；<see langword="null"/> 取系统时钟。</param>
     /// <param name="secretRandom">密码学随机源（指纹盐）；<see langword="null"/> 取系统实现。</param>
+    /// <param name="pathManager">PATH 管理器（CLI 测试注入假实现）；<see langword="null"/> 按当前平台创建。</param>
     /// <exception cref="ArgumentException">工作目录或 git 可执行文件为空或全空白。</exception>
     public GitGuardSession(
         GitGuardSessionOptions? options = null,
         IClock? clock = null,
-        ISecretRandom? secretRandom = null)
+        ISecretRandom? secretRandom = null,
+        IPathManager? pathManager = null)
     {
         _options = options ?? new GitGuardSessionOptions();
         ArgumentException.ThrowIfNullOrWhiteSpace(_options.WorkingDirectory);
@@ -74,6 +79,8 @@ public sealed class GitGuardSession
         _secretRandom = secretRandom ?? SystemSecretRandom.Instance;
         _paths = new UserDataPaths(_options.DataDirectory, _options.UserConfigDirectory);
         _gitAccessFactory = new GitAccessFactory(_options.GitExecutable);
+        _injectedPathManager = pathManager;
+        _pathManager = new Lazy<IPathManager>(() => _injectedPathManager ?? PathManagerFactory.Create(_paths));
         Version = string.IsNullOrWhiteSpace(_options.GitGuardVersion) ? ResolveDefaultVersion() : _options.GitGuardVersion;
 
         _config = new Lazy<GitGuardConfig>(LoadConfig);
@@ -325,6 +332,13 @@ public sealed class GitGuardSession
             new HookExecutableResolver(_options.WorkingDirectory),
             () => Config.Hooks);
 
+    /// <summary>
+    /// 装配 CLI PATH 管理服务（GGD-0061）：平台实现惰性创建，未使用 <c>path</c> 命令的进程不触碰注册表 / Shell profile。
+    /// </summary>
+    /// <returns>已接线的 PATH 管理服务。</returns>
+    /// <exception cref="GitGuard.Core.PathException">当前平台不支持自动 PATH 管理。</exception>
+    public PathManagementService CreatePathManagement() => new PathManagementService(_pathManager.Value);
+
     /// <summary>装配审计列表用例（只读：仅在执行时打开审计库，不触发配置加载与检测器装配）。</summary>
     /// <returns>已接线的列表用例。</returns>
     /// <exception cref="SqliteException">审计数据库无法打开或迁移。</exception>
@@ -404,7 +418,8 @@ public sealed class GitGuardSession
                 ConfigOverrides = configOverrides ?? _options.ConfigOverrides,
             },
             _clock,
-            _secretRandom);
+            _secretRandom,
+            _injectedPathManager);
     }
 
     /// <summary>装配状态查询用例（只读：不触发审计打开与检测器装配）。</summary>

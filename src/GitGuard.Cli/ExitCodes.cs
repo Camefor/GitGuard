@@ -63,6 +63,15 @@ public static class ExitCodes
     /// <summary>已有并发的 install / uninstall 持锁。</summary>
     public const int INSTALL_IN_PROGRESS = 50;
 
+    /// <summary>PATH 条目冲突：目标路径已有非 GitGuard 托管的同名文件 / 符号链接（需 <c>--force</c>）。</summary>
+    public const int PATH_ENTRY_CONFLICT = 60;
+
+    /// <summary>PATH 管理不受支持：当前平台或 Shell 无法自动写入用户 PATH。</summary>
+    public const int PATH_UNSUPPORTED = 61;
+
+    /// <summary>PATH 超长：写入后的用户 PATH 超过平台长度上限。</summary>
+    public const int PATH_TOO_LONG = 62;
+
     /// <summary>未知错误：未分类异常（代码缺陷）；stderr 输出并写入脱敏崩溃日志。</summary>
     public const int UNKNOWN_ERROR = 99;
 }

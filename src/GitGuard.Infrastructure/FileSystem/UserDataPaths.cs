@@ -43,6 +43,9 @@ public sealed class UserDataPaths
     /// <summary>崩溃日志目录名（10-异常处理设计 §8）。</summary>
     private const string CRASH_DIRECTORY_NAME = "crash";
 
+    /// <summary>PATH 托管状态文件名（GGD-0061）。</summary>
+    private const string PATH_INSTALL_STATE_FILE_NAME = "path-install.json";
+
     /// <summary>用户级配置文件名（FR-071）。</summary>
     private const string USER_CONFIG_FILE_NAME = "config.yml";
 
@@ -95,6 +98,9 @@ public sealed class UserDataPaths
 
     /// <summary>崩溃日志目录（10-异常处理设计 §8：<c>&lt;data&gt;/crash</c>）。</summary>
     public string CrashDirectory => Path.Combine(DataDirectory, CRASH_DIRECTORY_NAME);
+
+    /// <summary>PATH 托管状态文件（GGD-0061：<c>&lt;data&gt;/path-install.json</c>）。</summary>
+    public string PathInstallStatePath => Path.Combine(DataDirectory, PATH_INSTALL_STATE_FILE_NAME);
 
     /// <summary>用户级配置目录（<c>~/.config/gitguard</c>）。</summary>
     public string UserConfigDirectory { get; }

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using GitGuard.Core.Abstractions;
 
 namespace GitGuard.Cli.Tests;
 
@@ -17,11 +18,14 @@ internal sealed class CliHarness : IDisposable
 
     private readonly StringWriter _output = new StringWriter();
     private readonly StringWriter _error = new StringWriter();
+    private readonly IPathManager? _pathManager;
 
     /// <summary>初始化夹具。</summary>
     /// <param name="isRepository">是否把工作目录初始化为 Git 仓库（<see langword="false"/> 用于非仓库场景）。</param>
-    internal CliHarness(bool isRepository = true)
+    /// <param name="pathManager">PATH 管理器注入（<c>path</c> 命令测试用假实现，避免修改真实用户 PATH）。</param>
+    internal CliHarness(bool isRepository = true, IPathManager? pathManager = null)
     {
+        _pathManager = pathManager;
         Root = Path.Combine(Path.GetTempPath(), "gitguard-cli-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Root);
 
@@ -167,12 +171,14 @@ internal sealed class CliHarness : IDisposable
     /// <param name="standardInput">标准输入内容（<c>scan --push</c> 推送信息行）。</param>
     /// <param name="skipEnvironment"><c>GITGUARD_SKIP</c> 取值（<see langword="null"/> 表示未设置）。</param>
     /// <param name="languageEnvironment"><c>GITGUARD_LANG</c> 取值（<see langword="null"/> 表示未设置）。</param>
+    /// <param name="executablePath">本进程可执行文件路径覆盖（<see langword="null"/> 使用默认测试占位值）。</param>
     /// <returns>进程退出码。</returns>
     internal Task<int> RunAsync(
         string[] args,
         string standardInput,
         string? skipEnvironment = null,
-        string? languageEnvironment = null)
+        string? languageEnvironment = null,
+        string? executablePath = null)
     {
         var host = new CliHost
         {
@@ -183,7 +189,8 @@ internal sealed class CliHarness : IDisposable
             DataDirectory = DataDirectory,
             UserConfigDirectory = UserConfigDirectory,
             GitGuardVersion = TEST_VERSION,
-            ExecutablePath = TEST_EXECUTABLE,
+            ExecutablePath = executablePath ?? TEST_EXECUTABLE,
+            PathManager = _pathManager,
             SkipEnvironment = skipEnvironment,
             LanguageEnvironment = languageEnvironment,
             IsErrorTerminal = false,

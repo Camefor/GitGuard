@@ -36,6 +36,21 @@ public sealed class ExitCodeMapperTests
     }
 
     [Fact]
+    public void Map_PathException_ClassifiesPermissionConflictUnsupportedAndTooLong()
+    {
+        ExitCodeMapper.Map(new PathException(PathException.WRITE_PERMISSION_DENIED, "只读"))
+            .Should().Be(ExitCodes.WRITE_PERMISSION_DENIED);
+        ExitCodeMapper.Map(new PathException(PathException.ENTRY_CONFLICT, "符号链接冲突"))
+            .Should().Be(ExitCodes.PATH_ENTRY_CONFLICT);
+        ExitCodeMapper.Map(new PathException(PathException.UNSUPPORTED, "平台不支持"))
+            .Should().Be(ExitCodes.PATH_UNSUPPORTED);
+        ExitCodeMapper.Map(new PathException(PathException.TOO_LONG, "PATH 超长"))
+            .Should().Be(ExitCodes.PATH_TOO_LONG);
+        ExitCodeMapper.Map(new PathException("SOMETHING_NEW", "未登记"))
+            .Should().Be(ExitCodes.UNKNOWN_ERROR);
+    }
+
+    [Fact]
     public void Map_AllowlistException_ClassifiesValidationAndNotFound()
     {
         ExitCodeMapper.Map(new AllowlistException(AllowlistException.ALLOWLIST_VALIDATION_FAILED, "参数非法"))
@@ -73,6 +88,8 @@ public sealed class ExitCodeMapperTests
             .Should().Be(GitException.NOT_A_GIT_REPOSITORY);
         ExitCodeMapper.ErrorCodeOf(new HookException(HookException.WRITE_PERMISSION_DENIED, "只读"))
             .Should().Be(HookException.WRITE_PERMISSION_DENIED);
+        ExitCodeMapper.ErrorCodeOf(new PathException(PathException.ENTRY_CONFLICT, "符号链接冲突"))
+            .Should().Be(PathException.ENTRY_CONFLICT);
         ExitCodeMapper.ErrorCodeOf(new AllowlistException(AllowlistException.ALLOWLIST_VALIDATION_FAILED, "参数非法"))
             .Should().Be(AllowlistException.ALLOWLIST_VALIDATION_FAILED);
         ExitCodeMapper.ErrorCodeOf(new BaselineException(BaselineException.BASELINE_WRITE_FAILED, "基线写入失败"))

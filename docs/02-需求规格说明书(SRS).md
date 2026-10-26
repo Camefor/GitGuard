@@ -36,6 +36,19 @@
 - **输出**：JSON（`gitguard.status.v1`）或人类可读文本，包含 Git 版本、`core.hooksPath`、Hook 状态分类（`Missing` / `Managed` / `Legacy` / `Binary` / `SymbolicLink`）、GitGuard 版本、配置文件加载链与配置警告；存在未托管的 `Legacy` / `Binary` / `SymbolicLink` 时 `needs_attention=true`（退出码 6）。
 - **关联测试用例**：`TC-FR-012-01`
 
+### 2.3.1 `FR-013` 用户级 PATH 管理
+
+- **描述**：把 GitGuard CLI 加入**当前用户**的 PATH，使用户在新终端可直接运行 `gitguard`；不修改系统级 PATH，不需要管理员 / `sudo` 权限。
+- **输入**：`gitguard path install [--force] [--update-profile]` / `gitguard path uninstall` / `gitguard path status`；当前进程必须为 `gitguard` / `gitguard.exe`（`dotnet run` / 测试宿主 → 退出码 61）。
+- **输出**：文本报告 → stderr；`--format json` → stdout（`gitguard.path.install.v1` / `uninstall.v1` / `status.v1`，见 `06-API接口设计` §4.12）。安装后写入 `<data>/path-install.json`（内部 Schema `gitguard.path.state.v1`），仅用于精确卸载。
+- **处理规则**：
+  - Windows：把可执行文件所在目录追加到 `HKCU\Environment\Path`（`REG_EXPAND_SZ`，保留 `%VAR%`、大小写不敏感去重、广播 `WM_SETTINGCHANGE`）；追加后超过 30000 字符 → 退出码 62。`--force` / `--update-profile` 无效果。
+  - Unix（Linux / macOS）：在 `~/.local/bin` 创建指向可执行文件的 `gitguard` 符号链接；`--update-profile` 依据 `$SHELL` 向 bash / zsh / sh / fish 的 profile 写入带标记的可逆 PATH 块，未识别 Shell → 退出码 61；目标冲突默认退出码 60，`--force` 备份为 `gitguard.local.bak` 后接管。
+  - 卸载只移除 GitGuard 托管条目，其他 PATH 条目 / profile 内容保持不变；无托管痕迹 → 退出码 5。状态文件缺失 / 损坏按「未安装」降级，不阻断命令。
+  - 状态查询区分 `installed` / `path_entry_present` / `effective`（当前进程 PATH） / `profile_configured`。
+- **异常处理**：写入权限不足 → 3；条目冲突 → 60；平台 / Shell 不支持或非 gitguard 进程 → 61；PATH 超长 → 62；状态文件损坏不抛异常。
+- **关联测试用例**：`TC-PATH-01` ~ `TC-PATH-05`
+
 ### 2.4 `FR-020` 暂存区扫描
 
 - **描述**：扫描当前仓库暂存区差异，判定是否存在敏感信息。
@@ -315,6 +328,7 @@ CLI 命令细节见 `06-API接口设计.md`。
 | `FR-010` | 3.1 | `03-SAD §6 Hook 模块` / `模块设计/Hook.md` | `TC-FR-010-01~05`（`InstallHookUseCaseTests` / `HookEndToEndTests` / `CliHookLifecycleTests`） | 已实现 |
 | `FR-011` | 3.1 | 同上 | `TC-FR-010-04`（`UninstallHookUseCaseTests` / `HookEndToEndTests`） | 已实现 |
 | `FR-012` | 3.1 | `模块设计/Cli.md` / `模块设计/Hook.md` | `TC-FR-012-01`（`StatusUseCaseTests` / `CliHookLifecycleTests`） | 已实现 |
+| `FR-013` | 全部（原始需求 3） | `06-API接口设计` §4.12 / §5.8、`14-部署文档` §2.1 | `TC-PATH-01~05`（`WindowsPathManagerTests` / `UnixPathManagerTests` / `PathCommandTests` / `PathManagementServiceTests` / `PathInstallStateStoreTests` / `ShellProfileEditorTests`） | 已实现（`GGD-0061`） |
 | `FR-020` | 3.2 | `模块设计/Secret.md` / `Privacy.md` / `模块设计/Policy.md` | `TC-FR-020-01~05`（`ScanEndToEndTests` / `ScanStagedUseCaseTests` / `UnifiedDiffParserTests` / `CliScanCommandTests`） | 已实现 |
 | `FR-021` | 3.2 | `模块设计/Secret.md` ~ `模块设计/LocalPathUrl.md` | `TC-FR-021-*`（`DetectorTests` / `BuiltinRuleFixtureTests` / `DetectorRobustnessTests`） | 已实现（60 条规则，GGD-0033 / GGD-0048 / GGD-0049 / GGD-0050 / GGD-0051） |
 | `FR-022` | 3.2 | `模块设计/Policy.md` | `PolicyEvaluatorTests` / `SeverityPolicyTests` / `PolicyDecisionTests` | 已实现 |
@@ -376,3 +390,4 @@ CLI 命令细节见 `06-API接口设计.md`。
 | 0.1.28 | 2026-10-24 | GGD-0049：§2.5 FR-021 规则库扩充至 50 条（Secret 21 / Privacy 14 / LocalPath 7 / Url 8），严重度分布更新为 Critical 11 / High 19 / Medium 12 / Low 8；Privacy 新增 IBAN / 美国电话 / 英国 NINO / 中国车牌 / 出生日期与 `iban-checksum`；§8 追溯矩阵同步 |
 | 0.1.29 | 2026-10-24 | GGD-0050：§2.5 FR-021 规则库扩充至 55 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 8），严重度分布更新为 Critical 11 / High 19 / Medium 12 / Low 13；LocalPath 新增 macOS 挂载卷 / root 主目录 / Web 部署目录 / Cygwin 盘符 / Windows 行内盘符路径；§8 追溯矩阵同步 |
 | 0.1.30 | 2026-10-25 | GGD-0051：§2.5 FR-021 规则库扩充至 60 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 13），严重度分布更新为 Critical 11 / High 24 / Medium 12 / Low 13；Url 新增 Google Cloud 签名 URL / Azure SAS / 数据库 URL 内嵌凭据 / OAuth 刷新令牌 / 飞书 Webhook；§8 追溯矩阵同步 |
+| 0.1.31 | 2026-10-26 | GGD-0061：新增 §2.3.1 FR-013 用户级 PATH 管理（Windows 用户环境变量 / Unix 符号链接 + 可选 profile 标记块、精确卸载、状态查询、退出码 3 / 5 / 60 / 61 / 62）；§8 追溯矩阵新增 FR-013 并指向 `TC-PATH-01~05` |

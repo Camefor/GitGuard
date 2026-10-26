@@ -145,6 +145,10 @@ dotnet_diagnostic.RCS1194.severity = none
 [src/GitGuard.Core/RepositoryException.cs]
 dotnet_diagnostic.RCS1194.severity = none
 
+# PathException 同 GitException：设计上强制携带 ErrorCode（PATH_WRITE_PERMISSION_DENIED / PATH_ENTRY_CONFLICT / PATH_UNSUPPORTED / PATH_TOO_LONG → 退出码 3 / 60 / 61 / 62）。
+[src/GitGuard.Core/PathException.cs]
+dotnet_diagnostic.RCS1194.severity = none
+
 # ===== 测试项目 =====
 [tests/**/*.cs]
 # 测试方法命名遵循《16-测试方案》§3：<Method>_<Scenario>_<Expectation>，允许下划线

@@ -65,7 +65,7 @@
   - Avalonia 新版 breaking changes → 锁定 11.3 LTS 版本。
   - 桌面端被当作「必选项」误解 → README 显式说明「桌面端可选」。
 - **退出条件**：
-  - [ ] 桌面端 Smoke 测试在三平台通过（发行工作流已就绪：Windows MSIX 本地通过，macOS / Linux 待首次 Release runner 验证）。
+  - [x] 桌面端 Smoke 测试在三平台通过（`GGD-0059`：`v1.1.0` Release 流水线的 Windows MSIX CI 冒烟、macOS arm64 / x64 DMG、Linux AppImage 构建与冒烟全部通过；MSIX 因未签名仅保留 CI 冒烟，不再发布）。
   - [x] 桌面端能展示 CLI 已记录的全部审计数据（`--smoke-test` 在 Windows MSIX 发行形态实测读取并导出 CLI 审计数据）。
 
 ### 2.4 阶段 4：规则库沉淀与文档稳定（v1.0）
@@ -84,7 +84,7 @@
 - **退出条件**：
   - [x] 规则库 ≥ 60 条（当前 60，`GGD-0048` / `GGD-0049` / `GGD-0050` / `GGD-0051` 已完成）。
   - [ ] 连续稳定运行 3 个月（2026-10-24 ~ 2027-01-24）且无 P0 Bug（用户验收）。
-  - [ ] 三平台发行冒烟通过（Windows CLI AOT / zip / MSIX 已在本地通过，`GGD-0053`；macOS / Linux 待首次 Release runner 验证）。
+  - [x] 三平台发行冒烟通过（`GGD-0053` Windows 本地基线；`GGD-0059` `v1.1.0` Release #40276679120：4 个 RID CLI Native AOT、Windows MSIX CI 冒烟、macOS arm64 / x64 DMG、Linux AppImage 全部构建与冒烟通过）。
   - [x] 文档稳定：规则清单 / README / 误报治理指南与实现一致，无失效链接（`GGD-0052` 已完成）。
 
 ### 2.5 阶段 5：桌面端 Hook 快捷管理（v1.1）
@@ -107,6 +107,22 @@
   - [x] 仓库页支持一键安装 / 重新安装 / 卸载与两类二次确认（`GGD-0055`）。
   - [x] ViewModel 自动化测试覆盖关键路径（Desktop 142 例通过）。
   - [ ] Windows 实机验收安装 / 强制接管 / 卸载与重启后 CLI 路径保持（用户执行）。
+
+### 2.6 阶段 6：CLI PATH 管理（v1.2 候选）
+
+- **周期**：2026-10-26 启动。
+- **目标**：补齐原始需求 3——CLI 能把自身写入用户级 PATH，并提供可逆的查询 / 卸载能力，解决桌面端 Hook 快捷管理依赖外部 CLI 在 PATH 中的前置问题。
+- **交付物**：
+  - Core `IPathManager` / `PathException` 与安装 / 卸载 / 状态报告模型。
+  - Infrastructure 用户级实现：Windows `HKCU\Environment\Path`（`REG_EXPAND_SZ`、保留变量、大小写不敏感去重、广播 `WM_SETTINGCHANGE`、禁止 `setx`）；Unix `~/.local/bin` 符号链接与可选 shell profile 标记块。
+  - Application `PathManagementService` 与组合根接线；CLI `gitguard path install / uninstall / status`、`--force` / `--update-profile`、JSON Schema 与中英文案。
+  - 测试全程通过注入假 PATH 管理器 / 临时注册表键与临时 HOME 完成，不修改真实 PATH。
+- **风险**：
+  - 直接改用户环境变量不可逆 → 状态文件记录受管条目，卸载仅删除 GitGuard 托管部分并保留其他条目。
+  - Unix 符号链接 / profile 冲突 → `--force` 显式接管并留备份；profile 使用可识别标记块。
+- **退出条件**：
+  - [x] 安装 / 卸载 / 状态命令与报告契约落地：`gitguard path install` / `uninstall` / `status` 支持文本与 JSON，`path status` 区分已登记 / 当前进程生效 / profile 配置，`path uninstall` 仅移除受管条目且不残留标记块（`GGD-0061`，自动化验证通过）。
+  - [ ] 新终端解析与真实用户环境回滚为用户验收项（需在目标机器执行安装 / 卸载并开新终端验证）。
 
 ## 3. 任务分解
 
@@ -153,6 +169,7 @@
 | 5 | `GGD-0055` | Desktop 仓库详情页 Hook 一键安装 / 卸载与 CLI 路径选择（已完成） | P1 | 1.5d |
 | 5 | `GGD-0056` | Desktop 操作期间隐藏 git 子进程控制台窗口（已完成） | P1 | 0.5d |
 | 5 | `GGD-0057` | Desktop 主题对比度与仓库详情操作区布局修复（已完成） | P1 | 0.5d |
+| 6 | `GGD-0061` | CLI 用户级 PATH 管理：`gitguard path install` / `uninstall` / `status`（已完成） | P1 | 2d |
 
 ## 4. 里程碑
 
@@ -227,3 +244,4 @@ flowchart LR
 | 0.1.33 | 2026-10-26 | v1.1 启动与完成（用户确认方案）：不内置 CLI，改为桌面端复用 Application 层 Hook 用例；§1 新增 v1.1 行、新增 §2.5 阶段 5，§3 登记 `GGD-0054` / `GGD-0055` 并标记完成；Release 构建 0 警告 0 错误，全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败） |
 | 0.1.34 | 2026-10-26 | GGD-0056 完成：`GitAccess` / `GitVersionProbe` 统一经 `GitProcessStartInfoFactory` 以 `UseShellExecute=false` + `CreateNoWindow=true` 启动 git，修复桌面端 WinExe 宿主在仓库列表 / 详情 / 扫描 / Hook 操作期间反复闪现控制台窗口；§2.5 交付物与 §3 任务表同步，新增 3 例 Infrastructure 测试（全量 1774） |
 | 0.1.35 | 2026-10-26 | GGD-0057 完成：Light / Dark 主题补齐警告 / 危险 / 成功 / 徽标语义画刷并满足 WCAG AA，仓库详情操作区固定底部并可换行，默认窗口调整为 1280×720；§2.5 交付物与 §3 任务表同步，新增 4 例 Desktop 主题 / 布局回归测试（全量 1778） |
+| 0.1.36 | 2026-10-26 | GGD-0061 完成：新增 §2.6 阶段 6（CLI 用户级 PATH 管理）——Core `IPathManager` / `PathException` 与报告模型、Windows `HKCU\Environment\Path`（`REG_EXPAND_SZ` / 变量保留 / 去重 / `WM_SETTINGCHANGE` / 超长保护）与 Unix `~/.local/bin` 符号链接 + shell profile 标记块、Application `PathManagementService` 与 CLI `path install / uninstall / status`（`--force` / `--update-profile`、三种 JSON Schema、退出码 60 / 61 / 62）；§3 任务表标记完成，新增 68 例测试（全量 1846 用例：1829 通过 + 17 平台跳过 + 0 失败）。新终端解析与真实用户环境回滚保留为用户验收项 |

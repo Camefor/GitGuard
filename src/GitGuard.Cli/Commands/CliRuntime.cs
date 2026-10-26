@@ -30,14 +30,16 @@ internal sealed class CliRuntime
         Host = host;
         TraceId = traceId;
         Text = text;
-        Session = new GitGuardSession(new GitGuardSessionOptions
-        {
-            WorkingDirectory = host.WorkingDirectory,
-            GitExecutable = host.GitExecutable,
-            DataDirectory = host.DataDirectory,
-            UserConfigDirectory = host.UserConfigDirectory,
-            GitGuardVersion = host.GitGuardVersion,
-        });
+        Session = new GitGuardSession(
+            new GitGuardSessionOptions
+            {
+                WorkingDirectory = host.WorkingDirectory,
+                GitExecutable = host.GitExecutable,
+                DataDirectory = host.DataDirectory,
+                UserConfigDirectory = host.UserConfigDirectory,
+                GitGuardVersion = host.GitGuardVersion,
+            },
+            pathManager: host.PathManager);
     }
 
     /// <summary>宿主缝合点。</summary>

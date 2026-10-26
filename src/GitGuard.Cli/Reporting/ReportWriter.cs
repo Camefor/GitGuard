@@ -35,6 +35,9 @@ internal sealed class ReportWriter
     private const string ALLOWLIST_LIST_SCHEMA = "gitguard.allowlist.list.v1";
     private const string RULES_LIST_SCHEMA = "gitguard.rules.list.v1";
     private const string RULES_VIEW_SCHEMA = "gitguard.rules.view.v1";
+    private const string PATH_INSTALL_SCHEMA = "gitguard.path.install.v1";
+    private const string PATH_UNINSTALL_SCHEMA = "gitguard.path.uninstall.v1";
+    private const string PATH_STATUS_SCHEMA = "gitguard.path.status.v1";
 
     private readonly TextWriter _output;
     private readonly TextWriter _error;
@@ -583,6 +586,115 @@ internal sealed class ReportWriter
         if (showPattern)
         {
             WriteIndented(_text.Get(CliTextKey.LabelPattern), rule.Pattern.Regex.ToString());
+        }
+    }
+
+    /// <summary>渲染 PATH 安装报告（<c>06-API接口设计</c> §5.8；文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="report">安装报告。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="report"/> 为 <see langword="null"/>。</exception>
+    internal void WritePathInstall(PathInstallReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        if (_json)
+        {
+            WritePathInstallJson(report);
+            return;
+        }
+
+        WriteColored("✔ ", ConsoleColor.Green);
+        _error.WriteLine(_text.Get(CliTextKey.PathInstallHeader));
+        if (report.AlreadyPresent)
+        {
+            WriteIndented(null, _text.Get(CliTextKey.PathInstallAlreadyPresent));
+        }
+
+        WriteIndented(_text.Get(CliTextKey.LabelPlatform), report.Platform);
+        WriteIndented(_text.Get(CliTextKey.LabelTargetDirectory), report.TargetDirectory);
+        WriteIndented(_text.Get(CliTextKey.LabelExecutable), report.ExecutablePath);
+        if (report.ProfilePath is { } profilePath)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelProfile), profilePath);
+            WriteIndented(
+                _text.Get(CliTextKey.LabelProfileConfigured),
+                BoolText(report.ProfileUpdated));
+        }
+
+        if (report.BackupPath is { } backupPath)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelBackup), backupPath);
+        }
+
+        WriteIndented(_text.Get(CliTextKey.LabelEffective), BoolText(report.Effective));
+        if (!report.Effective)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelHint), _text.Get(CliTextKey.PathRestartHint));
+        }
+        else
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelHint), _text.Get(CliTextKey.PathInstallHint));
+        }
+    }
+
+    /// <summary>渲染 PATH 卸载报告（文本 → stderr；JSON → stdout；<see cref="PathUninstallReport.NotInstalled"/> 由调用方映射退出码 5）。</summary>
+    /// <param name="report">卸载报告。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="report"/> 为 <see langword="null"/>。</exception>
+    internal void WritePathUninstall(PathUninstallReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        if (_json)
+        {
+            WritePathUninstallJson(report);
+            return;
+        }
+
+        if (report.NotInstalled)
+        {
+            WriteColored("⚠ ", ConsoleColor.Yellow);
+            _error.WriteLine(_text.Get(CliTextKey.PathUninstallNotInstalledHeader));
+        }
+        else
+        {
+            WriteColored("✔ ", ConsoleColor.Green);
+            _error.WriteLine(_text.Get(CliTextKey.PathUninstallHeader));
+        }
+
+        WriteIndented(_text.Get(CliTextKey.LabelPlatform), report.Platform);
+        WriteIndented(_text.Get(CliTextKey.LabelTargetDirectory), report.TargetDirectory);
+        WriteIndented(_text.Get(CliTextKey.LabelPathUpdated), BoolText(report.PathUpdated));
+        WriteIndented(_text.Get(CliTextKey.LabelLinkRemoved), BoolText(report.LinkRemoved));
+        WriteIndented(_text.Get(CliTextKey.LabelProfileBlockRemoved), BoolText(report.ProfileBlockRemoved));
+    }
+
+    /// <summary>渲染 PATH 状态报告（文本 → stderr；JSON → stdout）。</summary>
+    /// <param name="report">状态快照。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="report"/> 为 <see langword="null"/>。</exception>
+    internal void WritePathStatus(PathStatusReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        if (_json)
+        {
+            WritePathStatusJson(report);
+            return;
+        }
+
+        _error.WriteLine(_text.Get(CliTextKey.PathStatusHeader));
+        WriteIndented(_text.Get(CliTextKey.LabelPlatform), report.Platform);
+        WriteIndented(_text.Get(CliTextKey.LabelTargetDirectory), report.TargetDirectory);
+        WriteIndented(_text.Get(CliTextKey.LabelExecutable), report.ExecutablePath);
+        WriteIndented(
+            _text.Get(CliTextKey.LabelInstalled),
+            report.Installed ? _text.Get(CliTextKey.PathStatusInstalled) : _text.Get(CliTextKey.PathStatusNotInstalled));
+        WriteIndented(_text.Get(CliTextKey.LabelPathEntry), BoolText(report.PathEntryPresent));
+        WriteIndented(_text.Get(CliTextKey.LabelEffective), BoolText(report.Effective));
+        WriteIndented(
+            _text.Get(CliTextKey.LabelProfile),
+            report.ProfilePath ?? _text.Get(CliTextKey.PathProfileNotConfigured));
+        if (report.ProfilePath is not null)
+        {
+            WriteIndented(_text.Get(CliTextKey.LabelProfileConfigured), BoolText(report.ProfileConfigured));
         }
     }
 
@@ -1405,6 +1517,68 @@ internal sealed class ReportWriter
         _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
     }
 
+    private void WritePathInstallJson(PathInstallReport report)
+    {
+        var buffer = new ArrayBufferWriter<byte>(512);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", PATH_INSTALL_SCHEMA);
+            writer.WriteString("platform", report.Platform);
+            writer.WriteString("target_directory", report.TargetDirectory);
+            writer.WriteString("executable", report.ExecutablePath);
+            writer.WriteBoolean("already_present", report.AlreadyPresent);
+            writer.WriteBoolean("path_updated", report.PathUpdated);
+            writer.WriteString("profile_path", report.ProfilePath);
+            writer.WriteBoolean("profile_updated", report.ProfileUpdated);
+            writer.WriteString("backup_path", report.BackupPath);
+            writer.WriteBoolean("effective", report.Effective);
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WritePathUninstallJson(PathUninstallReport report)
+    {
+        var buffer = new ArrayBufferWriter<byte>(384);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", PATH_UNINSTALL_SCHEMA);
+            writer.WriteString("platform", report.Platform);
+            writer.WriteString("target_directory", report.TargetDirectory);
+            writer.WriteBoolean("path_updated", report.PathUpdated);
+            writer.WriteBoolean("link_removed", report.LinkRemoved);
+            writer.WriteBoolean("profile_block_removed", report.ProfileBlockRemoved);
+            writer.WriteBoolean("not_installed", report.NotInstalled);
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
+    private void WritePathStatusJson(PathStatusReport report)
+    {
+        var buffer = new ArrayBufferWriter<byte>(512);
+        using (var writer = new Utf8JsonWriter(buffer, JsonText.WriterOptions))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", PATH_STATUS_SCHEMA);
+            writer.WriteString("platform", report.Platform);
+            writer.WriteString("target_directory", report.TargetDirectory);
+            writer.WriteString("executable", report.ExecutablePath);
+            writer.WriteBoolean("installed", report.Installed);
+            writer.WriteBoolean("path_entry_present", report.PathEntryPresent);
+            writer.WriteBoolean("effective", report.Effective);
+            writer.WriteString("profile_path", report.ProfilePath);
+            writer.WriteBoolean("profile_configured", report.ProfileConfigured);
+            writer.WriteEndObject();
+        }
+
+        _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+    }
+
     private void WriteAuditExportJson(AuditExportReport report)
     {
         var buffer = new ArrayBufferWriter<byte>(256);
@@ -1459,6 +1633,9 @@ internal sealed class ReportWriter
 
         _output.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
     }
+
+    private string BoolText(bool value) =>
+        _text.Get(value ? CliTextKey.ValueYes : CliTextKey.ValueNo);
 
     private void WriteIndented(string? label, string value)
     {

@@ -1,4 +1,6 @@
-﻿namespace GitGuard.Cli;
+﻿using GitGuard.Core.Abstractions;
+
+namespace GitGuard.Cli;
 
 /// <summary>
 /// CLI 进程宿主的外部注入点（测试缝隙 + 进程环境快照）：工作目录、标准流、数据目录、git 可执行文件与
@@ -30,8 +32,11 @@ public sealed class CliHost
     /// <summary>GitGuard 版本覆盖（测试用）；<see langword="null"/> 取本程序集版本。</summary>
     public string? GitGuardVersion { get; init; }
 
-    /// <summary>GitGuard 可执行文件路径（写入 Hook 分发脚本）；<see langword="null"/> 取 <see cref="ResolveExecutablePath"/>。</summary>
+    /// <summary>GitGuard 可执行文件路径（写入 Hook 分发脚本 / PATH）；<see langword="null"/> 取 <see cref="ResolveExecutablePath"/>。</summary>
     public string? ExecutablePath { get; init; }
+
+    /// <summary>PATH 管理器覆盖（测试注入假实现，避免修改真实用户 PATH）；<see langword="null"/> 按当前平台创建。</summary>
+    public IPathManager? PathManager { get; init; }
 
     /// <summary><c>GITGUARD_SKIP</c> 环境变量取值（<c>1</c> 表示 Hook 模式下显式跳过扫描，FR-050）；未设置为 <see langword="null"/>。</summary>
     public string? SkipEnvironment { get; init; }
