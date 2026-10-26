@@ -94,6 +94,7 @@
 - **交付物**：
   - Application 层共享 `HookManagementService` / `HookExecutableResolver` / `HookSelection`，CLI `install` / `uninstall` 复用（`GGD-0054` 已完成）。
   - Desktop 仓库详情页 Hook 操作区：安装 / 重新安装、卸载、二进制 / 符号链接强制接管确认、卸载二次确认（`GGD-0055` 已完成）。
+  - Desktop 所有非交互 git 子进程隐藏控制台窗口，仓库列表 / 详情 / 扫描 / Hook 操作期间无窗口闪现（`GGD-0056` 已完成）。
   - CLI 路径解析顺序：`hooks.gitguard_executable_path` → PATH → 已知安装位置 → 文件选择器；选择结果写入桌面设置，不写回项目配置。
   - ViewModel 自动化测试覆盖安装、路径选择取消 / 无效、强制接管、卸载确认、错误映射与语言刷新。
 - **依赖**：阶段 3 桌面端与阶段 4 文档基线完成；不依赖 CLI 打包。
@@ -149,6 +150,7 @@
 | 4 | `GGD-0053` | v1.0 发布基线：版本号 1.0.0、发行说明、三平台产物回归（已完成；Windows 本地冒烟通过，macOS / Linux 待 Release runner） | P1 | 2d |
 | 5 | `GGD-0054` | Application 层共享 Hook 管理服务与 CLI 可执行文件解析，CLI `install` / `uninstall` 复用（已完成） | P1 | 1.5d |
 | 5 | `GGD-0055` | Desktop 仓库详情页 Hook 一键安装 / 卸载与 CLI 路径选择（已完成） | P1 | 1.5d |
+| 5 | `GGD-0056` | Desktop 操作期间隐藏 git 子进程控制台窗口（已完成） | P1 | 0.5d |
 
 ## 4. 里程碑
 
@@ -221,3 +223,4 @@ flowchart LR
 | 0.1.31 | 2026-10-25 | GGD-0052 完成：文档稳定化——规则清单与 `BuiltinRules.yaml` 一致（60 条，21 / 14 / 12 / 13）、相对链接审计通过；`docs/README.md` 阶段基线、模块导航与 ADR-0004 链接更新；CONTEXT 当前阶段 / Gitleaks 集成状态更正；§2.4 退出条件「文档稳定」达成，§3 任务表同步 |
 | 0.1.32 | 2026-10-25 | GGD-0053 完成：版本号冻结 1.0.0，新增 `docs/20-v1.0发行说明.md`；Windows CLI AOT / zip / MSIX 本地发行冒烟通过，macOS / Linux 留待首次 Release runner；§1 / §2.4 退出条件与 §3 任务表同步（全量 1750 用例） |
 | 0.1.33 | 2026-10-26 | v1.1 启动与完成（用户确认方案）：不内置 CLI，改为桌面端复用 Application 层 Hook 用例；§1 新增 v1.1 行、新增 §2.5 阶段 5，§3 登记 `GGD-0054` / `GGD-0055` 并标记完成；Release 构建 0 警告 0 错误，全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败） |
+| 0.1.34 | 2026-10-26 | GGD-0056 完成：`GitAccess` / `GitVersionProbe` 统一经 `GitProcessStartInfoFactory` 以 `UseShellExecute=false` + `CreateNoWindow=true` 启动 git，修复桌面端 WinExe 宿主在仓库列表 / 详情 / 扫描 / Hook 操作期间反复闪现控制台窗口；§2.5 交付物与 §3 任务表同步，新增 3 例 Infrastructure 测试（全量 1774） |

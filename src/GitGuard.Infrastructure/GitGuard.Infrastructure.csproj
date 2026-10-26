@@ -16,4 +16,9 @@
     <EmbeddedResource Include="Sqlite\Migrations\*.sql" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- GGD-0056：内部启动配置工厂需要被基础设施测试直接断言 -->
+    <InternalsVisibleTo Include="GitGuard.Infrastructure.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -24,14 +24,12 @@ public static class GitVersionProbe
         ArgumentException.ThrowIfNullOrWhiteSpace(gitExecutable);
         TimeSpan effectiveTimeout = timeout ?? DEFAULT_TIMEOUT;
 
-        var startInfo = new ProcessStartInfo(gitExecutable)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-            UseShellExecute = false,
-        };
+        // 与 GitAccess 共用隐藏窗口配置，避免桌面端启动时闪现 git --version 控制台窗口
+        var startInfo = GitProcessStartInfoFactory.Create(gitExecutable);
+        startInfo.RedirectStandardOutput = true;
+        startInfo.RedirectStandardError = true;
+        startInfo.StandardOutputEncoding = Encoding.UTF8;
+        startInfo.StandardErrorEncoding = Encoding.UTF8;
         startInfo.ArgumentList.Add("--version");
 
         try

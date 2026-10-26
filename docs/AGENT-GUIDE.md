@@ -132,11 +132,11 @@
 | --- | --- |
 | 当前任务 ID | — |
 | 当前状态 | `DONE` |
-| 当前目标 | 无（v1.1 Hook 快捷管理已完成，等待用户指派下一任务） |
-| 最后完成动作 | `GGD-0055` 完成：Desktop 仓库页新增 Hook 安装 / 重新安装 / 卸载、CLI 自动解析与文件选择、强制接管 / 卸载二次确认、路径持久化与中英文案；v1.1 文档与发行说明同步 |
-| 下一步动作 | 用户按 `TC-FR-100-15` 实机验收 v1.1；如需 CLI 写入系统 PATH（原始需求 3），确认后登记新任务 |
-| 涉及文件 | Application `Hooks/*`、CLI `InstallCommand` / `UninstallCommand`、Desktop `RepositoriesViewModel` / `RepositoriesView.axaml` / `RepositoryOperations` / `DesktopSettings` / `DesktopText`、Desktop / Application 测试及 v1.1 文档 |
-| 验证结果 | Release 构建 0 警告 0 错误；`dotnet format` 通过；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败），其中 Desktop 138、Application 302、CLI 131 |
+| 当前目标 | 无（`GGD-0056` 完成，等待用户 v1.1 实机验收） |
+| 最后完成动作 | `GGD-0056` 完成：`GitAccess` / `GitVersionProbe` 统一经 `GitProcessStartInfoFactory` 启动 git（`UseShellExecute=false` + `CreateNoWindow=true`），修复桌面端操作期间控制台窗口闪现；新增 3 例 Infrastructure 回归测试 |
+| 下一步动作 | 用户实机确认仓库列表 / 详情 / 扫描 / Hook 操作期间无控制台窗口闪现；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务 |
+| 涉及文件 | Infrastructure `GitAccess` / `GitVersionProbe` / `GitProcessStartInfoFactory` / `GitGuard.Infrastructure.csproj`、Infrastructure 测试、测试方案 / RoadMap / v1.1 发行说明 / README / AGENT-GUIDE |
+| 验证结果 | Release 构建 0 警告 0 错误；`dotnet format` 通过；全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），其中 Infrastructure 210（204 通过 + 6 平台跳过） |
 | 阻塞/待确认 | 无 |
 | 最后更新 | 2026-10-26 |
 
@@ -148,7 +148,7 @@
 
 | 完成 | ID | 优先级 | 状态 | 任务 | 来源与验收 |
 | --- | --- | --- | --- | --- | --- |
-> 暂无待办任务。v1.1（`GGD-0054` / `GGD-0055`）已完成并通过全量测试；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
+> 暂无待办任务。v1.1（`GGD-0054` / `GGD-0055`）与 `GGD-0056` 已完成并通过全量测试；原始需求 3「GitGuard.Cli 写入系统 PATH」未纳入本版本，待用户确认后登记。
 
 ### 8.2 暂停/阻塞任务恢复详情
 
@@ -216,6 +216,7 @@
 
 | [x] | `GGD-0054` | 提取 Application 层共享 Hook 管理服务与 CLI 可执行文件解析器，CLI `install` / `uninstall` 复用 | 2026-10-26 | `HookManagementService` / `HookExecutableResolver` / `HookSelection` 落地；CLI 参数、输出契约与退出码不变；Release 构建 0 警告 0 错误；Application 302/302、CLI 131/131 通过 |
 | [x] | `GGD-0055` | Desktop 仓库详情页 Hook 一键安装 / 卸载与 CLI 路径选择 | 2026-10-26 | 右侧操作区提供安装 / 重新安装 / 卸载及两类二次确认；CLI 自动解析 → 文件选择 → `hookExecutablePath` 持久化；Desktop 138/138；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败） |
+| [x] | `GGD-0056` | 修复 GitGuard Desktop 操作期间 git 子进程闪现控制台窗口 | 2026-10-26 | `GitAccess` / `GitVersionProbe` 统一经 `GitProcessStartInfoFactory` 以 `UseShellExecute=false` + `CreateNoWindow=true` 启动 git；新增 3 例回归测试；Release 构建 0 警告 0 错误、`dotnet format` 通过，全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），Infrastructure 210（204 通过 + 6 平台跳过） |
 
 ## 10. 取消任务
 
@@ -281,3 +282,4 @@
 - 2026-10-25 · `GGD-0052` · v1.0 文档稳定化：以脚本复核 `BuiltinRules.yaml` 60 条（Secret 21 / Privacy 14 / LocalPath 12 / Url 13；Critical 11 / High 24 / Medium 12 / Low 13）与 PRD / SRS / 测试方案 / 误报治理指南 / README 声明一致；校验 60 个规则 ID 在模块设计 Secret / Privacy / LocalPathUrl 与 19 指南附录 A 全覆盖（0 缺失）；重写 Markdown 相对链接检查器（正确处理 `<...>`、平衡括号与表格转义），全库 79 条相对链接 0 失效；修复 `docs/README.md`（v0.1 规划基线 → v1.0 开发中、P1 / P2 / P3 状态、模块导航补 LocalPathUrl、RoadMap 四阶段、ADR-0004 链接）、`CONTEXT.md`（当前阶段 / Gitleaks 已集成 / LocalPathUrl 入口 / 团队管理员阶段标注）、`Hook.md`（ADR-0004 去「待新增」）、`17-开发RoadMap.md`（「文档稳定」退出条件勾选、GGD-0052 完成）；`git diff --check` 通过；纯文档改动未运行构建 / 测试（风险匹配）。说明：`docs/06` 中 `"version": "0.1.0"` 为当前程序集版本示例，留待 `GGD-0053` 升版同步 · 下一步：`GGD-0053` v1.0 发布基线
 - 2026-10-25 · `GGD-0053` · v1.0 发布基线：`Directory.Build.props` 版本冻结 `1.0.0`；新增 `docs/20-v1.0发行说明.md`（版本概览、60 条规则、自 v0.3 变更、安装升级、验证记录、已知限制、正式发布条件）；`README.md` / `docs/README.md` / `docs/06-API接口设计.md` / `docs/14-部署文档.md` / `docs/17-开发RoadMap.md` / `CONTEXT.md` 同步 1.0.0、发行说明入口与发布基线状态 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 退出码 0；`dotnet test GitGuard.sln -c Release --no-build` 1750 用例（1741 通过 + 9 平台跳过 + 0 失败）；Windows Native AOT `gitguard version` → `gitguard 1.0.0`、JSON `schema=gitguard.version.v1` / `gitguard_version=1.0.0`；发行 zip 含 `gitguard.exe` / `e_sqlite3.dll` / `SHA256SUMS`（exe SHA-256 `c5758335f960e3eeba0052281546f1fd6fe6b3c1cfa8683e71c8ebde18b77c4d`，zip SHA-256 `ddef10e32d51555dc141bb9736932da51109663670d1fab0dfd0417c7f446028`）；MSIX 解包 → `smoke-test.ps1` 通过（`Desktop smoke passed: 1 audit run(s), latest findings=1.`） · 关键决策：① 仅冻结版本号并产出本地发行基线，不创建 `v1.0.0` Tag / GitHub Release——RoadMap §2.4 要求正式发布前完成 3 个月稳定运行观察（至 2027-01-24）；② macOS / Linux 本机不可验证且无 `gh`，与 `GGD-0047` 先例一致记录为待首次 Release runner 原生冒烟，不伪造通过；③ 发行说明明确「发布候选」状态并列出未签名 / 未公证等已知限制；④ 文档示例版本号与程序集版本保持一致 · 环境陷阱：Windows Native AOT 链接需 `vswhere.exe` 在 PATH（追加 VS Installer 目录）；清理发布目录时 `Get-ChildItem -Include` 在无通配路径 / 非递归场景被忽略，改用扩展名 `Where-Object` 过滤；新增 `.md` 必须 UTF-8 BOM + CRLF · 文档同步 9 份：`docs/20-v1.0发行说明.md` / README / docs/README / 06-API接口设计 / 14-部署文档 / 17-开发RoadMap / CONTEXT / AGENT-GUIDE / Directory.Build.props · 下一步：用户验收 v1.0 正式发布条件（3 个月稳定运行、macOS / Linux Release runner 冒烟）或指派新任务
 - 2026-10-26 · `GGD-0054` / `GGD-0055` · 完成 v1.1 桌面端 Hook 快捷管理：Application 新增 `HookManagementService` / `HookExecutableResolver` / `HookSelection`，CLI `install` / `uninstall` 复用共享服务且参数、输出契约与退出码不变；Desktop `IRepositoryOperations` / `RepositoryOperations` 接入 CLI 解析与 Hook 安装 / 卸载，`RepositoriesView` 增加安装 / 重新安装 / 卸载按钮、强制接管与卸载确认条，`ICliPathPicker` + Avalonia StorageProvider 支持手动选择，`DesktopSettings.HookExecutablePath` 持久化，`DesktopText` 补齐中英文案与 `HookException` / `ConfigurationException` 映射；测试新增 Application `HookExecutableResolverTests` / `HookSelectionTests` / 配置覆盖用例与 Desktop 7 例，并补全既有假对象接口 · 验证：Release 构建 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；全量 1771 用例（1762 通过 + 9 平台跳过 + 0 失败），Application 302、CLI 131、Desktop 138 · 关键决策：① Desktop 不内置 CLI，只持久化外部 CLI 路径；② 路径解析顺序为配置 → PATH → 已知安装位置，失败才允许手动选择；③ 二进制 / 符号链接要求强制接管二次确认，卸载始终覆盖三类 GitGuard 托管 Hook；④ 变更不写回项目 `.gitguard.yml` · 文档同步 12 份：`docs/21-v1.1发行说明.md` / README / docs/README / CONTEXT / 06-API / 11-前端UI设计 / 12-前端组件设计 / 14-部署文档 / 16-测试方案 / 17-开发RoadMap / Directory.Build.props / AGENT-GUIDE · 环境陷阱：静态只读模式数组须按 `_camelCase` 命名以满足 IDE1006；新增文本文件须 UTF-8 BOM + CRLF 才能通过 `dotnet format` · 下一步：用户按 `TC-FR-100-15` 实机验收 v1.1；原始需求 3（CLI 写入系统 PATH）待用户确认后登记新任务
+- 2026-10-26 · `GGD-0056` · 修复 GitGuard Desktop 操作期间 git 子进程闪现控制台窗口：用户反馈 Windows 桌面端在仓库列表 / 详情 / 扫描 / Hook 操作时反复出现一闪而过的控制台窗口；定位为 Desktop 以 WinExe 启动（无控制台），而 Infrastructure `GitAccess` 与 `GitVersionProbe` 的 `ProcessStartInfo` 仅设置 `UseShellExecute=false`、未设置 `CreateNoWindow`，每次 git 调用都会由系统新建控制台窗口；新增 `GitProcessStartInfoFactory` 统一设置 `CreateNoWindow=true` 并供两处复用，Infrastructure 项目增加 `InternalsVisibleTo` 供回归测试直接断言启动配置；Gitleaks 子进程已有 `CreateNoWindow`，ShellEditorLauncher 为显式打开编辑器的交互进程保持原样 · 测试新增 `GitProcessStartInfoFactoryTests` 3 例（隐藏窗口配置 + 空 / 空白可执行文件守卫），`TC-FR-100-16` 登记自动化与实机核验口径 · 验证：`dotnet build GitGuard.sln -c Release` 0 警告 0 错误；`dotnet format GitGuard.sln --verify-no-changes --no-restore` 通过；`dotnet test GitGuard.sln -c Release --no-build` 全量 1774 用例（1765 通过 + 9 平台跳过 + 0 失败），Infrastructure 210 用例（204 通过 + 6 平台跳过） · 文档同步：16-测试方案 0.2.28 / 17-开发RoadMap 0.1.34 / 21-v1.1发行说明 §2.4 与验证记录 / README 测试基线 / AGENT-GUIDE · 下一步：用户实机确认无窗口闪现；原始需求 3（CLI 写入系统 PATH）待用户确认后登记

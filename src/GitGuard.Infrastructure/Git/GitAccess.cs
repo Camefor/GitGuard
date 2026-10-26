@@ -476,16 +476,14 @@ public sealed class GitAccess : IGitAccess
         string? standardInput,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo(_gitExecutable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardInput = standardInput is not null,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-            UseShellExecute = false,
-        };
+        // 桌面端 WinExe 没有控制台；统一经工厂创建，避免每条 git 命令闪现控制台窗口
+        var startInfo = GitProcessStartInfoFactory.Create(_gitExecutable);
+        startInfo.WorkingDirectory = workingDirectory;
+        startInfo.RedirectStandardInput = standardInput is not null;
+        startInfo.RedirectStandardOutput = true;
+        startInfo.RedirectStandardError = true;
+        startInfo.StandardOutputEncoding = Encoding.UTF8;
+        startInfo.StandardErrorEncoding = Encoding.UTF8;
         foreach (string argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
