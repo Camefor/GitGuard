@@ -147,6 +147,17 @@ public sealed class RepositoryOperations : IRepositoryOperations
     public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.Run(() => _session.CreateAllowlistRemove().Execute(id), cancellationToken);
 
+    /// <inheritdoc />
+    public Task<BaselineAddResult> AddBaselineAsync(
+        string repoPath,
+        string fingerprintHex,
+        string ruleId,
+        string filePath,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () => new BaselineAddUseCase(repoPath).Execute(fingerprintHex, ruleId, filePath),
+            cancellationToken);
+
     /// <summary>读取仓库详情：Git / Hook 状态与最近扫描摘要。</summary>
     private static RepositoryDetail LoadDetail(GitGuardSession scope, string repoPath)
     {
