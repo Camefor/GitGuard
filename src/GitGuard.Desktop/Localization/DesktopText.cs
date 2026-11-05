@@ -620,6 +620,106 @@ internal static class DesktopText
             _ => string.Empty,
         };
 
+    /// <summary>加入白名单按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryAddToAllowlist(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Add to allowlist" : "加入白名单";
+
+    /// <summary>加入基线按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryAddToBaseline(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Add to baseline" : "加入基线";
+
+    /// <summary>白名单登记表单提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryAllowlistFormHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Allow this finding by rule + path + fingerprint (local machine, audited)."
+            : "将按「规则 + 路径 + 指纹」精确放行该发现项（本机生效，保留审计）。";
+
+    /// <summary>白名单登记原因标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryAllowlistReasonLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Reason (at least 5 characters)" : "原因（至少 5 字符）";
+
+    /// <summary>白名单登记原因水印。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化水印。</returns>
+    internal static string ScanHistoryAllowlistReasonWatermark(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Why this match is a false positive (audited)"
+            : "说明为何是误报（写入审计）";
+
+    /// <summary>高危严重度登记警告。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化警告。</returns>
+    internal static string ScanHistoryAllowlistSeverityWarning(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "This is a High/Critical finding. Allowlisting does not remove already-committed content from git history. If this is a real credential, rotate it and scrub it with git filter-repo / BFG first."
+            : "该发现项为高危 / 严重级别。加入白名单不会从 git 历史删除已提交内容；若这是真实凭据，请先轮换并用 git filter-repo / BFG 清除。";
+
+    /// <summary>基线登记表单提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryBaselineFormHint(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "Mark this fingerprint as known historical noise. It only affects scan --all baseline allowance, not commit/push blocking. The fingerprint is machine-local."
+            : "将该指纹登记为历史存量噪声，仅影响全量扫描（scan --all）的默认基线放行，不影响 commit / push 拦截；指纹仅本机有效。";
+
+    /// <summary>确认加入白名单按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryConfirmAllowlist(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Confirm allowlist" : "确认加入白名单";
+
+    /// <summary>确认加入基线按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryConfirmBaseline(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Confirm baseline" : "确认加入基线";
+
+    /// <summary>取消登记按钮。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化按钮文案。</returns>
+    internal static string ScanHistoryCancelAction(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Cancel" : "取消";
+
+    /// <summary>白名单原因过短提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryAllowlistReasonTooShort(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "The reason must be at least 5 characters." : "原因至少需要 5 个字符。";
+
+    /// <summary>白名单原因过长提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryAllowlistReasonTooLong(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "The reason must not exceed 256 characters." : "原因不能超过 256 个字符。";
+
+    /// <summary>白名单登记成功提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryAllowlistAdded(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Added to allowlist." : "已加入白名单。";
+
+    /// <summary>基线登记成功提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryBaselineAdded(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Added to baseline." : "已加入基线。";
+
+    /// <summary>基线指纹已存在提示。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string ScanHistoryBaselineAlreadyPresent(DesktopLanguage language) =>
+        language == DesktopLanguage.English
+            ? "This fingerprint is already in the baseline."
+            : "该指纹已在基线中，无需重复登记。";
+
     /// <summary>最近扫描摘要（时间按用户区域设置显示，审计内部仍为 UTC epoch）。</summary>
     /// <param name="summary">扫描运行摘要。</param>
     /// <param name="language">界面语言。</param>
@@ -912,6 +1012,24 @@ internal static class DesktopText
             (AllowlistException.ALLOWLIST_NOT_FOUND, _) =>
                 "白名单条目已不存在。",
             _ => fallbackMessage,
+        };
+
+    /// <summary>基线登记错误提示（按稳定错误码映射）。</summary>
+    /// <param name="errorCode">错误码。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化提示。</returns>
+    internal static string BaselineError(string errorCode, DesktopLanguage language) =>
+        (errorCode, language) switch
+        {
+            (BaselineException.BASELINE_INVALID, DesktopLanguage.English) =>
+                "The baseline file is invalid and could not be updated.",
+            (BaselineException.BASELINE_WRITE_FAILED, DesktopLanguage.English) =>
+                "Could not write the baseline file.",
+            (BaselineException.BASELINE_INVALID, _) =>
+                "基线文件内容无效，无法登记该发现项。",
+            (BaselineException.BASELINE_WRITE_FAILED, _) =>
+                "基线文件写入失败，未登记该发现项。",
+            _ => "基线登记失败。",
         };
 
     /// <summary>仓库操作错误提示（按稳定错误码映射；未知错误回退原始消息）。</summary>

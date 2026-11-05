@@ -1,4 +1,5 @@
 ﻿using GitGuard.Application.Hooks;
+using GitGuard.Application.Scanning;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
 
@@ -135,4 +136,18 @@ public interface IRepositoryOperations
     /// <param name="id">条目身份标识。</param>
     /// <param name="cancellationToken">取消标记。</param>
     Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>把单个发现项指纹登记进该仓库的基线文件（历史存量噪声；仅影响全量扫描默认基线消费）。</summary>
+    /// <param name="repoPath">仓库工作区根目录绝对路径。</param>
+    /// <param name="fingerprintHex">64 位十六进制指纹。</param>
+    /// <param name="ruleId">规则 ID（写入条目元数据）。</param>
+    /// <param name="filePath">仓库相对路径（写入条目元数据）。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>登记结果（<see cref="BaselineAddResult.AddedEntries"/> 为 0 表示指纹已在基线中）。</returns>
+    Task<BaselineAddResult> AddBaselineAsync(
+        string repoPath,
+        string fingerprintHex,
+        string ruleId,
+        string filePath,
+        CancellationToken cancellationToken = default);
 }

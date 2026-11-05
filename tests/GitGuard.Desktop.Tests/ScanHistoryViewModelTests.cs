@@ -1,5 +1,7 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Scanning;
+using GitGuard.Core;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
 using GitGuard.Desktop.Localization;
@@ -291,6 +293,163 @@ public sealed class ScanHistoryViewModelTests
         viewModel.Findings[0].SeverityText.Should().Be("High");
     }
 
+    [Fact]
+    public async Task OpenAllowlistFormCommand_ShowsFormWithReasonRequired()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.OpenAllowlistFormCommand.Execute(null);
+
+        viewModel.IsAllowlistFormVisible.Should().BeTrue();
+        viewModel.IsBaselineFormVisible.Should().BeFalse();
+
+        await viewModel.ConfirmAllowlistCommand.ExecuteAsync(null);
+
+        viewModel.ActionMessage.Should().Be("原因至少需要 5 个字符。");
+        fake.Adds.Should().BeEmpty();
+        viewModel.IsAllowlistFormVisible.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ConfirmAllowlistCommand_AddsEntryClosesFormAndShowsMessage()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+            AddHandler = (ruleId, pathPattern, fingerprintHex, reason) =>
+            {
+                ruleId.Should().Be("GGD/SECRET/AWS_KEY");
+                pathPattern.Should().Be("src/appsettings.json");
+                fingerprintHex.Should().Be(FINGERPRINT_HEX);
+                reason.Should().Be("误报：测试夹具示例密钥");
+                return Task.FromResult(AllowlistEntry.Create(
+                    ruleId,
+                    pathPattern,
+                    Fingerprint.FromHex(fingerprintHex!),
+                    reason,
+                    new DateTimeOffset(2026, 10, 20, 9, 0, 0, TimeSpan.Zero),
+                    "tester"));
+            },
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.OpenAllowlistFormCommand.Execute(null);
+        viewModel.AllowlistReason = "误报：测试夹具示例密钥";
+
+        await viewModel.ConfirmAllowlistCommand.ExecuteAsync(null);
+
+        fake.Adds.Should().ContainSingle();
+        viewModel.IsAllowlistFormVisible.Should().BeFalse();
+        viewModel.Message.Should().Be("已加入白名单。");
+    }
+
+    [Fact]
+    public async Task OpenAllowlistFormCommand_HighSeverityFinding_ShowsWarning()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.NeedsAllowlistSeverityWarning.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ConfirmAllowlistCommand_BackendValidationFailure_KeepsFormAndShowsMessage()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+            AddHandler = (_, _, _, _) => Task.FromException<AllowlistEntry>(
+                new AllowlistException(AllowlistException.ALLOWLIST_VALIDATION_FAILED, "原始消息")),
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.OpenAllowlistFormCommand.Execute(null);
+        viewModel.AllowlistReason = "误报：测试夹具示例密钥";
+
+        await viewModel.ConfirmAllowlistCommand.ExecuteAsync(null);
+
+        viewModel.IsAllowlistFormVisible.Should().BeTrue();
+        viewModel.ActionMessage.Should().Be("白名单参数不合法，请检查规则 ID、路径 glob、指纹与原因。");
+    }
+
+    [Fact]
+    public async Task ConfirmBaselineCommand_AddsBaselineEntryAndShowsMessage()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+            BaselineAddHandler = (repoPath, fingerprintHex, ruleId, filePath) =>
+            {
+                repoPath.Should().Be(repositoryPath);
+                fingerprintHex.Should().Be(FINGERPRINT_HEX);
+                ruleId.Should().Be("GGD/SECRET/AWS_KEY");
+                filePath.Should().Be("src/appsettings.json");
+                return Task.FromResult(new BaselineAddResult(
+                    Path.Combine(repositoryPath, ".gitguard-baseline.json"), 1));
+            },
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.OpenBaselineFormCommand.Execute(null);
+
+        viewModel.IsBaselineFormVisible.Should().BeTrue();
+        viewModel.IsAllowlistFormVisible.Should().BeFalse();
+
+        await viewModel.ConfirmBaselineCommand.ExecuteAsync(null);
+
+        fake.BaselineAdds.Should().ContainSingle();
+        viewModel.IsBaselineFormVisible.Should().BeFalse();
+        viewModel.Message.Should().Be("已加入基线。");
+    }
+
+    [Fact]
+    public async Task ConfirmBaselineCommand_AlreadyPresent_ShowsAlreadyPresentMessage()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+            BaselineAddHandler = (_, _, _, _) => Task.FromResult(
+                new BaselineAddResult(Path.Combine(repositoryPath, ".gitguard-baseline.json"), 0)),
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.OpenBaselineFormCommand.Execute(null);
+        await viewModel.ConfirmBaselineCommand.ExecuteAsync(null);
+
+        viewModel.Message.Should().Be("该指纹已在基线中，无需重复登记。");
+    }
+
     private static ScanHistoryViewModel CreateViewModel(
         FakeRepositoryOperations operations,
         out FakeEditorLauncher editor)
@@ -349,6 +508,18 @@ public sealed class ScanHistoryViewModelTests
         internal List<Guid> LoadedIds { get; } = new List<Guid>();
 
         internal int LoadCalls => LoadedIds.Count;
+
+        internal Func<string?, string?, string?, string, Task<AllowlistEntry>> AddHandler { get; set; } =
+            (_, _, _, _) => Task.FromException<AllowlistEntry>(new NotSupportedException("测试未配置 AddHandler。"));
+
+        internal Func<string, string, string, string, Task<BaselineAddResult>> BaselineAddHandler { get; set; } =
+            (_, _, _, _) => Task.FromException<BaselineAddResult>(new NotSupportedException("测试未配置 BaselineAddHandler。"));
+
+        internal List<(string? RuleId, string? PathPattern, string? FingerprintHex, string Reason)> Adds { get; } =
+            new List<(string? RuleId, string? PathPattern, string? FingerprintHex, string Reason)>();
+
+        internal List<(string RepoPath, string FingerprintHex, string RuleId, string FilePath)> BaselineAdds { get; } =
+            new List<(string RepoPath, string FingerprintHex, string RuleId, string FilePath)>();
 
         public Task<IReadOnlyList<RegisteredRepository>> ListAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("扫描历史测试不读取仓库列表。");
@@ -409,11 +580,25 @@ public sealed class ScanHistoryViewModelTests
             string? pathPattern,
             string? fingerprintHex,
             string reason,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException("扫描历史测试不新增白名单。");
+            CancellationToken cancellationToken = default)
+        {
+            Adds.Add((ruleId, pathPattern, fingerprintHex, reason));
+            return AddHandler(ruleId, pathPattern, fingerprintHex, reason);
+        }
 
         public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("扫描历史测试不删除白名单。");
+
+        public Task<BaselineAddResult> AddBaselineAsync(
+            string repoPath,
+            string fingerprintHex,
+            string ruleId,
+            string filePath,
+            CancellationToken cancellationToken = default)
+        {
+            BaselineAdds.Add((repoPath, fingerprintHex, ruleId, filePath));
+            return BaselineAddHandler(repoPath, fingerprintHex, ruleId, filePath);
+        }
     }
 
     /// <summary>记录调用的编辑器启动器假对象。</summary>

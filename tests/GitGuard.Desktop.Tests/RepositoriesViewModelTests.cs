@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Scanning;
 using GitGuard.Core;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
@@ -900,6 +901,14 @@ public sealed class RepositoriesViewModelTests
             RemoveAllowlistCalls++;
             return RemoveAllowlistHandler(id);
         }
+
+        public Task<BaselineAddResult> AddBaselineAsync(
+            string repoPath,
+            string fingerprintHex,
+            string ruleId,
+            string filePath,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("仓库列表测试不登记基线。");
     }
 
     /// <summary>可编程桌面设置假对象：记录保存次数与最终快照。</summary>

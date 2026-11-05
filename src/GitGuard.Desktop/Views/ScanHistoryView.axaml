@@ -369,6 +369,87 @@
                         Classes="primary"
                         HorizontalAlignment="Left" />
 
+                <!-- GGD-0062：从发现项一键登记白名单 / 基线 -->
+                <StackPanel Spacing="8">
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="8">
+                    <Button Content="{Binding AddToAllowlistText}"
+                            Command="{Binding OpenAllowlistFormCommand}"
+                            IsEnabled="{Binding CanOpenAllowlist}"
+                            CornerRadius="8" />
+                    <Button Content="{Binding AddToBaselineText}"
+                            Command="{Binding OpenBaselineFormCommand}"
+                            IsEnabled="{Binding CanOpenBaseline}"
+                            CornerRadius="8" />
+                  </WrapPanel>
+
+                  <!-- 白名单登记表单 -->
+                  <Border IsVisible="{Binding IsAllowlistFormVisible}"
+                          Background="{DynamicResource GitGuardContentBrush}"
+                          BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          Padding="12">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding AllowlistFormHint}" Classes="hint" />
+                      <Border IsVisible="{Binding NeedsAllowlistSeverityWarning}"
+                              Classes="warningPanel"
+                              Padding="10">
+                        <TextBlock Text="{Binding AllowlistSeverityWarning}"
+                                   Classes="warning"
+                                   FontSize="11"
+                                   TextWrapping="Wrap" />
+                      </Border>
+                      <TextBlock Text="{Binding AllowlistReasonLabel}" Classes="fieldLabel" />
+                      <TextBox Text="{Binding AllowlistReason}"
+                               Watermark="{Binding AllowlistReasonWatermark}"
+                               CornerRadius="8"
+                               AcceptsReturn="True"
+                               TextWrapping="Wrap"
+                               MinHeight="64" />
+                      <TextBlock Text="{Binding ActionMessage}"
+                                 IsVisible="{Binding HasActionMessage}"
+                                 Classes="error"
+                                 FontSize="12"
+                                 TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="{Binding ConfirmAllowlistText}"
+                                Command="{Binding ConfirmAllowlistCommand}"
+                                IsEnabled="{Binding CanSubmitAction}"
+                                Classes="primary" />
+                        <Button Content="{Binding CancelActionText}"
+                                Command="{Binding CancelActionFormCommand}"
+                                CornerRadius="8" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 基线登记表单 -->
+                  <Border IsVisible="{Binding IsBaselineFormVisible}"
+                          Background="{DynamicResource GitGuardContentBrush}"
+                          BorderBrush="{DynamicResource GitGuardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          Padding="12">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding BaselineFormHint}" Classes="hint" />
+                      <TextBlock Text="{Binding ActionMessage}"
+                                 IsVisible="{Binding HasActionMessage}"
+                                 Classes="error"
+                                 FontSize="12"
+                                 TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="{Binding ConfirmBaselineText}"
+                                Command="{Binding ConfirmBaselineCommand}"
+                                IsEnabled="{Binding CanSubmitAction}"
+                                Classes="primary" />
+                        <Button Content="{Binding CancelActionText}"
+                                Command="{Binding CancelActionFormCommand}"
+                                CornerRadius="8" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+
               </StackPanel>
             </ScrollViewer>
 

@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Scanning;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
 using GitGuard.Desktop.Localization;
@@ -183,5 +184,13 @@ public sealed class RepositoryItemViewModelTests
 
         public Task RemoveAllowlistAsync(Guid id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("本测试不删除白名单。");
+
+        public Task<BaselineAddResult> AddBaselineAsync(
+            string repoPath,
+            string fingerprintHex,
+            string ruleId,
+            string filePath,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("本测试不登记基线。");
     }
 }

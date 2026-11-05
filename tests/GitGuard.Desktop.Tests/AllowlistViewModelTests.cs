@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using GitGuard.Application.Hooks;
+using GitGuard.Application.Scanning;
 using GitGuard.Core;
 using GitGuard.Core.Model;
 using GitGuard.Core.Policy;
@@ -479,5 +480,13 @@ public sealed class AllowlistViewModelTests
             RemovedIds.Add(id);
             return RemoveHandler(id);
         }
+
+        public Task<BaselineAddResult> AddBaselineAsync(
+            string repoPath,
+            string fingerprintHex,
+            string ruleId,
+            string filePath,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("白名单测试不登记基线。");
     }
 }
