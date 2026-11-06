@@ -42,6 +42,8 @@ public sealed class ScanHistoryViewModel : ObservableObject
     private bool _showAllowlistForm;
     private bool _showBaselineForm;
     private bool _isActionBusy;
+    private bool _allowlistByFingerprint = true;
+    private bool _allowlistByRuleAndPath;
 
     /// <summary>初始化扫描历史 ViewModel。</summary>
     /// <param name="operations">仓库操作服务。</param>
@@ -332,6 +334,34 @@ public sealed class ScanHistoryViewModel : ObservableObject
         SelectedFinding is { } finding &&
         finding.Finding.Severity is Severity.High or Severity.Critical;
 
+    /// <summary>白名单登记粒度是否为「仅这条值」（指纹精确）。</summary>
+    public bool AllowlistByFingerprint
+    {
+        get => _allowlistByFingerprint;
+        set
+        {
+            if (value)
+            {
+                SetProperty(ref _allowlistByFingerprint, true);
+                SetProperty(ref _allowlistByRuleAndPath, false);
+            }
+        }
+    }
+
+    /// <summary>白名单登记粒度是否为「规则 + 路径」（整文件放行该规则）。</summary>
+    public bool AllowlistByRuleAndPath
+    {
+        get => _allowlistByRuleAndPath;
+        set
+        {
+            if (value)
+            {
+                SetProperty(ref _allowlistByRuleAndPath, true);
+                SetProperty(ref _allowlistByFingerprint, false);
+            }
+        }
+    }
+
     /// <summary>上一页是否可用。</summary>
     public bool CanGoPrevious => CurrentPage > 1 && !IsLoadingPage && !IsLoadingRun;
 
@@ -415,6 +445,18 @@ public sealed class ScanHistoryViewModel : ObservableObject
 
     /// <summary>取消登记按钮文案。</summary>
     public string CancelActionText => DesktopText.ScanHistoryCancelAction(_language);
+
+    /// <summary>放行范围标签。</summary>
+    public string AllowlistGranularityLabel => DesktopText.ScanHistoryAllowlistGranularityLabel(_language);
+
+    /// <summary>仅这条值选项文案。</summary>
+    public string AllowlistFingerprintOptionText => DesktopText.ScanHistoryAllowlistFingerprintOption(_language);
+
+    /// <summary>规则 + 路径选项文案。</summary>
+    public string AllowlistRulePathOptionText => DesktopText.ScanHistoryAllowlistRulePathOption(_language);
+
+    /// <summary>策略动作字段标签。</summary>
+    public string ActionLabel => DesktopText.ScanHistoryActionLabel(_language);
 
     /// <summary>规则字段标签。</summary>
     public string RuleLabel => DesktopText.ScanHistoryRuleLabel(_language);
@@ -574,6 +616,8 @@ public sealed class ScanHistoryViewModel : ObservableObject
 
         IsAllowlistFormVisible = true;
         IsBaselineFormVisible = false;
+        SetProperty(ref _allowlistByFingerprint, true);
+        SetProperty(ref _allowlistByRuleAndPath, false);
         ActionMessage = null;
         Message = null;
     }
@@ -624,8 +668,9 @@ public sealed class ScanHistoryViewModel : ObservableObject
         ActionMessage = null;
         try
         {
+            string? fingerprintHex = AllowlistByRuleAndPath ? null : finding.FingerprintText;
             await _operations
-                .AddAllowlistAsync(finding.RuleId, finding.FilePath, finding.FingerprintText, reason)
+                .AddAllowlistAsync(finding.RuleId, finding.FilePath, fingerprintHex, reason)
                 .ConfigureAwait(true);
             if (!_isActive || !ReferenceEquals(SelectedFinding, finding))
             {
@@ -886,6 +931,10 @@ public sealed class ScanHistoryViewModel : ObservableObject
         OnPropertyChanged(nameof(ConfirmAllowlistText));
         OnPropertyChanged(nameof(ConfirmBaselineText));
         OnPropertyChanged(nameof(CancelActionText));
+        OnPropertyChanged(nameof(AllowlistGranularityLabel));
+        OnPropertyChanged(nameof(AllowlistFingerprintOptionText));
+        OnPropertyChanged(nameof(AllowlistRulePathOptionText));
+        OnPropertyChanged(nameof(ActionLabel));
         OnPropertyChanged(nameof(RuleLabel));
         OnPropertyChanged(nameof(SeverityLabel));
         OnPropertyChanged(nameof(LocationLabel));

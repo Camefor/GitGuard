@@ -415,6 +415,21 @@ internal static class DesktopText
         _ => severity.ToString(),
     };
 
+    /// <summary>策略动作的本地化文案（GGD-0063）。</summary>
+    /// <param name="action">策略动作（<c>findings.action</c>）；可为 <see langword="null"/>。</param>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化动作文案；未知动作回退原值。</returns>
+    internal static string FindingActionText(string? action, DesktopLanguage language) =>
+        action switch
+        {
+            "AllowedByAllowlist" => language == DesktopLanguage.English ? "Allowed (allowlist)" : "已放行 · 白名单",
+            "AllowedByBaseline" => language == DesktopLanguage.English ? "Ignored (baseline)" : "已忽略 · 基线",
+            "Block" => language == DesktopLanguage.English ? "Blocked" : "阻断",
+            "Warn" => language == DesktopLanguage.English ? "Warned" : "警告",
+            "Allow" => language == DesktopLanguage.English ? "Allowed" : "放行",
+            _ => action ?? string.Empty,
+        };
+
     /// <summary>仓库详情页的扫描历史入口。</summary>
     /// <param name="language">界面语言。</param>
     /// <returns>本地化按钮文案。</returns>
@@ -561,6 +576,12 @@ internal static class DesktopText
     /// <returns>本地化标签。</returns>
     internal static string ScanHistorySeverityLabel(DesktopLanguage language) =>
         language == DesktopLanguage.English ? "Severity" : "严重度";
+
+    /// <summary>策略动作字段标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryActionLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Action" : "动作";
 
     /// <summary>位置字段标签。</summary>
     /// <param name="language">界面语言。</param>
@@ -719,6 +740,24 @@ internal static class DesktopText
         language == DesktopLanguage.English
             ? "This fingerprint is already in the baseline."
             : "该指纹已在基线中，无需重复登记。";
+
+    /// <summary>白名单放行范围标签。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化标签。</returns>
+    internal static string ScanHistoryAllowlistGranularityLabel(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Scope" : "放行范围";
+
+    /// <summary>白名单「仅这条值」选项。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化选项文案。</returns>
+    internal static string ScanHistoryAllowlistFingerprintOption(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "Only this exact value" : "仅这条值（指纹精确）";
+
+    /// <summary>白名单「规则 + 路径」选项。</summary>
+    /// <param name="language">界面语言。</param>
+    /// <returns>本地化选项文案。</returns>
+    internal static string ScanHistoryAllowlistRulePathOption(DesktopLanguage language) =>
+        language == DesktopLanguage.English ? "This file · this rule" : "本文件 · 本规则全部放行";
 
     /// <summary>最近扫描摘要（时间按用户区域设置显示，审计内部仍为 UTC epoch）。</summary>
     /// <param name="summary">扫描运行摘要。</param>

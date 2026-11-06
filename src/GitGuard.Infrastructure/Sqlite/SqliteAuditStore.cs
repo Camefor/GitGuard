@@ -667,7 +667,7 @@ public sealed partial class SqliteAuditStore : IAuditStore, IAllowlistStore, IRe
     {
         using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT id, rule_id, file_path, line_number, severity, fingerprint, snippet_masked, commit_sha " +
+            "SELECT id, rule_id, file_path, line_number, severity, fingerprint, snippet_masked, commit_sha, action " +
             "FROM findings WHERE run_id = $run_id ORDER BY rowid;";
         command.Parameters.AddWithValue("$run_id", runId.ToString());
 
@@ -683,8 +683,9 @@ public sealed partial class SqliteAuditStore : IAuditStore, IAllowlistStore, IRe
             var fingerprint = Fingerprint.FromHex(reader.GetString(5));
             var snippetMasked = SnippetMasked.Create(reader.GetString(6));
             string? commitSha = reader.IsDBNull(7) ? null : reader.GetString(7);
+            string? action = reader.IsDBNull(8) ? null : reader.GetString(8);
 
-            findings.Add(Finding.Restore(id, ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha));
+            findings.Add(Finding.Restore(id, ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha, action));
         }
 
         return findings;

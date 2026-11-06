@@ -5,8 +5,9 @@ using GitGuard.Desktop.Localization;
 namespace GitGuard.Desktop.ViewModels;
 
 /// <summary>
-/// 发现项列表 / 详情展示模型（GGD-0043）：只读取 <see cref="Finding.SnippetMasked"/> 与
-/// <see cref="Finding.Fingerprint"/>，不持有、不读取任何明文敏感内容（DR-02）。
+/// 发现项列表 / 详情展示模型（GGD-0043，GGD-0063 起含策略动作）：只读取
+/// <see cref="Finding.SnippetMasked"/>、<see cref="Finding.Fingerprint"/> 与 <see cref="Finding.Action"/>，
+/// 不持有、不读取任何明文敏感内容（DR-02）。
 /// </summary>
 public sealed class FindingItemViewModel : ObservableObject
 {
@@ -61,11 +62,21 @@ public sealed class FindingItemViewModel : ObservableObject
     /// <summary>是否存在提交上下文。</summary>
     public bool HasCommit => Finding.CommitSha is not null;
 
+    /// <summary>策略动作（<c>findings.action</c>）；扫描期不置位，持久化读回时填充。</summary>
+    public string? Action => Finding.Action;
+
+    /// <summary>策略动作的本地化文案（放行 / 警告 / 阻断 / 白名单忽略 / 基线忽略）。</summary>
+    public string ActionText => DesktopText.FindingActionText(Finding.Action, _language);
+
+    /// <summary>是否存在策略动作。</summary>
+    public bool HasAction => !string.IsNullOrWhiteSpace(Finding.Action);
+
     /// <summary>按新界面语言刷新派生文案。</summary>
     /// <param name="language">目标界面语言。</param>
     public void Relocalize(DesktopLanguage language)
     {
         _language = language;
         OnPropertyChanged(nameof(SeverityText));
+        OnPropertyChanged(nameof(ActionText));
     }
 }

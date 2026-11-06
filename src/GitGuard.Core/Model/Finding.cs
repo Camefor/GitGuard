@@ -17,7 +17,8 @@ public sealed class Finding : IEquatable<Finding>
         Severity severity,
         Fingerprint fingerprint,
         SnippetMasked snippetMasked,
-        string? commitSha)
+        string? commitSha,
+        string? action)
     {
         Id = id;
         RuleId = ruleId;
@@ -27,6 +28,7 @@ public sealed class Finding : IEquatable<Finding>
         Fingerprint = fingerprint;
         SnippetMasked = snippetMasked;
         CommitSha = commitSha;
+        Action = action;
     }
 
     /// <summary>发现项身份标识（UUIDv7，与 <c>findings.id</c> 对应）。</summary>
@@ -54,6 +56,12 @@ public sealed class Finding : IEquatable<Finding>
     public string? CommitSha { get; }
 
     /// <summary>
+    /// 策略动作（<c>findings.action</c>）：<c>AllowedByAllowlist</c> / <c>AllowedByBaseline</c> /
+    /// <c>Allow</c> / <c>Warn</c> / <c>Block</c>。扫描期不置位（<see langword="null"/>），仅持久化读回时填充，供报告与审计展示。
+    /// </summary>
+    public string? Action { get; }
+
+    /// <summary>
     /// 创建发现项；身份标识在构造时生成（UUIDv7）。
     /// </summary>
     /// <param name="ruleId">命中的规则 ID。</param>
@@ -63,6 +71,7 @@ public sealed class Finding : IEquatable<Finding>
     /// <param name="fingerprint">由 <c>Fingerprinter</c> 产出的指纹。</param>
     /// <param name="snippetMasked">由 <c>Masker</c> 产出的脱敏片段。</param>
     /// <param name="commitSha">可选：所属提交 SHA（40 或 64 位十六进制）。</param>
+    /// <param name="action">可选：策略动作（扫描期通常不置位，持久化读回时填充）。</param>
     /// <returns>通过全部不变式校验的发现项。</returns>
     /// <exception cref="ArgumentNullException"><paramref name="ruleId"/> 或 <paramref name="filePath"/> 为 <see langword="null"/>。</exception>
     /// <exception cref="InvariantViolationException">任一领域不变式被违反时抛出。</exception>
@@ -73,8 +82,9 @@ public sealed class Finding : IEquatable<Finding>
         Severity severity,
         Fingerprint fingerprint,
         SnippetMasked snippetMasked,
-        string? commitSha = null) =>
-        Restore(Guid.CreateVersion7(), ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha);
+        string? commitSha = null,
+        string? action = null) =>
+        Restore(Guid.CreateVersion7(), ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha, action);
 
     /// <summary>
     /// 以既有身份标识重建发现项；供持久化层（<c>IAuditStore</c>）读回时还原原始 <see cref="Id"/>，
@@ -88,6 +98,7 @@ public sealed class Finding : IEquatable<Finding>
     /// <param name="fingerprint">由 <c>Fingerprinter</c> 产出的指纹。</param>
     /// <param name="snippetMasked">由 <c>Masker</c> 产出的脱敏片段。</param>
     /// <param name="commitSha">可选：所属提交 SHA（40 或 64 位十六进制）。</param>
+    /// <param name="action">可选：策略动作（扫描期通常不置位，持久化读回时填充）。</param>
     /// <returns>通过全部不变式校验的发现项。</returns>
     /// <exception cref="ArgumentNullException"><paramref name="ruleId"/> 或 <paramref name="filePath"/> 为 <see langword="null"/>。</exception>
     /// <exception cref="InvariantViolationException">任一领域不变式被违反时抛出。</exception>
@@ -99,7 +110,8 @@ public sealed class Finding : IEquatable<Finding>
         Severity severity,
         Fingerprint fingerprint,
         SnippetMasked snippetMasked,
-        string? commitSha = null)
+        string? commitSha = null,
+        string? action = null)
     {
         ArgumentNullException.ThrowIfNull(ruleId);
         ArgumentNullException.ThrowIfNull(filePath);
@@ -121,7 +133,7 @@ public sealed class Finding : IEquatable<Finding>
             DomainGuard.Require(validSha, "DDD §4.1", $"CommitSha 必须为 40 或 64 位十六进制：{commitSha}");
         }
 
-        return new Finding(id, ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha);
+        return new Finding(id, ruleId, filePath, lineNumber, severity, fingerprint, snippetMasked, commitSha, action);
     }
 
     /// <summary>按身份标识（<see cref="Id"/>）判断实体相等性。</summary>
