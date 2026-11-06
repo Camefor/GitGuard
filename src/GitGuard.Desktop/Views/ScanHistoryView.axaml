@@ -257,6 +257,10 @@
                                Classes="findingMeta"
                                FontFamily="Consolas"
                                FontSize="10" />
+                    <TextBlock Text="{Binding ActionText}"
+                               IsVisible="{Binding HasAction}"
+                               Classes="findingMeta"
+                               FontSize="10" />
                   </StackPanel>
                 </DataTemplate>
               </ListBox.ItemTemplate>
@@ -323,6 +327,12 @@
                                TextWrapping="Wrap" />
                   </StackPanel>
                 </Grid>
+
+                <StackPanel Spacing="2" IsVisible="{Binding SelectedFinding.HasAction}">
+                  <TextBlock Text="{Binding ActionLabel}" Classes="fieldLabel" />
+                  <TextBlock Text="{Binding SelectedFinding.ActionText}"
+                             Classes="fieldValue" />
+                </StackPanel>
 
                 <StackPanel Spacing="2">
                   <TextBlock Text="{Binding LocationLabel}" Classes="fieldLabel" />
@@ -399,6 +409,17 @@
                                    FontSize="11"
                                    TextWrapping="Wrap" />
                       </Border>
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding AllowlistGranularityLabel}" Classes="fieldLabel" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                          <RadioButton Content="{Binding AllowlistFingerprintOptionText}"
+                                       IsChecked="{Binding AllowlistByFingerprint}"
+                                       GroupName="AllowlistGranularity" />
+                          <RadioButton Content="{Binding AllowlistRulePathOptionText}"
+                                       IsChecked="{Binding AllowlistByRuleAndPath}"
+                                       GroupName="AllowlistGranularity" />
+                        </StackPanel>
+                      </StackPanel>
                       <TextBlock Text="{Binding AllowlistReasonLabel}" Classes="fieldLabel" />
                       <TextBox Text="{Binding AllowlistReason}"
                                Watermark="{Binding AllowlistReasonWatermark}"

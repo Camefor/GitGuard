@@ -450,6 +450,77 @@ public sealed class ScanHistoryViewModelTests
         viewModel.Message.Should().Be("该指纹已在基线中，无需重复登记。");
     }
 
+    [Fact]
+    public async Task FindingItem_ActionText_ShowsLocalizedAllowlistIgnored()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id, "AllowedByAllowlist")),
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        FindingItemViewModel finding = viewModel.Findings.Should().ContainSingle().Subject;
+        finding.Action.Should().Be("AllowedByAllowlist");
+        finding.HasAction.Should().BeTrue();
+        finding.ActionText.Should().Be("已放行 · 白名单");
+    }
+
+    [Fact]
+    public async Task ConfirmAllowlistCommand_WithRuleAndPathGranularity_AddsEntryWithoutFingerprint()
+    {
+        string repositoryPath = CreateRepositoryPath();
+        AuditRunSummary summary = CreateSummaries(repositoryPath, 1)[0];
+        var fake = new FakeRepositoryOperations
+        {
+            QueryHandler = (_, _, _) => Task.FromResult(new AuditRunPage(new[] { summary }, 1)),
+            LoadHandler = id => Task.FromResult<ScanRun?>(CreateRun(repositoryPath, id)),
+            AddHandler = (_, _, _, _) => Task.FromResult(AllowlistEntry.Create(
+                "GGD/SECRET/AWS_KEY",
+                "src/appsettings.json",
+                null,
+                "误报：测试",
+                new DateTimeOffset(2026, 10, 20, 9, 0, 0, TimeSpan.Zero),
+                "tester")),
+        };
+        var viewModel = CreateViewModel(fake, out _);
+        await viewModel.OpenAsync("甲仓库", repositoryPath, TestContext.Current.CancellationToken);
+
+        viewModel.OpenAllowlistFormCommand.Execute(null);
+        viewModel.AllowlistReason = "误报：测试夹具示例密钥";
+        viewModel.AllowlistByRuleAndPath = true;
+
+        await viewModel.ConfirmAllowlistCommand.ExecuteAsync(null);
+
+        fake.Adds.Should().ContainSingle();
+        fake.Adds[0].RuleId.Should().Be("GGD/SECRET/AWS_KEY");
+        fake.Adds[0].PathPattern.Should().Be("src/appsettings.json");
+        fake.Adds[0].FingerprintHex.Should().BeNull();
+    }
+
+    [Fact]
+    public void AllowlistGranularity_DefaultsToFingerprint_AndSwitchingIsExclusive()
+    {
+        var viewModel = new ScanHistoryViewModel(
+            new FakeRepositoryOperations(), new FakeEditorLauncher(), () => { }, DesktopLanguage.Chinese);
+
+        viewModel.AllowlistByFingerprint.Should().BeTrue();
+        viewModel.AllowlistByRuleAndPath.Should().BeFalse();
+
+        viewModel.AllowlistByRuleAndPath = true;
+
+        viewModel.AllowlistByRuleAndPath.Should().BeTrue();
+        viewModel.AllowlistByFingerprint.Should().BeFalse();
+
+        viewModel.AllowlistByFingerprint = true;
+
+        viewModel.AllowlistByFingerprint.Should().BeTrue();
+        viewModel.AllowlistByRuleAndPath.Should().BeFalse();
+    }
+
     private static ScanHistoryViewModel CreateViewModel(
         FakeRepositoryOperations operations,
         out FakeEditorLauncher editor)
@@ -474,7 +545,7 @@ public sealed class ScanHistoryViewModelTests
                 1))
             .ToArray();
 
-    private static ScanRun CreateRun(string repositoryPath, Guid runId) =>
+    private static ScanRun CreateRun(string repositoryPath, Guid runId, string? findingAction = null) =>
         ScanRun.Restore(
             runId,
             repositoryPath,
@@ -483,16 +554,17 @@ public sealed class ScanHistoryViewModelTests
             45,
             ScanResult.Blocked,
             1,
-            new[] { CreateFinding() });
+            new[] { CreateFinding(findingAction) });
 
-    private static Finding CreateFinding() =>
+    private static Finding CreateFinding(string? action = null) =>
         Finding.Create(
             "GGD/SECRET/AWS_KEY",
             "src/appsettings.json",
             42,
             Severity.High,
             Fingerprint.FromHex(FINGERPRINT_HEX),
-            SnippetMasked.Create(MASKED_SNIPPET));
+            SnippetMasked.Create(MASKED_SNIPPET),
+            action: action);
 
     /// <summary>可编程仓库操作假对象；仅扫描历史方法参与本组测试。</summary>
     private sealed class FakeRepositoryOperations : IRepositoryOperations
